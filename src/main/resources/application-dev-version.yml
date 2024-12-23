@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/feedzmore
+    username: postgres
+    password: postgres
+    hikari:
+      connection-timeout: 20000
+      minimum-idle: 10
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      max-lifetime: 90000
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    generate-ddl: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+
+logging:
+  config: classpath:logback.xml
