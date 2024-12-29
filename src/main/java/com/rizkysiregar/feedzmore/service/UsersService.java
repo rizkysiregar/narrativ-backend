@@ -1,10 +1,10 @@
 package com.rizkysiregar.feedzmore.service;
 
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
-import com.rizkysiregar.feedzmore.model.dto.UserLoginDto;
+import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserRegisterDto;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
-import com.rizkysiregar.feedzmore.model.entity.UsersEntity;
+import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,24 +28,24 @@ public class UsersService {
 
     private BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
 
-    public UserRegisterDto register(UsersEntity usersEntity) {
-        if (usersEntity.getUsername() == null || usersEntity.getPassword() == null) {
+    public UserRegisterDto register(UserEntity userEntity) {
+        if (userEntity.getUsername() == null || userEntity.getPassword() == null) {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
-        usersEntity.setPassword(encoder.encode(usersEntity.getPassword()));
-        userRepository.save(usersEntity);
+        userEntity.setPassword(encoder.encode(userEntity.getPassword()));
+        userRepository.save(userEntity);
         return UserRegisterDto.builder()
-                .username(usersEntity.getUsername())
+                .username(userEntity.getUsername())
                 .build();
     }
 
-    public UserLoginDto verify(UserLoginRequest userLoginRequest) {
+    public UserLoginDTO verify(UserLoginRequest userLoginRequest) {
         Authentication authentication =
                 authManager.authenticate(new UsernamePasswordAuthenticationToken(userLoginRequest.getUsername(), userLoginRequest.getPassword()));
 
         if (authentication.isAuthenticated()) {
-            return UserLoginDto.builder()
+            return UserLoginDTO.builder()
                     .token(jwtService.generateToken(userLoginRequest.getUsername()))
                     .build();
         }

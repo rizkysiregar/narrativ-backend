@@ -6,6 +6,6 @@ import lombok.Data;
 
 @Data
 @Builder
-public class UserLoginDto {
+public class UserLoginDTO {
     String token;
 }

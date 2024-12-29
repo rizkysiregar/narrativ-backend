@@ -1,8 +1,8 @@
-package com.rizkysiregar.feedzmore.service;
+package com.rizkysiregar.feedzmore.service.impl;
 
 
 import com.rizkysiregar.feedzmore.model.UserPrincipal;
-import com.rizkysiregar.feedzmore.model.entity.UsersEntity;
+import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -20,7 +20,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        UsersEntity user = userRepository.findByUsername(username);
+        UserEntity user = userRepository.findByUsername(username);
 
         if (user == null) {
             throw new UsernameNotFoundException("User not found");

@@ -1,8 +1,8 @@
 package com.rizkysiregar.feedzmore.controller;
 
-import com.rizkysiregar.feedzmore.model.dto.UserLoginDto;
+import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserRegisterDto;
-import com.rizkysiregar.feedzmore.model.entity.UsersEntity;
+import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
 import com.rizkysiregar.feedzmore.service.UsersService;
 import lombok.extern.slf4j.Slf4j;
@@ -19,13 +19,13 @@ public class UsersController {
     UsersService usersService;
 
     @PostMapping("/register")
-    public UserRegisterDto register(@RequestBody UsersEntity usersEntity) {
+    public UserRegisterDto register(@RequestBody UserEntity userEntity) {
         log.info("::. Entering /register users");
-        return usersService.register(usersEntity);
+        return usersService.register(userEntity);
     }
 
     @PostMapping("/login")
-    public UserLoginDto login(@RequestBody UserLoginRequest userLoginRequest) {
+    public UserLoginDTO login(@RequestBody UserLoginRequest userLoginRequest) {
        log.info("::. Entering /login users");
        log.info(":: " + userLoginRequest.toString());
         return usersService.verify(userLoginRequest);

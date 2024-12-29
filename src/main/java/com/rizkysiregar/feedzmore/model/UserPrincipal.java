@@ -1,6 +1,6 @@
 package com.rizkysiregar.feedzmore.model;
 
-import com.rizkysiregar.feedzmore.model.entity.UsersEntity;
+import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -10,9 +10,9 @@ import java.util.Collections;
 
 public class UserPrincipal implements UserDetails {
 
-    private UsersEntity usersEntity;
-    public UserPrincipal(UsersEntity usersEntity) {
-        this.usersEntity = usersEntity;
+    private UserEntity userEntity;
+    public UserPrincipal(UserEntity userEntity) {
+        this.userEntity = userEntity;
     }
 
     @Override
@@ -22,12 +22,12 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public String getPassword() {
-        return this.usersEntity.getPassword();
+        return this.userEntity.getPassword();
     }
 
     @Override
     public String getUsername() {
-        return this.usersEntity.getUsername();
+        return this.userEntity.getUsername();
     }
 
     @Override

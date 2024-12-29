@@ -2,7 +2,7 @@ package com.rizkysiregar.feedzmore.config;
 
 
 import com.rizkysiregar.feedzmore.service.JWTService;
-import com.rizkysiregar.feedzmore.service.UserDetailsServiceImpl;
+import com.rizkysiregar.feedzmore.service.impl.UserDetailsServiceImpl;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
