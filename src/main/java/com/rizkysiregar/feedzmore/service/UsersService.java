@@ -47,6 +47,7 @@ public class UsersService {
         if (authentication.isAuthenticated()) {
             return UserLoginDTO.builder()
                     .token(jwtService.generateToken(userLoginRequest.getUsername()))
+                    .username(userLoginRequest.getUsername())
                     .build();
         }
 

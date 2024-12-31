@@ -8,4 +8,5 @@ import lombok.Data;
 @Builder
 public class UserLoginDTO {
     String token;
+    String username;
 }
