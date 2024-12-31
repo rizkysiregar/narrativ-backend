@@ -1,17 +1,26 @@
 package com.rizkysiregar.feedzmore.service.impl;
 
 
+import com.rizkysiregar.feedzmore.constant.GlobalMessage;
+import com.rizkysiregar.feedzmore.exception.BusinessException;
+import com.rizkysiregar.feedzmore.model.dto.AddPostDTO;
 import com.rizkysiregar.feedzmore.model.dto.PostDTO;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
+import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.PostRepository;
 import com.rizkysiregar.feedzmore.service.PostService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.File;
 import java.util.List;
 
 
@@ -19,6 +28,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class PostServiceImpl implements PostService {
+    @Value("${image.upload.dir}")
+    private String uploadDir;
+
     private final PostRepository postRepository;
 
     @Override
@@ -44,5 +56,39 @@ public class PostServiceImpl implements PostService {
                 postPage.getTotalElements(),
                 postPage.getTotalPages(),
                 postPage.isLast());
+    }
+
+    @Override
+    public AddPostDTO addNewPost(AddPostRequest addPostRequest, MultipartFile image) {
+        log.info("::. Entering PostServiceImpl.addNewPost by : " + addPostRequest.getUsername());
+        log.info(":: image upload dir : " + uploadDir);
+        if (image.isEmpty()) {
+            log.error("Image is empty");
+            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        }
+
+        if (image.getSize() > 5 * 100 * 1024) { // Limit to max 5 mb
+            log.error("Image too large");
+            throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            // ensure the directory exist
+            File dir = new File(uploadDir);
+            if (!dir.exists()) dir.mkdir();
+
+            // create a unique file name
+            String uniqueFileImageName = System.currentTimeMillis() + "_" + image.getOriginalFilename();
+            String imagePath = uploadDir + "/" + uniqueFileImageName;
+
+            // save file to the disk, either mac for local or server path for dev/prod
+            image.transferTo(new File(imagePath));
+        } catch (Exception e) {
+            throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        return AddPostDTO.builder()
+                .status("File uploaded successfully")
+                .build();
     }
 }

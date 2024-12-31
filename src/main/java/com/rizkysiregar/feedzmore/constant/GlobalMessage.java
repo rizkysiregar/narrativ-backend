@@ -8,6 +8,7 @@ public enum GlobalMessage {
     SUCCESS("200", "Success"),
     INTERNAL_ERROR("500", "Internal Server Error"),
     BAD_REQUEST("400", "Bad Request"),
+    BAD_REQUEST_FILE_TO_LARGE("400", "Bad Request, file too large"),
     UNAUTHORIZED("401", "UNAUTHORIZED"),;
 
 
