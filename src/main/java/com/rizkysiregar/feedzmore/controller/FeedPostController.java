@@ -23,8 +23,8 @@ public class FeedPostController {
     }
 
     @PostMapping(value = "/upload", consumes = "multipart/form-data")
-    public AddPostDTO upload(@RequestPart("post") AddPostRequest addPostRequest,
-                             @RequestParam("image") MultipartFile image) {
+    public AddPostDTO upload(@RequestPart(value = "json") AddPostRequest addPostRequest,
+                             @RequestPart(value = "file") MultipartFile image) {
         return postService.addNewPost(addPostRequest, image);
     }
 

@@ -17,5 +17,9 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
 
+image:
+  upload:
+    dir: /Users/macbook/Feedzmore/media/images
+
 logging:
   config: classpath:logback.xml

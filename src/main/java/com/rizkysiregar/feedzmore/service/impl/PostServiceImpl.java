@@ -78,11 +78,12 @@ public class PostServiceImpl implements PostService {
             if (!dir.exists()) dir.mkdir();
 
             // create a unique file name
-            String uniqueFileImageName = System.currentTimeMillis() + "_" + image.getOriginalFilename();
+            String uniqueFileImageName = System.currentTimeMillis() + "_" + addPostRequest.getUsername() + "_" + image.getOriginalFilename();
             String imagePath = uploadDir + "/" + uniqueFileImageName;
 
             // save file to the disk, either mac for local or server path for dev/prod
             image.transferTo(new File(imagePath));
+            log.info(":: image > " + imagePath + " successfully uploaded.");
         } catch (Exception e) {
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
