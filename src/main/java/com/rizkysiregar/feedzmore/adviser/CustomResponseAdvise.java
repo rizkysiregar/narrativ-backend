@@ -6,7 +6,6 @@ import com.rizkysiregar.feedzmore.model.response.BaseResponse;
 import com.rizkysiregar.feedzmore.util.BeanMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.MethodParameter;
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConverter;
@@ -29,12 +28,15 @@ public class CustomResponseAdvise extends BaseController implements ResponseBody
         return true;
     }
 
+
+    /*
     @Override
     public Object beforeBodyWrite(Object object, MethodParameter returnType, MediaType selectedContentType, Class<? extends HttpMessageConverter<?>> selectedConverterType, ServerHttpRequest request, ServerHttpResponse response) {
         if (returnType.getContainingClass().isAnnotationPresent(RestController.class)) {
             if (!Objects.requireNonNull(returnType.getMethod()).isAnnotationPresent(IgnoreResponseBinding.class)) {
 
                 if (object instanceof List || object instanceof Map) {
+                    log.info("Response is instance of List or Map");
                     return buildSuccessResponse(object);
                 } else if (object instanceof ResponseEntity<?>) {
                     log.info("Response is instance of response entity");
@@ -58,4 +60,49 @@ public class CustomResponseAdvise extends BaseController implements ResponseBody
         }
         return object;
     }
+
+     */
+
+
+    @Override
+    public Object beforeBodyWrite(
+            Object object,
+            MethodParameter returnType,
+            MediaType selectedContentType,
+            Class<? extends HttpMessageConverter<?>> selectedConverterType,
+            ServerHttpRequest request,
+            ServerHttpResponse response) {
+
+        if (returnType.getContainingClass().isAnnotationPresent(RestController.class)) {
+            if (!Objects.requireNonNull(returnType.getMethod()).isAnnotationPresent(IgnoreResponseBinding.class)) {
+
+                if (object instanceof List || object instanceof Map) {
+                    log.info("Response is instance of List or Map");
+                    return buildSuccessResponse(object);
+                } else if (object instanceof ResponseEntity<?>) {
+                    log.info("Response is instance of ResponseEntity");
+                    return object; // Don't wrap ResponseEntity
+                } else if (object instanceof org.springframework.core.io.Resource) {
+                    log.info("Response is instance of Resource");
+                    return object; // Don't wrap Resource, needed for image host api
+                } else if (object instanceof byte[]) {
+                    log.info("Response is instance of byte[]");
+                    return object;
+                } else if (object instanceof String) {
+                    log.info("Response is instance of String");
+                    return object;
+                } else {
+                    // Wrap all other responses in BaseResponse
+                    BaseResponse<?> baseResponse = BeanMapper.map(object, BaseResponse.class);
+                    if (Objects.isNull(baseResponse.getCode())) {
+                        return buildSuccessResponse(object);
+                    }
+                    return object;
+                }
+            }
+        }
+        return object;
+    }
+
+
 }
