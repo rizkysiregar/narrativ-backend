@@ -6,9 +6,12 @@ import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.dto.AddPostDTO;
 import com.rizkysiregar.feedzmore.model.dto.PostDTO;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
+import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
-import com.rizkysiregar.feedzmore.repository.PostRepository;
+import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
+import com.rizkysiregar.feedzmore.repository.PostPaginationRepository;
+import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.PostService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +24,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 
 @Service
@@ -31,13 +37,15 @@ public class PostServiceImpl implements PostService {
     @Value("${image.upload.dir}")
     private String uploadDir;
 
-    private final PostRepository postRepository;
+    private final PostPaginationRepository postPaginationRepository;
+    private final PostCrudRepository postCrudRepository;
+    private final UserRepository userRepository;
 
     @Override
     public PaginatedResponse<PostDTO> getAllPost(int page, int size) {
         log.info(":: Fetching post pagination with page=  " + page + ", size= " + size);
         Pageable pageable = PageRequest.of(page, size);
-        Page<PostEntity> postPage = postRepository.findAll(pageable);
+        Page<PostEntity> postPage = postPaginationRepository.findAll(pageable);
 
         List<PostDTO> postDto = postPage.getContent().stream().map(post -> {
             PostDTO dto = new PostDTO();
@@ -84,6 +92,19 @@ public class PostServiceImpl implements PostService {
             // save file to the disk, either mac for local or server path for dev/prod
             image.transferTo(new File(imagePath));
             log.info(":: image > " + imagePath + " successfully uploaded.");
+
+            // getting user details data
+            UserEntity userEntity = userRepository.findByUsername(addPostRequest.getUsername());
+
+            // attempt to save to repo
+            PostEntity postEntity = PostEntity.builder()
+                    .caption(addPostRequest.getCaption())
+                    .createdAt(LocalDateTime.now())
+                    .imageUrl(uniqueFileImageName)
+                    .user(userEntity)
+                    .build();
+
+            postCrudRepository.save(postEntity);
         } catch (Exception e) {
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
