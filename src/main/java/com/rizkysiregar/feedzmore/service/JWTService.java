@@ -35,8 +35,6 @@ public class JWTService {
                 .claims()
                 .add(claims)
                 .subject(username)
-                .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + 60 * 60 * 200)) // 200 minute
                 .and()
                 .signWith(getKey())
                 .compact();
@@ -68,7 +66,8 @@ public class JWTService {
 
     public boolean validateToken(String token, UserDetails userDetails) {
         final String userName = extractUsername(token);
-        return (userName.equals(userDetails.getUsername()) && !isTokenExpired(token));
+        //return (userName.equals(userDetails.getUsername()) && !isTokenExpired(token));
+        return (userName.equals(userDetails.getUsername())); // exclude the token expiration validation
     }
 
     private boolean isTokenExpired(String token) {
