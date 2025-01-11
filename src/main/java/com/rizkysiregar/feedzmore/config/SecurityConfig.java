@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.config;
 
+import com.rizkysiregar.feedzmore.util.Constants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -38,7 +39,7 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(request -> request
-                        .requestMatchers("register", "login", "/res/photo").permitAll()
+                        .requestMatchers(Constants.JWT_WHITELIST.toArray(String[]::new)).permitAll()
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
                 .sessionManagement(session ->
