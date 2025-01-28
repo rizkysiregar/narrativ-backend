@@ -6,6 +6,7 @@ import lombok.Getter;
 public enum GlobalMessage {
 
     SUCCESS("200", "Success"),
+    CREATED("201", "Created"),
     INTERNAL_ERROR("500", "Internal Server Error"),
     BAD_REQUEST("400", "Bad Request"),
     BAD_REQUEST_FILE_TO_LARGE("400", "Bad Request, file too large"),

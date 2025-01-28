@@ -110,7 +110,7 @@ public class PostServiceImpl implements PostService {
         }
 
         return AddPostDTO.builder()
-                .status("File uploaded successfully")
+                .status(GlobalMessage.CREATED.getMessage())
                 .build();
     }
 }
