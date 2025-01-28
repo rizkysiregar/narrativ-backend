@@ -15,19 +15,25 @@ import java.nio.file.Paths;
 public class FileStorageConfig {
     @Value("${image.upload.dir}")
     private String imageDir;
-
+    @Value("${video.dir}")
+    private String videoDir;
     @Getter
-    private Path fileStorageLocation;
+    private Path imageStorageLocation;
+    @Getter
+    private Path videoStorageLocation;
 
     @PostConstruct
     public void init() {
         log.info("::. Attempt to load fileStorageLocation ... ... .. ");
         try {
-            fileStorageLocation = Paths.get(imageDir).toAbsolutePath().normalize();
+            imageStorageLocation = Paths.get(imageDir).toAbsolutePath().normalize();
+            videoStorageLocation = Paths.get(videoDir).toAbsolutePath().normalize();
 
             // create location if doesn't exist
-            Files.createDirectories(fileStorageLocation);
-            log.info("File storage directory initialized: " + fileStorageLocation);
+            Files.createDirectories(imageStorageLocation);
+            Files.createDirectories(videoStorageLocation);
+            log.info("::. Image storage directory initialized to: " + imageStorageLocation);
+            log.info("::. Video storage directory initialized to: " + videoStorageLocation);
         } catch (Exception e) {
             throw new RuntimeException("Could not initialize file storage location", e);
         }
