@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -44,7 +45,7 @@ public class PostServiceImpl implements PostService {
     @Override
     public PaginatedResponse<PostDTO> getAllPost(int page, int size) {
         log.info(":: Fetching post pagination with page=  " + page + ", size= " + size);
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<PostEntity> postPage = postPaginationRepository.findAll(pageable);
 
         List<PostDTO> postDto = postPage.getContent().stream().map(post -> {
