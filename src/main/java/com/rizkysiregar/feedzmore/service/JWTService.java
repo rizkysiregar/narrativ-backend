@@ -4,6 +4,8 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -14,14 +16,17 @@ import java.util.*;
 import java.util.function.Function;
 
 @Service
+@Slf4j
 public class JWTService {
-    private String secretKey = "";
+    @Value("${secret.key}")
+    private String secretKey;
 
     JWTService() {
         try {
             KeyGenerator keyGen = KeyGenerator.getInstance("HmacSHA256");
             SecretKey sk = keyGen.generateKey();
-            secretKey = Base64.getEncoder().encodeToString(sk.getEncoded());
+//            secretKey = Base64.getEncoder().encodeToString(sk.getEncoded()); // for generate
+
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
@@ -42,6 +47,7 @@ public class JWTService {
     }
 
     private SecretKey getKey() {
+        log.info("secretKey.getKey > " + secretKey);
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         return Keys.hmacShaKeyFor(keyBytes);
     }

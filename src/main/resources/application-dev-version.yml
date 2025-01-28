@@ -21,5 +21,11 @@ image:
   upload:
     dir: /Users/macbook/Feedzmore/media/images
 
+video:
+  dir: /Users/macbook/Feedzmore/media/videos
+
+secret:
+  key: 6L9AYq7f9JS9KYRSu7oL416WYSJPLuYaavlhgRnBbAY=
+
 logging:
   config: classpath:logback.xml
