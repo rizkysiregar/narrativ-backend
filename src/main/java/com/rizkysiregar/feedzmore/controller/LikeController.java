@@ -15,12 +15,12 @@ public class LikeController {
     @Autowired
     private LikeUnlikeService likeUnlikeService;
 
-    @PostMapping()
+    @PostMapping
     public LikesDTO likePost(@RequestBody LikeUnlikePostRequest likeUnlikePostRequest) {
         return likeUnlikeService.likePost(likeUnlikePostRequest);
     }
 
-    @DeleteMapping()
+    @DeleteMapping
     public LikesDTO unlikePost(@RequestBody LikeUnlikePostRequest likeUnlikePostRequest) {
         return likeUnlikeService.unlikePost(likeUnlikePostRequest);
     }

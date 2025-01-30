@@ -46,7 +46,7 @@ public class LikeUnlikeServiceImpl implements LikeUnlikeService {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
-        if (!likeRepository.existByUserIdAndPostId(request.getUserId(), request.getPostId())) {
+        if (!likeRepository.existsByUserIdAndPostId(request.getUserId(), request.getPostId())) {
             LikeEntity likeEntity = new LikeEntity();
             likeEntity.setUser(user.get());
             likeEntity.setPost(post.get());
