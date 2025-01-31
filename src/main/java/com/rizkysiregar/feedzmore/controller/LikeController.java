@@ -10,19 +10,19 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/post/likes")
+@RequestMapping("/post")
 public class LikeController {
     @Autowired
     private LikeUnlikeService likeUnlikeService;
 
-    @PostMapping
+    @PostMapping("/like")
     public LikesDTO likePost(@RequestBody LikeUnlikePostRequest likeUnlikePostRequest) {
         return likeUnlikeService.likePost(likeUnlikePostRequest);
     }
 
-    @DeleteMapping
-    public LikesDTO unlikePost(@RequestBody LikeUnlikePostRequest likeUnlikePostRequest) {
-        return likeUnlikeService.unlikePost(likeUnlikePostRequest);
+    @DeleteMapping("/unlike")
+    public LikesDTO unlikePost(@RequestParam UUID postId, @RequestParam UUID userId) {
+        return likeUnlikeService.unlikePost(postId, userId);
     }
 
     @GetMapping("/count")

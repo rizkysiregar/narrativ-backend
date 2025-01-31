@@ -8,6 +8,6 @@ import java.util.UUID;
 
 public interface LikeUnlikeService {
     LikesDTO likePost(LikeUnlikePostRequest request);
-    LikesDTO unlikePost(LikeUnlikePostRequest request);
+    LikesDTO unlikePost(UUID postId, UUID userId);
     PostLikeCountDTO getPostLikeCount(UUID postId);
 }

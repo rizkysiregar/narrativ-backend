@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -59,11 +60,19 @@ public class LikeUnlikeServiceImpl implements LikeUnlikeService {
                 .build();
     }
 
+    @Transactional
     @Override
-    public LikesDTO unlikePost(LikeUnlikePostRequest request) {
-        log.info("## User " + request.getUserId() + " trying to unlike post " + request.getPostId());
+    public LikesDTO unlikePost(UUID postId, UUID userId) {
+        log.info("## User " + userId + " trying to unlike post " + postId);
 
-        likeRepository.deleteByUserIdAndPostId(request.getUserId(), request.getPostId());
+        Optional<LikeEntity> likeEntity = likeRepository.findByUserIdAndPostId(userId, postId);
+
+        if (likeEntity.isEmpty()) {
+            log.error("::. there is not matched like data");
+            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        }
+
+        likeRepository.deleteByUserIdAndPostId(userId, postId);
         return LikesDTO.builder()
                 .status(GlobalMessage.SUCCESS.getMessage())
                 .build();
@@ -72,6 +81,7 @@ public class LikeUnlikeServiceImpl implements LikeUnlikeService {
     @Override
     public PostLikeCountDTO getPostLikeCount(UUID postId) {
         log.info("## Tyring to get like count of post " + postId);
+
         return PostLikeCountDTO.builder()
                 .likesCount(likeRepository.countByPostId(postId))
                 .build();
