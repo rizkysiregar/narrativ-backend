@@ -25,7 +25,7 @@ public class LikeController {
         return likeUnlikeService.unlikePost(postId, userId);
     }
 
-    @GetMapping("/count")
+    @GetMapping("/likes/count")
     public PostLikeCountDTO getPostLikeCount(@RequestParam UUID postId) {
         return likeUnlikeService.getPostLikeCount(postId);
     }

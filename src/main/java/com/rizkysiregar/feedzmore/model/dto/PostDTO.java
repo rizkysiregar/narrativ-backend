@@ -17,5 +17,6 @@ public class PostDTO {
     private String username;
     private String caption;
     private String imageUrl;
+    private String likeCount;
     private LocalDateTime createdAt;
 }

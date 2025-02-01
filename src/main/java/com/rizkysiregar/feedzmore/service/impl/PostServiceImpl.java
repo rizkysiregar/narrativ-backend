@@ -9,6 +9,7 @@ import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
+import com.rizkysiregar.feedzmore.repository.LikeRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
 import com.rizkysiregar.feedzmore.repository.PostPaginationRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
@@ -41,12 +42,14 @@ public class PostServiceImpl implements PostService {
     private final PostPaginationRepository postPaginationRepository;
     private final PostCrudRepository postCrudRepository;
     private final UserRepository userRepository;
+    private final LikeRepository likeRepository;
 
     @Override
     public PaginatedResponse<PostDTO> getAllPost(int page, int size) {
         log.info(":: Fetching post pagination with page=  " + page + ", size= " + size);
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<PostEntity> postPage = postPaginationRepository.findAll(pageable);
+
 
         List<PostDTO> postDto = postPage.getContent().stream().map(post -> {
             PostDTO dto = new PostDTO();
@@ -55,6 +58,7 @@ public class PostServiceImpl implements PostService {
             dto.setCaption(post.getCaption());
             dto.setImageUrl(post.getImageUrl());
             dto.setCreatedAt(post.getCreatedAt());
+            dto.setLikeCount(String.valueOf(likeRepository.countByPostId(post.getId())));
             return dto;
         }).toList();
 
