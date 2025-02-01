@@ -7,11 +7,11 @@ import com.rizkysiregar.feedzmore.model.entity.LikeEntity;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.LikeUnlikePostRequest;
-import com.rizkysiregar.feedzmore.model.response.LikesDTO;
 import com.rizkysiregar.feedzmore.repository.LikeRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.LikeUnlikeService;
+import com.rizkysiregar.feedzmore.util.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -32,7 +32,7 @@ public class LikeUnlikeServiceImpl implements LikeUnlikeService {
     private final PostCrudRepository postCrudRepository;
 
     @Override
-    public LikesDTO likePost(LikeUnlikePostRequest request) {
+    public Operation likePost(LikeUnlikePostRequest request) {
         log.info("## User " + request.getUserId() + " trying to like post " + request.getPostId());
         Optional<UserEntity> user = userRepository.findById(request.getUserId());
         Optional<PostEntity> post = postCrudRepository.findById(request.getPostId());
@@ -55,14 +55,12 @@ public class LikeUnlikeServiceImpl implements LikeUnlikeService {
             likeRepository.save(likeEntity);
         }
 
-        return LikesDTO.builder()
-                .status(GlobalMessage.SUCCESS.getMessage())
-                .build();
+        return Operation.LIKED;
     }
 
     @Transactional
     @Override
-    public LikesDTO unlikePost(UUID postId, UUID userId) {
+    public Operation unlikePost(UUID postId, UUID userId) {
         log.info("## User " + userId + " trying to unlike post " + postId);
 
         Optional<LikeEntity> likeEntity = likeRepository.findByUserIdAndPostId(userId, postId);
@@ -73,9 +71,7 @@ public class LikeUnlikeServiceImpl implements LikeUnlikeService {
         }
 
         likeRepository.deleteByUserIdAndPostId(userId, postId);
-        return LikesDTO.builder()
-                .status(GlobalMessage.SUCCESS.getMessage())
-                .build();
+        return Operation.DISLIKED;
     }
 
     @Override
