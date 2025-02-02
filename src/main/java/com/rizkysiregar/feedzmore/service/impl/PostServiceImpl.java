@@ -9,10 +9,7 @@ import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
-import com.rizkysiregar.feedzmore.repository.LikeRepository;
-import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
-import com.rizkysiregar.feedzmore.repository.PostPaginationRepository;
-import com.rizkysiregar.feedzmore.repository.UserRepository;
+import com.rizkysiregar.feedzmore.repository.*;
 import com.rizkysiregar.feedzmore.service.PostService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +40,7 @@ public class PostServiceImpl implements PostService {
     private final PostCrudRepository postCrudRepository;
     private final UserRepository userRepository;
     private final LikeRepository likeRepository;
+    private final CommentRepository commentRepository;
 
     @Override
     public PaginatedResponse<PostDTO> getAllPost(int page, int size) {
@@ -59,6 +57,7 @@ public class PostServiceImpl implements PostService {
             dto.setImageUrl(post.getImageUrl());
             dto.setCreatedAt(post.getCreatedAt());
             dto.setLikeCount(String.valueOf(likeRepository.countByPostId(post.getId())));
+            dto.setCommentCount(String.valueOf(commentRepository.contByPostId(post.getId())));
             return dto;
         }).toList();
 
