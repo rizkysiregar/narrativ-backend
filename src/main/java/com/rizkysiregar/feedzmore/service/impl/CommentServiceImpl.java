@@ -59,5 +59,10 @@ public class CommentServiceImpl implements CommentService {
         return commentRepository.findByParentIdOrderByCreatedAtAsc(commentId);
     }
 
+    @Override
+    public long getCountByPostId(UUID postId) {
+        return commentRepository.contByPostId(postId);
+    }
+
 
 }

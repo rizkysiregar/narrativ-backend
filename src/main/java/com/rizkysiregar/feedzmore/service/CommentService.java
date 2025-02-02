@@ -10,4 +10,5 @@ public interface CommentService {
     Operation addComment(UUID postId, UUID userId, String content, UUID parentId);
     List<CommentEntity> getCommentForPost(UUID postId, int page, int size);
     List<CommentEntity> getReplies(UUID commentId);
+    long getCountByPostId(UUID postId);
 }
