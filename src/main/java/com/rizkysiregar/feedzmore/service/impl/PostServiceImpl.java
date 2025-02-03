@@ -26,6 +26,7 @@ import java.io.File;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 
 @Service
@@ -42,26 +43,28 @@ public class PostServiceImpl implements PostService {
     private final CommentRepository commentRepository;
 
     @Override
-    public PaginatedResponse<PostDTO> getAllPost(int page, int size) {
-        log.info(":: Fetching post pagination with page=  " + page + ", size= " + size);
+    public PaginatedResponse<PostDTO> getAllPost(int page, int size, UUID userId) {
+        log.info(":: Fetching post pagination with page=  " + page + ", size= " + size + " ,userId=" + userId);
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<PostEntity> postPage = postPaginationRepository.findAll(pageable);
+//        Page<PostEntity> postPage = postPaginationRepository.findAll(pageable);
+        Page<PostDTO> postPage = postPaginationRepository.findAllWithCounts(pageable, userId);
 
 
-        List<PostDTO> postDto = postPage.getContent().stream().map(post -> {
-            PostDTO dto = new PostDTO();
-            dto.setId(post.getId());
-            dto.setUsername(post.getUser().getUsername());
-            dto.setCaption(post.getCaption());
-            dto.setImageUrl(post.getImageUrl());
-            dto.setCreatedAt(post.getCreatedAt());
-            dto.setLikeCount(String.valueOf(likeRepository.countByPostId(post.getId())));
-            dto.setCommentCount(String.valueOf(commentRepository.contByPostId(post.getId())));
-            return dto;
-        }).toList();
+//        List<PostDTO> postDto = postPage.getContent().stream().map(post -> {
+//            PostDTO dto = new PostDTO();
+//            dto.setId(post.getId());
+//            dto.setUsername(post.getUser().getUsername());
+//            dto.setCaption(post.getCaption());
+//            dto.setImageUrl(post.getImageUrl());
+//            dto.setCreatedAt(post.getCreatedAt());
+//            dto.setLikeCount(String.valueOf(likeRepository.countByPostId(post.getId())));
+//            dto.setCommentCount(String.valueOf(commentRepository.contByPostId(post.getId())));
+//            return dto;
+//        }).toList();
+
 
         return new PaginatedResponse<>(
-                postDto,
+                postPage.getContent(),
                 postPage.getNumber(),
                 postPage.getSize(),
                 postPage.getTotalElements(),

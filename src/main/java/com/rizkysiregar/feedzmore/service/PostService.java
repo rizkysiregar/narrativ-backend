@@ -7,8 +7,10 @@ import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.UUID;
+
 
 public interface PostService {
-    PaginatedResponse<PostDTO> getAllPost(int page, int size);
+    PaginatedResponse<PostDTO> getAllPost(int page, int size, UUID userId);
     AddPostDTO addNewPost(AddPostRequest addPostRequest, MultipartFile image);
 }

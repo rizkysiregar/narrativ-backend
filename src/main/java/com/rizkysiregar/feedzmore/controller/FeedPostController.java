@@ -10,6 +10,8 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/posts")
 public class FeedPostController {
@@ -19,8 +21,9 @@ public class FeedPostController {
     @GetMapping
     public PaginatedResponse<PostDTO> getAllPosts(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return postService.getAllPost(page, size);
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam UUID userId) {
+        return postService.getAllPost(page, size, userId);
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
