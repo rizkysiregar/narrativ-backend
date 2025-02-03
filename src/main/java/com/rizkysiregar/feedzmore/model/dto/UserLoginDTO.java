@@ -9,4 +9,5 @@ import lombok.Data;
 public class UserLoginDTO {
     String token;
     String username;
+    String userId;
 }

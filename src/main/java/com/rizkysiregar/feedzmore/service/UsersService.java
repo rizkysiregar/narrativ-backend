@@ -16,6 +16,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+import java.util.OptionalInt;
+
 @Service
 public class UsersService {
 
@@ -45,9 +48,16 @@ public class UsersService {
                 authManager.authenticate(new UsernamePasswordAuthenticationToken(userLoginRequest.getUsername(), userLoginRequest.getPassword()));
 
         if (authentication.isAuthenticated()) {
+            Optional<UserEntity> userEntity = userRepository.findByUsername(userLoginRequest.getUsername());
+
+            if (userEntity.isEmpty()) {
+                throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+            }
+
             return UserLoginDTO.builder()
                     .token(jwtService.generateToken(userLoginRequest.getUsername()))
                     .username(userLoginRequest.getUsername())
+                    .userId(userEntity.get().getId().toString())
                     .build();
         }
 
