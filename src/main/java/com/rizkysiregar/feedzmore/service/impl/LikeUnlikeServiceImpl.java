@@ -33,12 +33,13 @@ public class LikeUnlikeServiceImpl implements LikeUnlikeService {
 
     @Override
     public Operation likePost(LikeUnlikePostRequest request) {
-        log.info("## User " + request.getUserId() + " trying to like post " + request.getPostId());
-        Optional<UserEntity> user = userRepository.findById(request.getUserId());
+        log.info("## User " + request.getUsername() + " trying to like post " + request.getPostId());
+//        Optional<UserEntity> user = userRepository.findById(request.getUserId());
+        Optional<UserEntity> user = userRepository.findByUsername(request.getUsername());
         Optional<PostEntity> post = postCrudRepository.findById(request.getPostId());
 
         if (user.isEmpty()) {
-            log.error("::. user with id " + request.getUserId() + " not found");
+            log.error("::. user with id " + request.getUsername() + " not found");
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
@@ -47,7 +48,7 @@ public class LikeUnlikeServiceImpl implements LikeUnlikeService {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
-        if (!likeRepository.existsByUserIdAndPostId(request.getUserId(), request.getPostId())) {
+        if (!likeRepository.existsByUserIdAndPostId(user.get().getId(), request.getPostId())) {
             LikeEntity likeEntity = new LikeEntity();
             likeEntity.setUser(user.get());
             likeEntity.setPost(post.get());

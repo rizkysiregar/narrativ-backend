@@ -13,5 +13,5 @@ import java.util.UUID;
 @Builder
 public class LikeUnlikePostRequest {
     UUID postId;
-    UUID userId;
+    String username;
 }
