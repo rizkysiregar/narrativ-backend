@@ -24,9 +24,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.List;
-import java.util.UUID;
+import java.util.Optional;
 
 
 @Service
@@ -98,14 +97,18 @@ public class PostServiceImpl implements PostService {
             log.info(":: image > " + imagePath + " successfully uploaded.");
 
             // getting user details data
-            UserEntity userEntity = userRepository.findByUsername(addPostRequest.getUsername());
+            Optional<UserEntity> userEntity = userRepository.findByUsername(addPostRequest.getUsername());
+
+            if (userEntity.isEmpty()) {
+                throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+            }
 
             // attempt to save to repo
             PostEntity postEntity = PostEntity.builder()
                     .caption(addPostRequest.getCaption())
                     .createdAt(LocalDateTime.now())
                     .imageUrl(uniqueFileImageName)
-                    .user(userEntity)
+                    .user(userEntity.get())
                     .build();
 
             postCrudRepository.save(postEntity);
