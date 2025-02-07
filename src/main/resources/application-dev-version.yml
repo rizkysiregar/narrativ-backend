@@ -19,7 +19,9 @@ spring:
 
 image:
   upload:
-    dir: /Users/macbook/Feedzmore/media/images
+    dir:
+      image-profile: /Users/macbook/Feedzmore/media/images/profile
+      image-post: /Users/macbook/Feedzmore/media/images/post
 
 video:
   dir: /Users/macbook/Feedzmore/media/videos

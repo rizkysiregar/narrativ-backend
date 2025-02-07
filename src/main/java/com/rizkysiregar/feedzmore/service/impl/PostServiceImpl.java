@@ -33,7 +33,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class PostServiceImpl implements PostService {
-    @Value("${image.upload.dir}")
+    @Value("${image.upload.dir.image-post}")
     private String uploadDir;
 
     private final PostPaginationRepository postPaginationRepository;

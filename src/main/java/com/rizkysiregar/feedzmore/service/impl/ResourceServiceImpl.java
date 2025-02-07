@@ -33,7 +33,7 @@ public class ResourceServiceImpl implements ResourceService {
     public ResponseEntity<Resource> getResourceImage(String fileName) {
         log.info("::. attempt to get image | " + fileName);
         try {
-            Path filePath = fileStorageConfig.getImageStorageLocation().resolve(fileName).normalize();
+            Path filePath = fileStorageConfig.getPostImageStorageLocation().resolve(fileName).normalize();
             Resource resource = new UrlResource(filePath.toUri());
 
             if (resource.exists() && resource.isReadable()) {

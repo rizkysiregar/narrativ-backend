@@ -13,12 +13,18 @@ import java.nio.file.Paths;
 @Component
 @Slf4j
 public class FileStorageConfig {
-    @Value("${image.upload.dir}")
-    private String imageDir;
+    @Value("${image.upload.dir.image-post}")
+    private String postImageDir;
+    @Value("${image.upload.dir.image-profile}")
+    private String profileImageDir;
     @Value("${video.dir}")
     private String videoDir;
     @Getter
-    private Path imageStorageLocation;
+    private Path postImageStorageLocation;
+
+    @Getter
+    private Path profileImageStorageLocation;
+
     @Getter
     private Path videoStorageLocation;
 
@@ -26,13 +32,16 @@ public class FileStorageConfig {
     public void init() {
         log.info("::. Attempt to load fileStorageLocation ... ... .. ");
         try {
-            imageStorageLocation = Paths.get(imageDir).toAbsolutePath().normalize();
+            postImageStorageLocation = Paths.get(postImageDir).toAbsolutePath().normalize();
+            profileImageStorageLocation = Paths.get(profileImageDir).toAbsolutePath().normalize();
             videoStorageLocation = Paths.get(videoDir).toAbsolutePath().normalize();
 
             // create location if doesn't exist
-            Files.createDirectories(imageStorageLocation);
+            Files.createDirectories(postImageStorageLocation);
+            Files.createDirectories(profileImageStorageLocation);
             Files.createDirectories(videoStorageLocation);
-            log.info("::. Image storage directory initialized to: " + imageStorageLocation);
+            log.info("::. Post Image storage directory initialized to: " + postImageStorageLocation);
+            log.info("::. Profile Image storage directory initialized to: " + profileImageStorageLocation);
             log.info("::. Video storage directory initialized to: " + videoStorageLocation);
         } catch (Exception e) {
             throw new RuntimeException("Could not initialize file storage location", e);
