@@ -1,9 +1,13 @@
 package com.rizkysiregar.feedzmore.service.impl;
 
+import com.rizkysiregar.feedzmore.mapper.CommentMapper;
+import com.rizkysiregar.feedzmore.model.dto.CommentDTO;
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
+import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.repository.CommentRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
+import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.CommentService;
 import com.rizkysiregar.feedzmore.util.Operation;
 import jakarta.persistence.EntityNotFoundException;
@@ -23,6 +27,7 @@ public class CommentServiceImpl implements CommentService {
 
     private final CommentRepository commentRepository;
     private final PostCrudRepository postCrudRepository;
+    private final UserRepository userRepository;
 
     @Override
     public Operation addComment(UUID postId, UUID userId, String content, UUID parentId) {
@@ -36,9 +41,10 @@ public class CommentServiceImpl implements CommentService {
                     .orElseThrow(() -> new EntityNotFoundException("Parent comment not found"));
         }
 
+        UserEntity user = userRepository.findById(userId).orElseThrow(() -> new EntityNotFoundException("User not found"));
         CommentEntity comment = CommentEntity.builder()
                 .post(post)
-                .userId(userId)
+                .user(user)
                 .content(content)
                 .parent(parentComment)
                 .build();
@@ -49,9 +55,12 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
-    public List<CommentEntity> getCommentForPost(UUID postId, int page, int size) {
+    public List<CommentDTO> getCommentForPost(UUID postId, int page, int size) {
+//        commentRepository.findByPostId(postId).orElseThrow(() -> new EntityNotFoundException("Post not found"));
+
         Pageable pageable = PageRequest.of(page, size);
-        return commentRepository.findByPostIdAndParentIsNullOrderByCreatedAtAsc(postId, pageable);
+        List<CommentEntity> listOfComments =  commentRepository.findByPostIdAndParentIsNullOrderByCreatedAtAsc(postId, pageable);
+        return CommentMapper.toDtoList(listOfComments);
     }
 
     @Override

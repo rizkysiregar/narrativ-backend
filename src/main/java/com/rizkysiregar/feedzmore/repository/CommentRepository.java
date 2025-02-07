@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -19,4 +20,6 @@ public interface CommentRepository extends JpaRepository<CommentEntity, UUID> {
     // JPQL Refer to the entity name not the table name
     @Query("SELECT COUNT(c) FROM CommentEntity c WHERE c.post.id = :postId")
     long contByPostId(@Param("postId") UUID postId);
+
+    Optional<CommentEntity> findByPostId(UUID postId);
 }

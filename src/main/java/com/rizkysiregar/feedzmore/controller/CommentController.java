@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.controller;
 
+import com.rizkysiregar.feedzmore.model.dto.CommentDTO;
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
 import com.rizkysiregar.feedzmore.service.CommentService;
 import com.rizkysiregar.feedzmore.util.Operation;
@@ -27,10 +28,10 @@ public class CommentController {
 
 
     @GetMapping("/{postId}")
-    public List<CommentEntity> getComments(
+    public List<CommentDTO> getComments(
             @PathVariable UUID postId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "0") int size
+            @RequestParam(defaultValue = "10") int size
     ) {
         return commentService.getCommentForPost(postId, page, size);
     }

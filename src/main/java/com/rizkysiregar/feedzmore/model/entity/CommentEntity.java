@@ -23,8 +23,9 @@ public class CommentEntity {
     @JoinColumn(name = "post_id", nullable = false)
     private PostEntity post;
 
-    @Column(nullable = false)
-    private UUID userId;
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private UserEntity user;
 
     @ManyToOne
     @JoinColumn(name = "parent_id")
