@@ -15,4 +15,4 @@ spring:
   application:
     name: feedzmore-service
   profiles:
-    active: dev-version
+    active: local-version
