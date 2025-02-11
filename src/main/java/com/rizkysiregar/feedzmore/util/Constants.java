@@ -11,5 +11,9 @@ public class Constants {
             "/swagger-ui/**",
             "/swagger-ui.html"
     );
+
+    public static final List<String> METHOD_LIST = List.of(
+            "GET", "POST", "PUT", "DELETE", "OPTIONS"
+    );
 }
 
