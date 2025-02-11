@@ -23,6 +23,7 @@ image:
       image-profile: /Users/macbook/Feedzmore/media/images/profile
       image-post: /Users/macbook/Feedzmore/media/images/post
 
+
 video:
   dir: /Users/macbook/Feedzmore/media/videos
 
@@ -31,3 +32,5 @@ secret:
 
 logging:
   config: classpath:logback.xml
+  file:
+    path: /Users/macbook/Feedzmore/logs

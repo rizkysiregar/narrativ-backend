@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/feedzmore
+    url: jdbc:postgresql://host.docker.internal:5432/feedzmore
     username: postgres
     password: postgres
     hikari:
@@ -20,14 +20,16 @@ spring:
 image:
   upload:
     dir:
-      image-profile: /Users/macbook/Feedzmore/media/images/profile
-      image-post: /Users/macbook/Feedzmore/media/images/post
+      image-profile: /app/media/images/profile
+      image-post: /app/media/images/post
 
 video:
-  dir: /Users/macbook/Feedzmore/media/videos
+  dir: /app/media/videos
 
 secret:
   key: 6L9AYq7f9JS9KYRSu7oL416WYSJPLuYaavlhgRnBbAY=
 
 logging:
   config: classpath:logback.xml
+  file:
+    path: /app/logs

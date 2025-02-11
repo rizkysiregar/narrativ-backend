@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
 
-  <property name="DEV_HOME" value="./log"/>
+  <property name="LOG_PATH" value="${LOG_PATH:-./logs}}"/>
 
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <layout class="ch.qos.logback.classic.PatternLayout">
@@ -12,7 +12,7 @@
   </appender>
 
   <appender name="FILE-AUDIT" class="ch.qos.logback.core.rolling.RollingFileAppender">
-    <file>${DEV_HOME}/application.log</file>
+    <file>${LOG_PATH}/application.log</file>
     <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
       <Pattern>
         %green(%d{yyyy-MM-dd HH:mm:ss}) %highlight(%-5level| %t) -- %yellow(%logger{35}) - %red([%X{Slf4jMDCFilter.UUID}]) - %msg %n
@@ -21,7 +21,7 @@
 
     <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
       <!-- rollover daily -->
-      <fileNamePattern>${DEV_HOME}/archived/application.%d{yyyy-MM-dd}.%i.log
+      <fileNamePattern>${LOG_PATH}/archived/application.%d{yyyy-MM-dd}.%i.log
       </fileNamePattern>
       <timeBasedFileNamingAndTriggeringPolicy
               class="ch.qos.logback.core.rolling.SizeAndTimeBasedFileNamingAndTriggeringPolicy">

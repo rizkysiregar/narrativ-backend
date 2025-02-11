@@ -5,15 +5,16 @@ services:
     image: 441293/feedzmore-service:latest  # ✅ Replace with your Docker Hub image
     container_name: feedzmore-app
     restart: always
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:5432/feedzmore
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update  # Adjust as needed
     ports:
       - "9091:9091"  # ✅ Expose your app
     networks:
       - backend
+    volumes:
+      # HOST-PATH:CONTAINER-PATH
+      - /opt/feedzmore/media/videos:/app/media/videos
+      - /opt/feedzmore/media/image/post:/app/media/images/post
+      - /opt/feedzmore/media/image/profile:/app/media/images/profile
+      - /opt/feedzmore/logs:/app/logs
 
 networks:
   backend:
