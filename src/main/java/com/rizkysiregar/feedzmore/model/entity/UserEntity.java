@@ -18,6 +18,8 @@ public class UserEntity {
 
     @Column(nullable = false, unique = true, length = 50)
     @NotBlank(message = "Username is required")
+    @NotEmpty(message = "Username cannot be empty")
+    @Size(min = 3, max = 15, message = "The length of the username should be between 3 and 15")
     private String username;
 
     private String password;
@@ -28,12 +30,16 @@ public class UserEntity {
     private String email;
 
     @Column(length = 50)
+    @NotEmpty(message = "First name cannot be empty")
     private String firstName;
 
     @Column(length = 50)
+    @NotEmpty(message = "Last name cannot be empty")
     private String lastName;
 
-    @Column(length = 15)
+    @Column(length = 13)
+    @Pattern(regexp = "^[0-9]+$", message = "Phone number must contain only digits")
+    @Size(min = 10, max = 13, message = "Phone number must be between 10 and 13 digits")
     private String phoneNumber;
 
     @Column(nullable = false, updatable = false)
