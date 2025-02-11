@@ -30,6 +30,9 @@ video:
 secret:
   key: 6L9AYq7f9JS9KYRSu7oL416WYSJPLuYaavlhgRnBbAY=
 
+cors:
+  web-client-url: http://localhost:53375
+
 logging:
   config: classpath:logback.xml
   file:
