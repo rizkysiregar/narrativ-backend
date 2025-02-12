@@ -3,7 +3,6 @@ package com.rizkysiregar.feedzmore.config;
 import com.rizkysiregar.feedzmore.util.Constants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -33,8 +32,8 @@ import java.util.List;
 @Slf4j
 public class SecurityConfig {
 
-    @Value("${cors.web-client-url}")
-    String corsUrlClient;
+//    @Value("${cors.allowed-origins}")
+//    List<String> corsUrlClient;
 
     @Autowired
     private UserDetailsService userDetailsService;
@@ -74,9 +73,8 @@ public class SecurityConfig {
 
     @Bean
     public UrlBasedCorsConfigurationSource corsConfigurationSource() {
-        log.info("## register cors for web client > " + corsUrlClient);
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(corsUrlClient));
+        config.setAllowedOrigins(Constants.CORS_WHITELIST_ORIGIN);
         config.setAllowedMethods(Constants.METHOD_LIST);
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

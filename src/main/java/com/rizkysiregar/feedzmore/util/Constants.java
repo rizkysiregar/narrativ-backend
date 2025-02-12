@@ -15,5 +15,10 @@ public class Constants {
     public static final List<String> METHOD_LIST = List.of(
             "GET", "POST", "PUT", "DELETE", "OPTIONS"
     );
+
+    public static final List<String> CORS_WHITELIST_ORIGIN = List.of(
+            "http://localhost:53375",
+            "http://localhost:8083"
+    );
 }
 
