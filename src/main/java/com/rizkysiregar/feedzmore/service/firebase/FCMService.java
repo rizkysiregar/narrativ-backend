@@ -6,6 +6,7 @@ import com.google.firebase.internal.FirebaseService;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -44,6 +45,48 @@ public class FCMService {
             log.info("## fcm token > " + token);
         });
     }
+
+//    @Scheduled(cron = "0 * * * * *") // Runs every 1 minute
+//    private void testCronJob() {
+//        log.info("## test cronjob");
+//    }
+
+
+    //    0 → At second 0
+    //            0 → At minute 0
+    //            */8 → Every 8 hours (0, 8, 16, 24)
+    //* * * → Every day, every month, any day of the week
+    @Scheduled(cron = "0 0 */8 * * *")
+    public void sendDailyBroadcastMessage() {
+        getCachedToken().subscribe(token -> {
+            webClient.post()
+                    .uri("/projects/{projectId}/messages:send", "feedzmore")
+                    .header("Authorization", "Bearer " + token)
+                    .header("Content-Type", "application/json")
+                    .bodyValue(buildRequestBody("daily-news", "Daily Update!", "Good morning! Here’s your daily update.", true))
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .subscribe(response -> System.out.println("Daily notification sent: " + response));
+        });
+    }
+
+    private String buildRequestBody(String target, String title, String body, boolean isTopic) {
+        return String.format("""
+                    {
+                      "message": {
+                        "%s": "%s",
+                        "notification": {
+                          "title": "%s",
+                          "body": "%s"
+                        },
+                        "data": {
+                          "extraInfo": "some_data"
+                        }
+                      }
+                    }
+                """, isTopic ? "topic" : "token", target, title, body);
+    }
+
 
     @Cacheable(value = "firebaseTokenCache")
     public Mono<String> getCachedToken() {
