@@ -118,6 +118,11 @@
 			<version>1.5.20</version>
 			<scope>compile</scope>
 		</dependency>
+		<dependency>
+			<groupId>com.google.firebase</groupId>
+			<artifactId>firebase-admin</artifactId>
+			<version>9.4.3</version> <!-- Check for latest version -->
+		</dependency>
 
 	</dependencies>
 
