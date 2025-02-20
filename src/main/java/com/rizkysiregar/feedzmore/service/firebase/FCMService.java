@@ -3,8 +3,11 @@ package com.rizkysiregar.feedzmore.service.firebase;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.internal.FirebaseService;
+import com.rizkysiregar.feedzmore.model.entity.FcmBroadcastEntity;
+import com.rizkysiregar.feedzmore.repository.FcmBroadcastMessageRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -17,6 +20,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Optional;
 
 
 @Slf4j
@@ -26,8 +30,11 @@ public class FCMService {
     private static final String SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
     private String cachedAccessToken;
     private Instant tokenExpiration;
-
     private final WebClient webClient;
+
+    @Autowired
+    private FcmBroadcastMessageRepository fcmBroadcastMessageRepository;
+
 
     public FCMService(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder.baseUrl("https://fcm.googleapis.com/v1").build();
@@ -56,18 +63,26 @@ public class FCMService {
     //            0 → At minute 0
     //            */8 → Every 8 hours (0, 8, 16, 24)
     //* * * → Every day, every month, any day of the week
-    @Scheduled(cron = "0 0 */8 * * *")
+//    @Scheduled(cron = "0 0 */8 * * *")
+    @Scheduled(cron = "0 * * * * *") // Runs every 1 minute
     public void sendDailyBroadcastMessage() {
-        getCachedToken().subscribe(token -> {
-            webClient.post()
-                    .uri("/projects/{projectId}/messages:send", "feedzmore")
-                    .header("Authorization", "Bearer " + token)
-                    .header("Content-Type", "application/json")
-                    .bodyValue(buildRequestBody("daily-news", "Daily Update!", "Good morning! Here’s your daily update.", true))
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .subscribe(response -> System.out.println("Daily notification sent: " + response));
-        });
+        log.info("## attempt to sendDailyBroadcastMessage");
+        String PARAMETER_NAME = "REUSABLE-GREETINGS";
+        Optional<FcmBroadcastEntity> fcmBroadcast = fcmBroadcastMessageRepository.findByMessageName(PARAMETER_NAME);
+        if (fcmBroadcast.isPresent()) {
+            getCachedToken().subscribe(token -> {
+                webClient.post()
+                        .uri("/projects/{projectId}/messages:send", "feedzmore")
+                        .header("Authorization", "Bearer " + token)
+                        .header("Content-Type", "application/json")
+                        .bodyValue(buildRequestBody("daily-news", fcmBroadcast.get().getTitle(), fcmBroadcast.get().getBody(), true))
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .subscribe(response -> log.info("Daily notification sent: " + response));
+            });
+        } else {
+            log.info("## Parameter not found : " + PARAMETER_NAME);
+        }
     }
 
     private String buildRequestBody(String target, String title, String body, boolean isTopic) {
