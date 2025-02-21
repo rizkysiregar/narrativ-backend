@@ -21,5 +21,5 @@ public class FcmBroadcastEntity {
     private String messageName;
     private String title;
     private String body;
-
+    private String topic;
 }
