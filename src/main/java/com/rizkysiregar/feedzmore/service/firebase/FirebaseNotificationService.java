@@ -47,6 +47,7 @@ public class FirebaseNotificationService {
     }
 
     public Mono<String> sendNotificationToTopic(String topic, String title, String body) {
+        log.info("## attempt to send fcm to topic: " + topic + " , title: " + title + ", body: " + body);
         return tokenService.getAccessToken().flatMap(accessToken -> {
 
             Map<String, Object> requestBody = Map.of(
