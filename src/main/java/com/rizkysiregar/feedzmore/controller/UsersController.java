@@ -1,28 +1,40 @@
 package com.rizkysiregar.feedzmore.controller;
 
+import com.rizkysiregar.feedzmore.constant.GlobalMessage;
+import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserRegisterDto;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
 import com.rizkysiregar.feedzmore.service.UsersService;
+import com.rizkysiregar.feedzmore.service.otp.IOtpService;
+import com.rizkysiregar.feedzmore.util.Operation;
 import io.swagger.annotations.ApiOperation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @Slf4j
 @Tag(name = "Users API")
 @Validated
+@SecurityRequirement(name = "Bearer Authentication")
 public class UsersController {
 
     @Autowired
     UsersService usersService;
+
+    @Autowired
+    private IOtpService otpService;
+
 
     @ApiOperation(value = "Register a new user", notes = "use this to register a new user")
     @PostMapping("/register")
@@ -34,9 +46,27 @@ public class UsersController {
     @ApiOperation(value = "User login", notes = "use this to gain jwt credentials for user validity")
     @PostMapping("/login")
     public UserLoginDTO login(@RequestBody UserLoginRequest userLoginRequest) {
-       log.info("::. Entering /login users");
-       log.info(":: " + userLoginRequest.toString());
+        log.info("::. Entering /login users");
+        log.info(":: " + userLoginRequest.toString());
         return usersService.verify(userLoginRequest);
     }
 
+    @ApiOperation(value = "User Reset Password", notes = "Use this for sending otp into user registered email")
+    @PostMapping("/forgot-password")
+    public Operation forgotPassword(@RequestParam String email) {
+        if (email.trim().isEmpty()) {
+            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        }
+        return otpService.sendOtp(email);
+    }
+
+    @ApiOperation(value = "Verify OTP", notes = "Validate is OTP matched or not")
+    @PostMapping("/verify-otp")
+    public Operation verifyOtp(@RequestParam String email, @RequestParam String otp) {
+        if (otpService.verifyOtp(email, otp)) {
+            return Operation.MATCHED;
+        } else {
+            return Operation.FAILED;
+        }
+    }
 }
