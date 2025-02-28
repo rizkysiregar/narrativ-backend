@@ -17,5 +17,7 @@ public enum Operation {
     EXECUTED,
     FAILED,
     LIKED,
-    DISLIKED
+    DISLIKED,
+    SENT,
+    MATCHED
 }
