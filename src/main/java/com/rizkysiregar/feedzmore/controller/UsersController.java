@@ -2,6 +2,7 @@ package com.rizkysiregar.feedzmore.controller;
 
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
+import com.rizkysiregar.feedzmore.model.dto.SentOtpDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserRegisterDto;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
@@ -53,7 +54,7 @@ public class UsersController {
 
     @ApiOperation(value = "User Reset Password", notes = "Use this for sending otp into user registered email")
     @PostMapping("/forgot-password")
-    public Operation forgotPassword(@RequestParam String email) {
+    public SentOtpDTO forgotPassword(@RequestParam String email) {
         if (email.trim().isEmpty()) {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }

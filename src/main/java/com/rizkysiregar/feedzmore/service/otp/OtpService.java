@@ -1,9 +1,10 @@
 package com.rizkysiregar.feedzmore.service.otp;
 
 import com.rizkysiregar.feedzmore.model.OtpCode;
+import com.rizkysiregar.feedzmore.model.dto.SentOtpDTO;
 import com.rizkysiregar.feedzmore.repository.OtpCodeRepository;
 import com.rizkysiregar.feedzmore.service.email.IEmailService;
-import com.rizkysiregar.feedzmore.util.Operation;
+import com.rizkysiregar.feedzmore.util.EmailMasking;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +21,7 @@ public class OtpService implements IOtpService {
     private IEmailService emailService;
 
     @Override
-    public Operation sendOtp(String email) {
+    public SentOtpDTO sendOtp(String email) {
         String otp = generateOtp();
         LocalDateTime expirationTime = LocalDateTime.now().plusMinutes(5); // set expires to 5 min
 
@@ -29,7 +30,11 @@ public class OtpService implements IOtpService {
 
         String message = "Your password reset OTP is: " + otp;
         emailService.sendEmail(email, "Password Reset OTP", message);
-        return Operation.SENT;
+        return SentOtpDTO.builder()
+                .otpSendToEmailAddress(EmailMasking.maskEmail(email))
+                .expirationTimeInMinute("5")
+                .build();
+//        return Operation.SENT;
     }
 
     private String generateOtp() {
