@@ -25,8 +25,8 @@ public class FirebaseSchedulerService {
         this.broadcastMessageRepository = broadcastMessageRepository;
     }
 
-    //@Scheduled(fixedRate = 8 * 60 * 60 * 1000) // Every 8 hours or (28,800,000 ms)
-    @Scheduled(fixedRate = 30 * 1000) // Runs every 30 seconds or (30,000 ms)
+    @Scheduled(fixedRate = 8 * 60 * 60 * 1000) // Every 8 hours or (28,800,000 ms)
+    //@Scheduled(fixedRate = 30 * 1000) // Runs every 30 seconds or (30,000 ms) for testing
     public void sendSchedulerNotification() {
         String messageName = "REUSABLE-GREETINGS";
         Optional<FcmBroadcastEntity> entity = broadcastMessageRepository.findByMessageName(messageName);

@@ -37,7 +37,7 @@ public class ResourceServiceImpl implements ResourceService {
             Resource resource = new UrlResource(filePath.toUri());
 
             if (resource.exists() && resource.isReadable()) {
-                log.info("::. file exist and readable, return success");
+//                log.info("::. file exist and readable, return success");
                 return ResponseEntity.ok()
                         .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
                         .body(resource);

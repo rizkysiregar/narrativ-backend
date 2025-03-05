@@ -17,14 +17,29 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: feedzmore.helpdesk@gmail.com
+    password: xonk lbrm dyty hnuk
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
 image:
   upload:
     dir:
-      image-profile: /app/media/images/profile
-      image-post: /app/media/images/post
+      image-profile: /home/ubuntu/feedzmore-storage/media/images/profile
+      image-post: /home/ubuntu/feedzmore-storage/media/images/post
 
 video:
-  dir: /app/media/videos
+  dir: /home/ubuntu/feedzmore-storage/media/videos
 
 secret:
   key: 6L9AYq7f9JS9KYRSu7oL416WYSJPLuYaavlhgRnBbAY=
@@ -33,4 +48,4 @@ secret:
 logging:
   config: classpath:logback.xml
   file:
-    path: /app/logs
+    path: /home/ubuntu/feedzmore-storage/logs

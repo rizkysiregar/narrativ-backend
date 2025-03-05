@@ -2,11 +2,13 @@ version: '3.8'
 
 services:
   app:
-    image: 441293/feedzmore-service:latest  # ✅ Replace with your Docker Hub image
+    image: 441293/feedzmore-service:latest
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev-version
     container_name: feedzmore-app
     restart: always
     ports:
-      - "9091:9091"  # ✅ Expose your app
+      - "9091:9091"  # Expose app to host aka port binding
     networks:
       - backend
     volumes:

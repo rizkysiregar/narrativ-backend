@@ -77,19 +77,19 @@ public class CustomResponseAdvise extends BaseController implements ResponseBody
             if (!Objects.requireNonNull(returnType.getMethod()).isAnnotationPresent(IgnoreResponseBinding.class)) {
 
                 if (object instanceof List || object instanceof Map) {
-                    log.info("Response is instance of List or Map");
+//                    log.info("Response is instance of List or Map");
                     return buildSuccessResponse(object);
                 } else if (object instanceof ResponseEntity<?>) {
-                    log.info("Response is instance of ResponseEntity");
+//                    log.info("Response is instance of ResponseEntity");
                     return object; // Don't wrap ResponseEntity
                 } else if (object instanceof org.springframework.core.io.Resource) {
-                    log.info("Response is instance of Resource");
+//                    log.info("Response is instance of Resource");
                     return object; // Don't wrap Resource, needed for image host api
                 } else if (object instanceof byte[]) {
-                    log.info("Response is instance of byte[]");
+//                    log.info("Response is instance of byte[]");
                     return object;
                 } else if (object instanceof String) {
-                    log.info("Response is instance of String");
+//                    log.info("Response is instance of String");
                     return object;
                 } else {
                     // Wrap all other responses in BaseResponse

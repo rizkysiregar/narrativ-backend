@@ -8,6 +8,10 @@ DOCKER_REPO=441293
 build:
 	docker build -t $(APP_NAME):$(TAG) .
 
+# Remove old latest tag if it exists
+rmi-latest:
+	-docker rmi -f $(DOCKER_REPO)/$(APP_NAME):$(TAG)
+
 # Tag the image for Docker Hub
 tag:
 	docker tag $(APP_NAME):$(TAG) $(DOCKER_REPO)/$(APP_NAME):$(TAG)
@@ -15,6 +19,9 @@ tag:
 # Push the image to Docker Hub
 push: tag
 	docker push $(DOCKER_REPO)/$(APP_NAME):$(TAG)
+
+# Full update: Remove old image, build, tag, and push
+update-latest: rmi-latest build tag push
 
 # Run the container with Docker Compose
 run:

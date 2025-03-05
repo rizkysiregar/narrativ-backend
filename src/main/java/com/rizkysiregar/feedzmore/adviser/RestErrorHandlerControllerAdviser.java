@@ -1,6 +1,7 @@
 package com.rizkysiregar.feedzmore.adviser;
 
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
+import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.response.BaseResponse;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,19 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
                 .message(HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase())
                 .build(),
                 HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    @ResponseStatus(value = HttpStatus.INTERNAL_SERVER_ERROR)
+    public ResponseEntity<?> businessException(BusinessException e) {
+        log.error("BusinessException = {}", e.getMessage());
+        return new ResponseEntity<>(
+                BaseResponse.builder()
+                        .code(e.getCode())
+                        .message(e.getMessage())
+                        .build(),
+                e.getHttpStatus()
+        );
     }
 
     @ExceptionHandler(BadCredentialsException.class)

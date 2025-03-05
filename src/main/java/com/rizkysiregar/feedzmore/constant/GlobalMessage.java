@@ -9,9 +9,12 @@ public enum GlobalMessage {
     CREATED("201", "Created"),
     INTERNAL_ERROR("500", "Internal Server Error"),
     BAD_REQUEST("400", "Bad Request"),
+    TOO_MANY_REQUEST("429", "Too many request"),
+    TOO_MANY_REQUEST_OTP("429", "Too many request, You can request a new OTP after 5 minutes."),
     BAD_REQUEST_FILE_TO_LARGE("400", "Bad Request, file too large"),
     NOT_FOUND("404", "Data Not Found"),
-    UNAUTHORIZED("401", "UNAUTHORIZED"),;
+    UNAUTHORIZED("401", "UNAUTHORIZED"),
+    ;
 
 
     private final String code;
