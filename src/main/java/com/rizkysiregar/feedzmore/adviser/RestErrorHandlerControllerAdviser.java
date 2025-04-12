@@ -9,6 +9,7 @@ import org.springframework.boot.web.servlet.error.ErrorController;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -49,7 +50,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
         log.warn("BadCredentialsException = {}", e.getMessage());
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.UNAUTHORIZED.getCode())
-                .message(GlobalMessage.UNAUTHORIZED.getMessage())
+                .message(e.getMessage())
                 .build(),
                 HttpStatus.UNAUTHORIZED);
     }
@@ -63,6 +64,17 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
                 .message(HttpStatus.BAD_REQUEST.getReasonPhrase())
                 .build(),
                 HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(UsernameNotFoundException.class)
+    @ResponseStatus(value = HttpStatus.UNAUTHORIZED)
+    public ResponseEntity<?> usernameNotFoundException(UsernameNotFoundException unfe) {
+        log.warn("Method Arguments not Valid Exception = ", unfe);
+        return new ResponseEntity<>(BaseResponse.builder()
+                .code(GlobalMessage.UNAUTHORIZED.getCode())
+                .message(unfe.getMessage())
+                .build(),
+                HttpStatus.UNAUTHORIZED);
     }
 
 

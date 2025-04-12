@@ -20,5 +20,7 @@ public class Constants {
             "http://localhost:53375",
             "http://localhost:8083"
     );
+
+    public static final String INVALID_USERNAME_PASSWORD = "Invalid Username or Password";
 }
 

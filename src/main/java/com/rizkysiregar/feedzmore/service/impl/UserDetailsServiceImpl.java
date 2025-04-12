@@ -6,6 +6,7 @@ import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
+import com.rizkysiregar.feedzmore.util.Constants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -31,7 +32,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
         if (user.isEmpty()) {
             log.error("::. user " + username + " not exist");
-            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+            throw new UsernameNotFoundException(Constants.INVALID_USERNAME_PASSWORD);
         }
 
         return new UserPrincipal(user.get());
