@@ -81,7 +81,7 @@ public class PostServiceImpl implements PostService {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
-        if (image.getSize() > 5 * 100 * 1024) { // Limit to max 5 mb
+        if (image.getSize() > 5 * 1024 * 1024) { // Limit to max 5 mb
             log.error("Image too large");
             throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
         }
