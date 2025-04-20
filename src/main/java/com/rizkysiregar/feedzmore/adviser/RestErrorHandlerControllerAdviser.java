@@ -3,6 +3,8 @@ package com.rizkysiregar.feedzmore.adviser;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.response.BaseResponse;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Path;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.servlet.error.ErrorController;
@@ -14,6 +16,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @RestControllerAdvice
 @Slf4j
@@ -77,5 +82,16 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
                 HttpStatus.UNAUTHORIZED);
     }
 
+    @ExceptionHandler(ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, String> handleConstraintViolationException(ConstraintViolationException ex) {
+        log.warn("## handleConstraintViolationException {}", ex.getMessage());
+        Map<String, String> errors = new HashMap<>();
+        ex.getConstraintViolations().forEach(cv -> {
+            String field = cv.getPropertyPath().iterator().next().getName();
+            errors.put(field, cv.getMessage());
+        });
+        return errors;
+    }
 
 }

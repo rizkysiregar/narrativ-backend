@@ -14,7 +14,8 @@ public enum GlobalMessage {
     BAD_REQUEST_FILE_TO_LARGE("400", "Bad Request, file too large"),
     NOT_FOUND("404", "Data Not Found"),
     UNAUTHORIZED("401", "UNAUTHORIZED"),
-    PARAMETER_NOT_FOUND("404", "Parameter Not Found")
+    PARAMETER_NOT_FOUND("404", "Parameter Not Found"),
+    INVALID_OTP("404", "INVALID OTP")
     ;
 
 

@@ -24,7 +24,7 @@ public class EmailService implements IEmailService {
     @Override
     public void sendEmail(String to, String subject, String body) {
         try {
-            log.info("## sendEmail to:" + to + ", subject:" + subject + ", body:" + body);
+            log.info("## sendEmail to:{}, subject:{}, body:{}", to, subject, body);
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(to);
             message.setSubject(subject);

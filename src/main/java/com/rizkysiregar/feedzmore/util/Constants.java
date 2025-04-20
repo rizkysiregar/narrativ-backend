@@ -9,7 +9,9 @@ public class Constants {
             "/res/photo",
             "/v3/api-docs/**",
             "/swagger-ui/**",
-            "/swagger-ui.html"
+            "/swagger-ui.html",
+            "/forgot-password",
+            "/verify-otp"
     );
 
     public static final List<String> METHOD_LIST = List.of(

@@ -7,6 +7,7 @@ import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserRegisterDto;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
+import com.rizkysiregar.feedzmore.model.request.VerifyOtpRequest;
 import com.rizkysiregar.feedzmore.service.UsersService;
 import com.rizkysiregar.feedzmore.service.otp.IOtpService;
 import com.rizkysiregar.feedzmore.util.Operation;
@@ -14,6 +15,8 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -54,20 +57,17 @@ public class UsersController {
 
     @ApiOperation(value = "User Reset Password", notes = "Use this for sending otp into user registered email")
     @PostMapping("/forgot-password")
-    public SentOtpDTO forgotPassword(@RequestParam String email) {
-        if (email.trim().isEmpty()) {
-            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-        }
+    public SentOtpDTO forgotPassword(@RequestParam @NotBlank @Email String email) {
         return otpService.sendOtp(email);
     }
 
     @ApiOperation(value = "Verify OTP", notes = "Validate is OTP matched or not")
     @PostMapping("/verify-otp")
-    public Operation verifyOtp(@RequestParam String email, @RequestParam String otp) {
-        if (otpService.verifyOtp(email, otp)) {
+    public Operation verifyOtp(@RequestBody @Valid VerifyOtpRequest verifyOtpRequest) {
+        if (otpService.verifyOtp(verifyOtpRequest.getEmail(), verifyOtpRequest.getOtp())) {
             return Operation.MATCHED;
         } else {
-            return Operation.FAILED;
+            throw new BusinessException(GlobalMessage.INVALID_OTP, HttpStatus.BAD_REQUEST);
         }
     }
 }
