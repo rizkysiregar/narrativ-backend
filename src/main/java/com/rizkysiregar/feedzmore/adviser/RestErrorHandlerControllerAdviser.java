@@ -84,14 +84,20 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
 
     @ExceptionHandler(ConstraintViolationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Map<String, String> handleConstraintViolationException(ConstraintViolationException ex) {
+    public ResponseEntity<?> handleConstraintViolationException(ConstraintViolationException ex) {
         log.warn("## handleConstraintViolationException {}", ex.getMessage());
-        Map<String, String> errors = new HashMap<>();
-        ex.getConstraintViolations().forEach(cv -> {
-            String field = cv.getPropertyPath().iterator().next().getName();
-            errors.put(field, cv.getMessage());
-        });
-        return errors;
+//        Map<String, String> errors = new HashMap<>();
+//        ex.getConstraintViolations().forEach(cv -> {
+//            String field = cv.getPropertyPath().iterator().next().getName();
+//            errors.put(field, cv.getMessage());
+//        });
+//        return errors;
+
+        return new ResponseEntity<>(BaseResponse.builder()
+                .code(GlobalMessage.BAD_REQUEST.getCode())
+                .message(ex.getMessage())
+                .build(),
+                HttpStatus.BAD_REQUEST);
     }
 
 }
