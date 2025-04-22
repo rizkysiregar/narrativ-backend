@@ -1,11 +1,11 @@
 package com.rizkysiregar.feedzmore.controller;
 
-import com.rizkysiregar.feedzmore.constant.GlobalMessage;
-import com.rizkysiregar.feedzmore.exception.BusinessException;
+import com.rizkysiregar.feedzmore.model.dto.ResetTokenDTO;
 import com.rizkysiregar.feedzmore.model.dto.SentOtpDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserRegisterDto;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
+import com.rizkysiregar.feedzmore.model.request.ResetPasswordRequest;
 import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
 import com.rizkysiregar.feedzmore.model.request.VerifyOtpRequest;
 import com.rizkysiregar.feedzmore.service.UsersService;
@@ -19,7 +19,6 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -55,7 +54,7 @@ public class UsersController {
         return usersService.verify(userLoginRequest);
     }
 
-    @ApiOperation(value = "User Reset Password", notes = "Use this for sending otp into user registered email")
+    @ApiOperation(value = "User validation and OTP Request", notes = "Use this for sending otp into user registered email")
     @PostMapping("/forgot-password")
     public SentOtpDTO forgotPassword(@RequestParam @NotBlank @Email String email) {
         return otpService.sendOtp(email);
@@ -63,11 +62,13 @@ public class UsersController {
 
     @ApiOperation(value = "Verify OTP", notes = "Validate is OTP matched or not")
     @PostMapping("/verify-otp")
-    public Operation verifyOtp(@RequestBody @Valid VerifyOtpRequest verifyOtpRequest) {
-        if (otpService.verifyOtp(verifyOtpRequest.getEmail(), verifyOtpRequest.getOtp())) {
-            return Operation.MATCHED;
-        } else {
-            throw new BusinessException(GlobalMessage.INVALID_OTP, HttpStatus.BAD_REQUEST);
-        }
+    public ResetTokenDTO verifyOtp(@RequestBody @Valid VerifyOtpRequest request) {
+        return otpService.verifyOtp(request.getEmail(), request.getOtp());
+    }
+
+    @ApiOperation(value = "New password", notes = "Take email and new password also resetToken is needed")
+    @PostMapping("/reset-password")
+    public Operation resetPassword(@Valid @RequestBody ResetPasswordRequest resetPasswordRequest) {
+        return usersService.resetPassword(resetPasswordRequest);
     }
 }

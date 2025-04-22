@@ -1,12 +1,16 @@
 package com.rizkysiregar.feedzmore.service;
 
+import com.rizkysiregar.feedzmore.config.RedisUtil;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserRegisterDto;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
+import com.rizkysiregar.feedzmore.model.request.ResetPasswordRequest;
 import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
+import com.rizkysiregar.feedzmore.util.Operation;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -15,11 +19,13 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.OptionalInt;
 
 @Service
+@Slf4j
 public class UsersService {
 
     @Autowired
@@ -28,6 +34,8 @@ public class UsersService {
     AuthenticationManager authManager;
     @Autowired
     JWTService jwtService;
+    @Autowired
+    private RedisUtil redisUtil;
 
     private BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
 
@@ -63,4 +71,34 @@ public class UsersService {
 
         throw new BadCredentialsException("Bad Credentials!");
     }
+
+
+    @Transactional
+    public Operation resetPassword(ResetPasswordRequest resetPasswordRequest) {
+        Optional<UserEntity> byEmail = userRepository.findByEmail(resetPasswordRequest.getEmail());
+        if (byEmail.isPresent()) {
+            String resetTokenKey = "reset_token:".concat(resetPasswordRequest.getEmail());
+            // validate reset token
+            Object actualResetToken = redisUtil.get(resetTokenKey);
+            if (actualResetToken == null) {
+                log.info("## resetToken not found on redis");
+                throw new BusinessException(GlobalMessage.INVALID_RESET_TOKEN, HttpStatus.BAD_REQUEST);
+            } else {
+
+                if (actualResetToken.equals(resetPasswordRequest.getResetToken())) {
+                    // matched, do reset token
+                    UserEntity user = byEmail.get();
+                    user.setPassword(encoder.encode(resetPasswordRequest.getNewPassword()));
+                    userRepository.save(user);
+                    return Operation.UPDATED;
+                } else {
+                    log.info("## resetToken not matched!");
+                    throw new BusinessException(GlobalMessage.INVALID_RESET_TOKEN, HttpStatus.BAD_REQUEST);
+                }
+            }
+        } else {
+            throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
+        }
+    }
+
 }
