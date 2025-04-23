@@ -59,6 +59,11 @@ public class OtpService implements IOtpService {
 
             String otp = generateOtp();
             LocalDateTime expirationTime = LocalDateTime.now().plusSeconds(Long.parseLong(otpRetryTimeInSeconds));
+
+//            String message = "Your password reset OTP is: " + otp;
+//            emailService.sendEmail(email, "Password Reset OTP", message);
+            emailService.sendOtpEmail(email, otp);
+
             OtpCode otpCode = OtpCode.builder()
                     .email(email)
                     .otp(otp)
@@ -67,8 +72,6 @@ public class OtpService implements IOtpService {
             otpCodeRepository.save(otpCode);
             redisUtil.set("otp:" + email, otp, 60);
 
-            String message = "Your password reset OTP is: " + otp;
-            emailService.sendEmail(email, "Password Reset OTP", message);
             return SentOtpDTO.builder()
                     .otpSendToEmailAddress(EmailMasking.maskEmail(email))
                     // .expirationTimeInMinute(String.valueOf(Long.parseLong(otpRetryTimeInSeconds) / 60))

@@ -75,30 +75,29 @@ public class UsersService {
 
     @Transactional
     public Operation resetPassword(ResetPasswordRequest resetPasswordRequest) {
-        Optional<UserEntity> byEmail = userRepository.findByEmail(resetPasswordRequest.getEmail());
-        if (byEmail.isPresent()) {
-            String resetTokenKey = "reset_token:".concat(resetPasswordRequest.getEmail());
-            // validate reset token
-            Object actualResetToken = redisUtil.get(resetTokenKey);
-            if (actualResetToken == null) {
-                log.info("## resetToken not found on redis");
-                throw new BusinessException(GlobalMessage.INVALID_RESET_TOKEN, HttpStatus.BAD_REQUEST);
-            } else {
 
-                if (actualResetToken.equals(resetPasswordRequest.getResetToken())) {
-                    // matched, do reset token
-                    UserEntity user = byEmail.get();
-                    user.setPassword(encoder.encode(resetPasswordRequest.getNewPassword()));
-                    userRepository.save(user);
-                    return Operation.UPDATED;
-                } else {
-                    log.info("## resetToken not matched!");
-                    throw new BusinessException(GlobalMessage.INVALID_RESET_TOKEN, HttpStatus.BAD_REQUEST);
-                }
-            }
-        } else {
-            throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
+        UserEntity user = userRepository.findByEmail(resetPasswordRequest.getEmail())
+                .orElseThrow(() -> new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND));
+
+        String resetTokenKey = "reset_token:".concat(resetPasswordRequest.getEmail());
+        Object actualResetToken = redisUtil.get(resetTokenKey);
+
+        if (actualResetToken == null) {
+            log.info("## resetToken not found on redis");
+            throw new BusinessException(GlobalMessage.INVALID_RESET_TOKEN, HttpStatus.BAD_REQUEST);
         }
+
+        if (!actualResetToken.equals(resetPasswordRequest.getResetToken())) {
+            log.info("## resetToken not matched!");
+            throw new BusinessException(GlobalMessage.INVALID_RESET_TOKEN, HttpStatus.BAD_REQUEST);
+        }
+
+        // All good, update password
+        log.info("Updating password for user: {}", user.getEmail());
+        user.setPassword(encoder.encode(resetPasswordRequest.getNewPassword()));
+        userRepository.save(user);
+
+        return Operation.UPDATED;
     }
 
 }
