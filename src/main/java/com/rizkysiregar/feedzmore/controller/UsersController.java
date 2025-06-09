@@ -1,9 +1,6 @@
 package com.rizkysiregar.feedzmore.controller;
 
-import com.rizkysiregar.feedzmore.model.dto.ResetTokenDTO;
-import com.rizkysiregar.feedzmore.model.dto.SentOtpDTO;
-import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
-import com.rizkysiregar.feedzmore.model.dto.UserRegisterDto;
+import com.rizkysiregar.feedzmore.model.dto.*;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.ResetPasswordRequest;
 import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
@@ -19,11 +16,9 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @Slf4j
@@ -56,8 +51,8 @@ public class UsersController {
 
     @ApiOperation(value = "User validation and OTP Request", notes = "Use this for sending otp into user registered email")
     @PostMapping("/forgot-password")
-    public SentOtpDTO forgotPassword(@RequestParam @NotBlank @Email String email) {
-        return otpService.sendOtp(email);
+    public SentOtpDTO forgotPassword(@RequestBody @Valid EmailDTO emailDTO) {
+        return otpService.sendOtp(emailDTO.getEmail());
     }
 
     @ApiOperation(value = "Verify OTP", notes = "Validate is OTP matched or not")
@@ -67,8 +62,8 @@ public class UsersController {
     }
 
     @ApiOperation(value = "New password", notes = "Take email and new password also resetToken is needed")
-    @PostMapping("/reset-password")
-    public Operation resetPassword(@Valid @RequestBody ResetPasswordRequest resetPasswordRequest) {
-        return usersService.resetPassword(resetPasswordRequest);
+    @PostMapping("/confirm-reset-password")
+    public Operation confirmResetPassword(@Valid @RequestBody ResetPasswordRequest resetPasswordRequest) {
+        return usersService.confirmResetPassword(resetPasswordRequest);
     }
 }

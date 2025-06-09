@@ -1,4 +1,4 @@
-# Use amazon correto 21 as the base image
+# Use Amazon Corretto 21 as the base image
 FROM amazoncorretto:21
 
 # Set the working directory inside the container
@@ -7,8 +7,14 @@ WORKDIR /app
 # Copy the JAR file into the container
 COPY target/*.jar feedzmore-service.jar
 
-# Expose port 9091 for springboot to run
+# Create a directory for configuration files
+RUN mkdir -p /app/config
+
+# Copy all configuration files (including application.yml and profiles)
+COPY src/main/resources/application*.yml /app/config/
+
+# Expose port 9091 for Spring Boot
 EXPOSE 9091
 
-# Run the application
-ENTRYPOINT ["java", "-jar", "/app/feedzmore-service.jar"]
+# Run the application with explicit config location
+ENTRYPOINT ["java", "-jar", "-Dspring.config.location=file:/app/config/", "/app/feedzmore-service.jar"]

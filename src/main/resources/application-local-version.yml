@@ -33,9 +33,9 @@ spring:
           auth: true
           starttls:
             enable: true
-          connectiontimeout: 5000
-          timeout: 5000
-          writetimeout: 5000
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
 
 image:
   upload:
@@ -53,6 +53,13 @@ secret:
 
 
 logging:
+#  level:
+#    org.hibernate.SQL: DEBUG
+#    org.hibernate.type.descriptor.sql: TRACE
+#    org.springframework.orm.jpa: DEBUG
   config: classpath:logback.xml
   file:
     path: /Users/macbook/Feedzmore/logs
+
+otp:
+  retry-time-in-seconds: 60

@@ -50,7 +50,8 @@ public class OtpService implements IOtpService {
 
     @Override
     public SentOtpDTO sendOtp(String email) {
-        log.info("## retry in seconds: " + otpRetryTimeInSeconds);
+        log.info("## rcv: send otp to: {}", email);
+        log.info("## retry in seconds: {}", otpRetryTimeInSeconds);
         Optional<UserEntity> byEmail = userRepository.findByEmail(email);
         if (byEmail.isPresent()) {
             if (Boolean.TRUE.equals(redisUtil.hasKey("otp:" + email))) {

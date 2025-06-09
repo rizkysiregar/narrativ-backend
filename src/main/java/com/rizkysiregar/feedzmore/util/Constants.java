@@ -11,7 +11,8 @@ public class Constants {
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/forgot-password",
-            "/verify-otp"
+            "/verify-otp",
+            "/reset-password"
     );
 
     public static final List<String> METHOD_LIST = List.of(

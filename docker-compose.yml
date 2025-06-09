@@ -1,22 +1,44 @@
 version: '3.8'
 
 services:
-  app:
-    image: 441293/feedzmore-service:latest
+  postgres:
+    image: postgres:16
+    container_name: postgres_container
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: feedzmore
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend  # Ensure the database is in the same network
+
+  feedzmore-app:
+    image: 441293/feedzmore-service:latest  # Replace with your Docker Hub image
     environment:
       - SPRING_PROFILES_ACTIVE=dev-version
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/feedzmore
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
     container_name: feedzmore-app
     restart: always
     ports:
-      - "9091:9091"  # Expose app to host aka port binding
+      - "9091:9091"  # Expose your app
     networks:
       - backend
     volumes:
-      # HOST-PATH:CONTAINER-PATH
+      # Bind mounts (host:container)
       - /opt/feedzmore/media/videos:/app/media/videos
       - /opt/feedzmore/media/image/post:/app/media/images/post
       - /opt/feedzmore/media/image/profile:/app/media/images/profile
       - /opt/feedzmore/logs:/app/logs
 
 networks:
-  backend:
+  backend:  # Define the custom network
+    driver: bridge
+
+volumes:
+  postgres_data:  # Define the volume for PostgreSQL

@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
-import java.util.OptionalInt;
 
 @Service
 @Slf4j
@@ -74,7 +73,7 @@ public class UsersService {
 
 
     @Transactional
-    public Operation resetPassword(ResetPasswordRequest resetPasswordRequest) {
+    public Operation confirmResetPassword(ResetPasswordRequest resetPasswordRequest) {
 
         UserEntity user = userRepository.findByEmail(resetPasswordRequest.getEmail())
                 .orElseThrow(() -> new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND));

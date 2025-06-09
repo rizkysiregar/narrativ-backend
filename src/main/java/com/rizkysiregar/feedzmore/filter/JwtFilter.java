@@ -1,4 +1,4 @@
-package com.rizkysiregar.feedzmore.config;
+package com.rizkysiregar.feedzmore.filter;
 
 
 import com.rizkysiregar.feedzmore.service.JWTService;
@@ -7,7 +7,9 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,8 +18,10 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 
+@Slf4j
 @Component
 public class JwtFilter extends OncePerRequestFilter {
 
@@ -27,8 +31,29 @@ public class JwtFilter extends OncePerRequestFilter {
     @Autowired
     private ApplicationContext context;
 
+    @Value("${spring.profiles.active}}")
+    private String activeProfile;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        log.info("## active profile: {}", activeProfile );
+
+        // log all payload for dev only
+        if ("local-version".equals(activeProfile) || "dev-version".equals(activeProfile)) {
+            CachedBodyHttpServletRequest cachedRequest = new CachedBodyHttpServletRequest(request);
+            StringBuilder sb = new StringBuilder();
+            try (BufferedReader reader = cachedRequest.getReader()) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line).append(System.lineSeparator());
+                }
+            }
+
+            log.info("## Incoming Request: {} {}", request.getMethod(), request.getRequestURI());
+            log.info("## Payload: {} ", sb);
+        }
+
+
         String authHeader = request.getHeader("Authorization");
         System.out.println("token -> " + authHeader);
         String token = null;

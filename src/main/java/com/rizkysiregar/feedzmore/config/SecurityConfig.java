@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.config;
 
+import com.rizkysiregar.feedzmore.filter.JwtFilter;
 import com.rizkysiregar.feedzmore.util.Constants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
