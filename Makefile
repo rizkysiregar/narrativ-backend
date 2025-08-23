@@ -2,7 +2,7 @@
 APP_NAME=feedzmore-service
 TAG=latest
 # Docker Hub username
-DOCKER_REPO=441293
+DOCKER_REPO=rizkysiregar
 
 # Build Docker image
 build:

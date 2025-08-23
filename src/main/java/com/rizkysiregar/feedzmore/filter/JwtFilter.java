@@ -36,24 +36,6 @@ public class JwtFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        log.info("## active profile: {}", activeProfile );
-
-        // log all payload for dev only
-        if ("local-version".equals(activeProfile) || "dev-version".equals(activeProfile)) {
-            CachedBodyHttpServletRequest cachedRequest = new CachedBodyHttpServletRequest(request);
-            StringBuilder sb = new StringBuilder();
-            try (BufferedReader reader = cachedRequest.getReader()) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    sb.append(line).append(System.lineSeparator());
-                }
-            }
-
-            log.info("## Incoming Request: {} {}", request.getMethod(), request.getRequestURI());
-            log.info("## Payload: {} ", sb);
-        }
-
-
         String authHeader = request.getHeader("Authorization");
         System.out.println("token -> " + authHeader);
         String token = null;

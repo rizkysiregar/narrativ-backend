@@ -1,6 +1,8 @@
+# Use this env for ubuntu-server
+
 spring:
   datasource:
-    url: jdbc:postgresql://host.docker.internal:5432/feedzmore
+    url: jdbc:postgresql://192.168.1.17:5432/feedzmore
     username: postgres
     password: postgres
     hikari:
@@ -17,35 +19,49 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
 
+  redis:
+    host: 192.168.1.17
+    port: 6379
+    timeout: 60000
+
   mail:
     host: smtp.gmail.com
     port: 587
     username: feedzmore.helpdesk@gmail.com
-    password: xonk lbrm dyty hnuk
+    password: xonklbrmdytyhnuk
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
-          connectiontimeout: 5000
-          timeout: 5000
-          writetimeout: 5000
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
 
 image:
   upload:
     dir:
-      image-profile: /home/ubuntu/feedzmore-storage/media/images/profile
-      image-post: /home/ubuntu/feedzmore-storage/media/images/post
+      image-profile: /home/rizkysiregar/feedzmore/media/images/profile
+      image-post: /home/rizkysiregar/feedzmore/media/images/post
+
 
 video:
-  dir: /home/ubuntu/feedzmore-storage/media/videos
+  dir: /home/rizkysiregar/feedzmore/media/videos
 
 secret:
   key: 6L9AYq7f9JS9KYRSu7oL416WYSJPLuYaavlhgRnBbAY=
 
 
+
 logging:
+  #  level:
+  #    org.hibernate.SQL: DEBUG
+  #    org.hibernate.type.descriptor.sql: TRACE
+  #    org.springframework.orm.jpa: DEBUG
   config: classpath:logback.xml
   file:
-    path: /home/ubuntu/feedzmore-storage/logs
+    path: /home/rizkysiregar/feedzmore/logs
+
+otp:
+  retry-time-in-seconds: 60

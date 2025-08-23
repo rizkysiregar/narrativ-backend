@@ -34,11 +34,6 @@
   <logger name="org.hibernate" level="INFO"/>
   <logger name="org.hibernate" level="ERROR"/>
 
-  <!-- Send logs to both console and file audit -->
-  <!--  <logger name="co.id.dwidasa.rest" level="info" additivity="false">-->
-  <!--    <appender-ref ref="FILE-AUDIT"/>-->
-  <!--    <appender-ref ref="STDOUT"/>-->
-  <!--  </logger>-->
 
   <root level="info">
     <appender-ref ref="FILE-AUDIT"/>

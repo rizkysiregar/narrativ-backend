@@ -15,6 +15,6 @@ spring:
   application:
     name: feedzmore-service
   profiles:
-    active: local-version
-#    active: dev-version
+#    active: local-version
+    active: dev-version
 #    active: prod-version
