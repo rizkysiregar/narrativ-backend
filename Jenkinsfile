@@ -6,6 +6,7 @@ pipeline {
         DOCKER_HUB_CREDENTIALS = 'rizkysiregar-dockerhub-pat'
         SSH_CREDENTIALS = 'rizkysiregar-ubuntu-docker-host-pat'
         IMAGE_NAME = "rizkysiregar/feedzmore-service"
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
         SERVER_HOST = "192.168.1.50"
     }
 
@@ -16,16 +17,22 @@ pipeline {
             }
         }
 
+//         stage('Run Tests') {
+//             steps {
+//                 sh './gradlew test' // adjust according to your project
+//             }
+//         }
+
         stage('Build Docker Image') {
             steps {
-                // Using 'latest', but you can also use BUILD_NUMBER if you want versioned tags
-                sh "docker build -t $IMAGE_NAME:latest ."
+                sh "docker build -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest ."
             }
         }
 
         stage('Push Docker Image') {
             steps {
                 withDockerRegistry([credentialsId: "${DOCKER_HUB_CREDENTIALS}", url: '']) {
+                    sh "docker push $IMAGE_NAME:$IMAGE_TAG"
                     sh "docker push $IMAGE_NAME:latest"
                 }
             }
@@ -38,11 +45,21 @@ pipeline {
                         ssh -o StrictHostKeyChecking=no rizkysiregar@${SERVER_HOST} '
                             cd /home/rizkysiregar/feedzmore &&
                             docker compose pull &&
-                            docker compose up -d --force-recreate
+                            docker compose up -d --force-recreate &&
+                            docker image prune -af
                         '
                     """
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Deployment successful: $IMAGE_NAME:$IMAGE_TAG"
+        }
+        failure {
+            echo "Deployment failed!"
         }
     }
 }
