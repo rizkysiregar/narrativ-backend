@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    tools {
+        maven 'Maven3' // name you set in Global Tool Config
+    }
+
     environment {
         GIT_CREDENTIALS = 'rizkysiregar-github-pat'
         DOCKER_HUB_CREDENTIALS = 'rizkysiregar-dockerhub-pat'
