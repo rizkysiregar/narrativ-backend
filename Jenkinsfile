@@ -46,10 +46,7 @@ pipeline {
 
       stage('Deploy') {
           steps {
-              sh """
-              docker compose down
-              docker compose up -d
-              """
+              sh '/home/rizkysiregar/feedzmore/deploy.sh'
           }
       }
 
