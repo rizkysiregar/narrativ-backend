@@ -6,7 +6,9 @@ pipeline {
         DOCKER_HUB_CREDENTIALS = 'rizkysiregar-dockerhub-pat'
         SSH_CREDENTIALS = 'rizkysiregar-ubuntu-docker-host-pat'
         IMAGE_NAME = "rizkysiregar/feedzmore-service"
-        IMAGE_TAG = "${env.BUILD_NUMBER}"
+//         IMAGE_TAG = "${env.BUILD_NUMBER}"
+        IMAGE_TAG = "${env.GIT_COMMIT.take(7)}"
+
         SERVER_HOST = "192.168.1.50"
     }
 
@@ -17,11 +19,11 @@ pipeline {
             }
         }
 
-//         stage('Run Tests') {
-//             steps {
-//                 sh './gradlew test' // adjust according to your project
-//             }
-//         }
+        stage('Build & Test') {
+                   steps {
+                       sh 'mvn clean package -DskipTests'
+                   }
+        }
 
         stage('Build Docker Image') {
             steps {
