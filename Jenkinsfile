@@ -44,20 +44,35 @@ pipeline {
             }
         }
 
-        stage('Deploy on Server') {
-            steps {
-                sshagent (credentials: ["${SSH_CREDENTIALS}"]) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no rizkysiregar@${SERVER_HOST} '
-                            cd /home/rizkysiregar/feedzmore &&
-                            docker compose pull &&
-                            docker compose up -d --force-recreate &&
-                            docker image prune -af
-                        '
-                    """
-                }
-            }
-        }
+      stage('Deploy') {
+          steps {
+              sh """
+              docker compose down
+              docker compose up -d
+              """
+          }
+      }
+
+
+// if want to use ssh into server, but since jenkins and feedzmore are on the same host so just directly run docker command here
+//         stage('Deploy on Server') {
+//             steps {
+//                 sshagent (credentials: ["${SSH_CREDENTIALS}"]) {
+//                     sh """
+//                         ssh -o StrictHostKeyChecking=no rizkysiregar@${SERVER_HOST} '
+//                             cd /home/rizkysiregar/feedzmore &&
+//                             docker compose pull &&
+//                             docker compose up -d --force-recreate &&
+//                             docker image prune -af
+//                         '
+//                     """
+//                 }
+//             }
+//         }
+
+
+
+
     }
 
     post {
