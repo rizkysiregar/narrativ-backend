@@ -44,11 +44,13 @@ pipeline {
             }
         }
 
-      stage('Deploy') {
-          steps {
-              sh '/home/rizkysiregar/feedzmore/deploy.sh'
-          }
-      }
+        stage('Deploy') {
+            steps {
+                sshagent (credentials: ["${SSH_CREDENTIALS}"]) {
+                    sh 'ssh -o StrictHostKeyChecking=no rizkysiregar@192.168.1.50 "/home/rizkysiregar/feedzmore/deploy.sh"'
+                }
+            }
+        }
 
 
 // if want to use ssh into server, but since jenkins and feedzmore are on the same host so just directly run docker command here
