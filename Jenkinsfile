@@ -38,7 +38,7 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 withDockerRegistry([credentialsId: "${DOCKER_HUB_CREDENTIALS}", url: '']) {
-                    sh "docker push $IMAGE_NAME:$IMAGE_TAG"
+                    // sh "docker push $IMAGE_NAME:$IMAGE_TAG" // comment for now, pushing 2 image take a long time
                     sh "docker push $IMAGE_NAME:latest"
                 }
             }
