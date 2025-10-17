@@ -1,15 +1,25 @@
 package com.rizkysiregar.feedzmore.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
 @Component
-public class RedisUtil {
+@Slf4j
+public class RedisUtil implements CommandLineRunner {
 
     private final RedisTemplate<String, Object> redisTemplate;
+
+    @Value("${spring.redis.host}")
+    private String redisHost;
+
+    @Value("${spring.redis.port}")
+    private int redisPort;
 
     @Autowired
     public RedisUtil(RedisTemplate<String, Object> redisTemplate) {
@@ -49,5 +59,10 @@ public class RedisUtil {
     // Get remaining TTL
     public Long getExpire(String key) {
         return redisTemplate.getExpire(key);
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        log.info("## [Redis Service run on: ] " + redisHost + ", " + redisPort);
     }
 }
