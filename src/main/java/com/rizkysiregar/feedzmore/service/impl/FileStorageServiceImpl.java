@@ -4,6 +4,7 @@ import com.rizkysiregar.feedzmore.service.FileStorageService;
 import io.minio.*;
 import io.minio.http.Method;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,13 +26,16 @@ public class FileStorageServiceImpl implements FileStorageService {
     private final String bucketName;
 
 
-    public FileStorageServiceImpl(MinioClient minioClient, String bucketName) {
+    public FileStorageServiceImpl(MinioClient minioClient,
+                                  @Value("${minio.bucket}") String bucketName
+    ) {
         this.minioClient = minioClient;
         this.bucketName = bucketName;
     }
 
     @Override
     public String uploadFile(MultipartFile file, String userId) throws Exception {
+        log.info(":: Trying to upload file to minio: {}, {}", file.getOriginalFilename(), userId);
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String originalName = file.getOriginalFilename();
         String extension = "";
@@ -49,6 +53,7 @@ public class FileStorageServiceImpl implements FileStorageService {
             minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
         }
 
+        log.info(":: upload file with objectName: {}", objectName);
         // upload
         minioClient.putObject(
                 PutObjectArgs.builder()
@@ -64,6 +69,7 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public String getPresignUrl(String objectName) throws Exception {
+        log.info(":: Trying to get presign url for {}", objectName);
         return minioClient.getPresignedObjectUrl(
                 GetPresignedObjectUrlArgs.builder()
                         .bucket(bucketName)
