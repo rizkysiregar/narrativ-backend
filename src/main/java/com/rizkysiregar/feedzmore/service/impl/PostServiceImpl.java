@@ -2,6 +2,7 @@ package com.rizkysiregar.feedzmore.service.impl;
 
 
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
+import com.rizkysiregar.feedzmore.constant.ObjectStorageTypeGroup;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.dto.AddPostDTO;
 import com.rizkysiregar.feedzmore.model.dto.PostDTO;
@@ -10,6 +11,7 @@ import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.*;
+import com.rizkysiregar.feedzmore.service.FileStorageService;
 import com.rizkysiregar.feedzmore.service.PostService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +43,7 @@ public class PostServiceImpl implements PostService {
     private final UserRepository userRepository;
     private final LikeRepository likeRepository;
     private final CommentRepository commentRepository;
+    private final FileStorageService fileStorageService;
 
     @Override
     public PaginatedResponse<PostDTO> getAllPost(int page, int size, UUID userId) {
@@ -73,7 +76,7 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public AddPostDTO addNewPost(AddPostRequest addPostRequest, MultipartFile image) {
+    public AddPostDTO addNewPost(AddPostRequest addPostRequest, MultipartFile image) throws Exception {
         log.info("::. Entering PostServiceImpl.addNewPost by : " + addPostRequest.getUsername());
         log.info(":: image upload dir : " + uploadDir);
         if (image.isEmpty()) {
@@ -86,41 +89,26 @@ public class PostServiceImpl implements PostService {
             throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
         }
 
-        try {
-            // ensure the directory exist
-            File dir = new File(uploadDir);
-            if (!dir.exists()) dir.mkdir();
-
-            // create a unique file name
-            String uniqueFileImageName = System.currentTimeMillis() + "_" + addPostRequest.getUsername() + "_" + image.getOriginalFilename();
-            String imagePath = uploadDir + "/" + uniqueFileImageName;
-
-            // save file to the disk, either mac for local or server path for dev/prod
-            image.transferTo(new File(imagePath));
-            log.info(":: image > " + imagePath + " successfully uploaded.");
-
-            // getting user details data
-            Optional<UserEntity> userEntity = userRepository.findByUsername(addPostRequest.getUsername());
-
-            if (userEntity.isEmpty()) {
-                throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-            }
-
-            // attempt to save to repo
-            PostEntity postEntity = PostEntity.builder()
-                    .caption(addPostRequest.getCaption())
-                    .createdAt(LocalDateTime.now())
-                    .imageUrl(uniqueFileImageName)
-                    .user(userEntity.get())
-                    .build();
-
-            postCrudRepository.save(postEntity);
-        } catch (Exception e) {
-            throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        String objectName = fileStorageService.uploadFile(image, addPostRequest.getUsername(), ObjectStorageTypeGroup.POST_FEED);
+        Optional<UserEntity> user = userRepository.findByUsername(addPostRequest.getUsername());
+        user.ifPresentOrElse(
+                userEntity -> {
+                    PostEntity postEntity = PostEntity.builder()
+                            .caption(addPostRequest.getCaption())
+                            .createdAt(LocalDateTime.now())
+                            .imageUrl(objectName)
+                            .user(userEntity)
+                            .build();
+                    postCrudRepository.save(postEntity);
+                },
+                () -> {
+                    throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+                }
+        );
 
         return AddPostDTO.builder()
                 .status(GlobalMessage.CREATED.getMessage())
                 .build();
+
     }
 }

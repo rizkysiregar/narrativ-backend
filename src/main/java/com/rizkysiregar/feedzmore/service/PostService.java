@@ -12,5 +12,5 @@ import java.util.UUID;
 
 public interface PostService {
     PaginatedResponse<PostDTO> getAllPost(int page, int size, UUID userId);
-    AddPostDTO addNewPost(AddPostRequest addPostRequest, MultipartFile image);
+    AddPostDTO addNewPost(AddPostRequest addPostRequest, MultipartFile image) throws Exception ;
 }

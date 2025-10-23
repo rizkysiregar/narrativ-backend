@@ -32,10 +32,11 @@ public class FileController {
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public FileUploadResponse uploadFile(
             @RequestPart("file") MultipartFile file,
-            @RequestPart("userId") String userId
+            @RequestPart("userId") String userId,
+            @RequestPart("featureName") String featureName
     ) throws Exception {
 
-        String objectPath = fileStorageService.uploadFile(file, userId);
+        String objectPath = fileStorageService.uploadFile(file, userId, featureName);
 
         return FileUploadResponse.builder()
                 .fileName(file.getOriginalFilename())

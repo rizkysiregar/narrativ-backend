@@ -10,7 +10,7 @@ import org.springframework.web.multipart.MultipartFile;
  */
 
 public interface FileStorageService {
-    String uploadFile(MultipartFile file, String userId) throws Exception;
+    String uploadFile(MultipartFile file, String userId, String featureName) throws Exception;
 
     String getPresignUrl(String objectName) throws Exception;
 }

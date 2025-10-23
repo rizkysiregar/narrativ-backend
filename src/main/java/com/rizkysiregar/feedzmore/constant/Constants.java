@@ -1,4 +1,4 @@
-package com.rizkysiregar.feedzmore.util;
+package com.rizkysiregar.feedzmore.constant;
 
 import java.util.List;
 

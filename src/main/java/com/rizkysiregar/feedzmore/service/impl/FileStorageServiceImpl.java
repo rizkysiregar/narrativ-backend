@@ -34,7 +34,7 @@ public class FileStorageServiceImpl implements FileStorageService {
     }
 
     @Override
-    public String uploadFile(MultipartFile file, String userId) throws Exception {
+    public String uploadFile(MultipartFile file, String userId, String featureName) throws Exception {
         log.info(":: Trying to upload file to minio: {}, {}", file.getOriginalFilename(), userId);
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String originalName = file.getOriginalFilename();
@@ -45,7 +45,8 @@ public class FileStorageServiceImpl implements FileStorageService {
             extension = originalName.substring(originalName.lastIndexOf("."));
         }
 
-        String objectName = String.format("%s/%s_%s%s", userId, timestamp, "upload", extension);
+        // format it: userId/featureName/fileName
+        String objectName = String.format("%s/%s/%s_%s%s", userId, featureName, timestamp, "upload", extension);
 
         // ensure bucket exist
         boolean found = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build());
