@@ -6,6 +6,7 @@ public class Constants {
     public static final List<String> JWT_WHITELIST = List.of(
             "/register",
             "/login",
+            "/hello",
             "/res/photo",
             "/v3/api-docs/**",
             "/swagger-ui/**",
