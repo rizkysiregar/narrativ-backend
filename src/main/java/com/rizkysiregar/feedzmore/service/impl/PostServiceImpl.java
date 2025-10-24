@@ -35,8 +35,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class PostServiceImpl implements PostService {
-    @Value("${image.upload.dir.image-post}")
-    private String uploadDir;
 
     private final PostPaginationRepository postPaginationRepository;
     private final PostCrudRepository postCrudRepository;
@@ -47,27 +45,23 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public PaginatedResponse<PostDTO> getAllPost(int page, int size, UUID userId) {
-        log.info(":: Fetching post pagination with page=  " + page + ", size= " + size + " ,userId=" + userId);
+        log.info(":: Fetching post pagination with page=  {}, size= {} ,userId={}", page, size, userId);
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-//        Page<PostEntity> postPage = postPaginationRepository.findAll(pageable);
         Page<PostDTO> postPage = postPaginationRepository.findAllWithCounts(pageable, userId);
 
-
-//        List<PostDTO> postDto = postPage.getContent().stream().map(post -> {
-//            PostDTO dto = new PostDTO();
-//            dto.setId(post.getId());
-//            dto.setUsername(post.getUser().getUsername());
-//            dto.setCaption(post.getCaption());
-//            dto.setImageUrl(post.getImageUrl());
-//            dto.setCreatedAt(post.getCreatedAt());
-//            dto.setLikeCount(String.valueOf(likeRepository.countByPostId(post.getId())));
-//            dto.setCommentCount(String.valueOf(commentRepository.contByPostId(post.getId())));
-//            return dto;
-//        }).toList();
+        // Transform content.imageUrl with presign URLs
+        List<PostDTO> updatedContent = postPage.getContent().stream().peek(post -> {
+            try {
+                String url = fileStorageService.getPresignUrl(post.getImageUrl());
+                post.setImageUrl(url);
+            } catch (Exception e) {
+                log.error("## cannot get presign url for objectName= {}, because of= {}", post.getImageUrl(), e.getMessage());
+            }
+        }).toList();
 
 
         return new PaginatedResponse<>(
-                postPage.getContent(),
+                updatedContent,
                 postPage.getNumber(),
                 postPage.getSize(),
                 postPage.getTotalElements(),
@@ -77,8 +71,7 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public AddPostDTO addNewPost(AddPostRequest addPostRequest, MultipartFile image) throws Exception {
-        log.info("::. Entering PostServiceImpl.addNewPost by : " + addPostRequest.getUsername());
-        log.info(":: image upload dir : " + uploadDir);
+        log.info("::. Entering PostServiceImpl.addNewPost by : {}", addPostRequest.getUsername());
         if (image.isEmpty()) {
             log.error("Image is empty");
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
@@ -109,6 +102,5 @@ public class PostServiceImpl implements PostService {
         return AddPostDTO.builder()
                 .status(GlobalMessage.CREATED.getMessage())
                 .build();
-
     }
 }
