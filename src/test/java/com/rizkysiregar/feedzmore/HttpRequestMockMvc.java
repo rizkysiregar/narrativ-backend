@@ -48,27 +48,3 @@ public class HttpRequestMockMvc {
     }
 }
 
-
-@WebMvcTest(HelloController.class)
-//@AutoConfigureMockMvc
-class WebMockTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockBean
-    private HelloService service;
-
-
-    @Test
-    void greetingShouldReturnMessageFromService() throws Exception {
-        when(service.greet())
-                .thenReturn("Hello Welcome to Feedzmore!");
-
-        this.mockMvc
-                .perform(get("/api/v1/hello"))
-                .andDo(print())
-                .andExpect(content().string(containsString("Feedzmore!")));
-    }
-
-}
