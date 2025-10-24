@@ -53,13 +53,20 @@ secret:
 
 
 logging:
-#  level:
-#    org.hibernate.SQL: DEBUG
-#    org.hibernate.type.descriptor.sql: TRACE
-#    org.springframework.orm.jpa: DEBUG
+  #  level:
+  #    org.hibernate.SQL: DEBUG
+  #    org.hibernate.type.descriptor.sql: TRACE
+  #    org.springframework.orm.jpa: DEBUG
   config: classpath:logback.xml
   file:
     path: /Users/macbook/Feedzmore/logs
 
 otp:
   retry-time-in-seconds: 60
+
+
+minio:
+  endpoint: http://192.168.1.50:9000
+  bucket: test-bucket
+  access-key: rizkysiregar
+  secret-key: siregar123

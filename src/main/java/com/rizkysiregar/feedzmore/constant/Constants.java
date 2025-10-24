@@ -1,4 +1,4 @@
-package com.rizkysiregar.feedzmore.util;
+package com.rizkysiregar.feedzmore.constant;
 
 import java.util.List;
 
@@ -6,6 +6,7 @@ public class Constants {
     public static final List<String> JWT_WHITELIST = List.of(
             "/register",
             "/login",
+            "/hello",
             "/res/photo",
             "/v3/api-docs/**",
             "/swagger-ui/**",
