@@ -67,7 +67,7 @@ otp:
   retry-time-in-seconds: 60
 
 minio:
-  endpoint: http://192.168.1.50:9000
+  endpoint: http://192.168.1.50:9090
   bucket: test-bucket
   access-key: rizkysiregar
   secret-key: siregar123

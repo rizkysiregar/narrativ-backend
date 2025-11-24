@@ -22,7 +22,8 @@ public class Constants {
 
     public static final List<String> CORS_WHITELIST_ORIGIN = List.of(
             "http://localhost:53375",
-            "http://localhost:8083"
+            "http://localhost:8083",
+            "http://localhost:3000" // web admin react
     );
 
     public static final String INVALID_USERNAME_PASSWORD = "Invalid Username or Password";

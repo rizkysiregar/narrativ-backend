@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.controller;
 
+import com.rizkysiregar.feedzmore.model.request.BroadcastNotificationRequest;
 import com.rizkysiregar.feedzmore.service.firebase.FirebaseNotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -19,10 +20,8 @@ public class NotificationController {
 
     @PostMapping("/admin/broadcast/topic")
     public Mono<String> adminBroadcastTopic(
-            @RequestParam String title,
-            @RequestParam String topic,
-            @RequestParam String body
-    ) {
-        return notificationService.sendNotificationToTopic(topic, title, body);
+            @RequestBody BroadcastNotificationRequest request
+            ) {
+        return notificationService.sendNotificationToTopic(request.getTopic(), request.getTitle(), request.getBody());
     }
 }
