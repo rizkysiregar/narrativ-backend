@@ -15,10 +15,10 @@ public class RedisUtil implements CommandLineRunner {
 
     private final RedisTemplate<String, Object> redisTemplate;
 
-    @Value("${spring.redis.host}")
+    @Value("${spring.data.redis.host}")
     private String redisHost;
 
-    @Value("${spring.redis.port}")
+    @Value("${spring.data.redis.port}")
     private int redisPort;
 
     @Autowired
