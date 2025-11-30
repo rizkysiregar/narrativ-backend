@@ -19,10 +19,11 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
 
-  redis:
-    host: 192.168.1.50
-    port: 6379
-    timeout: 60000
+  data:
+    redis:
+      host: 192.168.1.50
+      port: 6379
+      timeout: 60000
 
   mail:
     host: smtp.gmail.com
@@ -67,7 +68,7 @@ otp:
   retry-time-in-seconds: 60
 
 minio:
-  endpoint: http://192.168.1.50:9090
+  endpoint: http://192.168.1.50:9000
   bucket: test-bucket
   access-key: rizkysiregar
   secret-key: siregar123
