@@ -40,15 +40,6 @@ spring:
           timeout: 10000
           writetimeout: 10000
 
-image:
-  upload:
-    dir:
-      image-profile: /home/rizkysiregar/feedzmore/media/images/profile
-      image-post: /home/rizkysiregar/feedzmore/media/images/post
-
-
-video:
-  dir: /home/rizkysiregar/feedzmore/media/videos
 
 secret:
   key: 6L9AYq7f9JS9KYRSu7oL416WYSJPLuYaavlhgRnBbAY=

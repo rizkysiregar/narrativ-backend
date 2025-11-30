@@ -19,7 +19,17 @@ import java.nio.file.Path;
 @Service
 @Slf4j
 public class ResourceServiceImpl implements ResourceService {
+    @Override
+    public ResponseEntity<Resource> getResourceImage(String fileName) {
+        return null;
+    }
 
+    @Override
+    public ResponseEntity<InputStreamResource> streamVideo(String fileName, String rangeHeader) {
+        return null;
+    }
+
+    /*
     @Value("${video.dir}")
     private String videoDir;
     private final FileStorageConfig fileStorageConfig;
@@ -27,6 +37,7 @@ public class ResourceServiceImpl implements ResourceService {
     public ResourceServiceImpl(FileStorageConfig fileStorageConfig) {
         this.fileStorageConfig = fileStorageConfig;
     }
+
 
 
     @Override
@@ -79,4 +90,6 @@ public class ResourceServiceImpl implements ResourceService {
 
         return null;
     }
+
+     */
 }

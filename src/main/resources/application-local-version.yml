@@ -1,6 +1,8 @@
+# Use this env for local but using service on the ubuntu server
+
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/feedzmore
+    url: jdbc:postgresql://192.168.1.50:5432/feedzmore
     username: postgres
     password: postgres
     hikari:
@@ -19,7 +21,7 @@ spring:
 
   data:
     redis:
-      host: localhost
+      host: 192.168.1.50
       port: 6379
       timeout: 60000
 
@@ -37,36 +39,15 @@ spring:
           connectiontimeout: 10000
           timeout: 10000
           writetimeout: 10000
-image:
-  upload:
-    dir:
-      image-profile: /Users/macbook/Feedzmore/media/images/profile
-      image-post: /Users/macbook/Feedzmore/media/images/post
-
-
-video:
-  dir: /Users/macbook/Feedzmore/media/videos
 
 secret:
   key: 6L9AYq7f9JS9KYRSu7oL416WYSJPLuYaavlhgRnBbAY=
 
-
-
-logging:
-  #  level:
-  #    org.hibernate.SQL: DEBUG
-  #    org.hibernate.type.descriptor.sql: TRACE
-  #    org.springframework.orm.jpa: DEBUG
-  config: classpath:logback.xml
-  file:
-    path: /Users/macbook/Feedzmore/logs
-
 otp:
   retry-time-in-seconds: 60
 
-
 minio:
-  endpoint: http:/localhost:9000
-  bucket: feed-post-bucket
+  endpoint: http://192.168.1.50:9000
+  bucket: test-bucket
   access-key: rizkysiregar
   secret-key: siregar123

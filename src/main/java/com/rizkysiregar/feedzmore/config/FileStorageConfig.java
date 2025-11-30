@@ -13,6 +13,7 @@ import java.nio.file.Paths;
 @Component
 @Slf4j
 public class FileStorageConfig {
+    /*
     @Value("${image.upload.dir.image-post}")
     private String postImageDir;
     @Value("${image.upload.dir.image-profile}")
@@ -47,5 +48,7 @@ public class FileStorageConfig {
             throw new RuntimeException("Could not initialize file storage location", e);
         }
     }
+
+     */
 
 }
