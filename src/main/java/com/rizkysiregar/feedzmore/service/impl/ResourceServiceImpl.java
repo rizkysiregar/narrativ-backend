@@ -1,33 +1,37 @@
 package com.rizkysiregar.feedzmore.service.impl;
 
-import com.rizkysiregar.feedzmore.config.FileStorageConfig;
+import com.rizkysiregar.feedzmore.model.dto.ImageObject;
+import com.rizkysiregar.feedzmore.service.FileStorageService;
 import com.rizkysiregar.feedzmore.service.ResourceService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-
-import java.io.File;
-import java.net.MalformedURLException;
-import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class ResourceServiceImpl implements ResourceService {
-    @Override
-    public ResponseEntity<Resource> getResourceImage(String fileName) {
-        return null;
-    }
+
+    private final FileStorageService fileStorageService;
 
     @Override
-    public ResponseEntity<InputStreamResource> streamVideo(String fileName, String rangeHeader) {
-        return null;
+    public ResponseEntity<InputStreamResource> getFile(String fileName, String bucketName) {
+        ImageObject object = fileStorageService.getObject(fileName, bucketName);
+        log.info("object: {}", object);
+
+        return ResponseEntity.ok()
+                .contentType(object.getContentType())
+                .contentLength(object.getSize())
+                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS))
+                .body(new InputStreamResource(object.getStream()));
     }
+
+
+
 
     /*
     @Value("${video.dir}")

@@ -15,7 +15,6 @@ import com.rizkysiregar.feedzmore.service.FileStorageService;
 import com.rizkysiregar.feedzmore.service.PostService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -52,8 +51,8 @@ public class PostServiceImpl implements PostService {
         // Transform content.imageUrl with presign URLs
         List<PostDTO> updatedContent = postPage.getContent().stream().peek(post -> {
             try {
-                String url = fileStorageService.getPresignUrl(post.getImageUrl());
-                post.setImageUrl(url);
+                //String url = fileStorageService.getPresignUrl(post.getImageUrl());
+                post.setImageUrl(post.getImageUrl());
             } catch (Exception e) {
                 log.error("## cannot get presign url for objectName= {}, because of= {}", post.getImageUrl(), e.getMessage());
             }

@@ -1,13 +1,19 @@
 package com.rizkysiregar.feedzmore.service.impl;
 
+import com.rizkysiregar.feedzmore.constant.GlobalMessage;
+import com.rizkysiregar.feedzmore.exception.BusinessException;
+import com.rizkysiregar.feedzmore.model.dto.ImageObject;
 import com.rizkysiregar.feedzmore.service.FileStorageService;
 import io.minio.*;
 import io.minio.http.Method;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.awt.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
@@ -79,5 +85,39 @@ public class FileStorageServiceImpl implements FileStorageService {
                         .expiry(1, TimeUnit.HOURS)
                         .build()
         );
+    }
+
+    @Override
+    public ImageObject getObject(String objectName, String bucketName) {
+        try {
+            // get metadata first
+            StatObjectResponse stat = minioClient.statObject(
+                    StatObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .build()
+            );
+
+            // now stream the file
+            GetObjectResponse response = minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .build()
+            );
+
+            MediaType contentType = MediaType.parseMediaType(stat.contentType());
+            long size = stat.size();  // CORRECT SIZE
+
+            return ImageObject.builder()
+                    .stream(response)
+                    .contentType(contentType)
+                    .size(size)
+                    .build();
+
+        } catch (Exception e) {
+            log.error(":: get object failed, objectName: {}", objectName);
+            throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 }
