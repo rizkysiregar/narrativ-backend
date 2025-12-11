@@ -16,5 +16,6 @@ spring:
     name: feedzmore-service
   profiles:
 #    active: local-version
+#    active: tailscale-version
     active: dev-version
 #    active: prod-version

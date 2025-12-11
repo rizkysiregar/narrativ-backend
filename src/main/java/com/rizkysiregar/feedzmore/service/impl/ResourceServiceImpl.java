@@ -3,12 +3,15 @@ package com.rizkysiregar.feedzmore.service.impl;
 import com.rizkysiregar.feedzmore.model.dto.ImageObject;
 import com.rizkysiregar.feedzmore.service.FileStorageService;
 import com.rizkysiregar.feedzmore.service.ResourceService;
+import com.rizkysiregar.feedzmore.util.Helper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -20,16 +23,42 @@ public class ResourceServiceImpl implements ResourceService {
 
     @Override
     public ResponseEntity<InputStreamResource> getFile(String fileName, String bucketName) {
+
         ImageObject object = fileStorageService.getObject(fileName, bucketName);
         log.info("object: {}", object);
 
+        // contentType from MinIO (MediaType)
+        MediaType mediaType = object.getContentType();
+        String contentType = null;
+
+        if (mediaType != null) {
+            contentType = mediaType.toString();
+        }
+
+        // Check invalid content type
+        if (contentType == null ||
+                contentType.trim().isEmpty() ||
+                contentType.equalsIgnoreCase("image/*") ||
+                contentType.endsWith("/*")) {
+
+            log.info("Invalid contentType '{}', detecting based on filename", contentType);
+            contentType = Helper.detectContentTypeFromFilename(fileName);
+        }
+
+        // Final fallback
+        if (contentType == null) {
+            log.info("Content type is null, fallback to APPLICATION_OCTET_STREAM");
+            contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        }
+
+        log.info("## final contentType: {}", contentType);
+
         return ResponseEntity.ok()
-                .contentType(object.getContentType())
+                .contentType(MediaType.parseMediaType(contentType))
                 .contentLength(object.getSize())
                 .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS))
                 .body(new InputStreamResource(object.getStream()));
     }
-
 
 
 

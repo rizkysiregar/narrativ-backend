@@ -1,0 +1,53 @@
+# Use this env for local but using service on the ubuntu server
+
+spring:
+  datasource:
+    url: jdbc:postgresql://100.126.105.106:5432/feedzmore
+    username: postgres
+    password: postgres
+    hikari:
+      connection-timeout: 20000
+      minimum-idle: 10
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      max-lifetime: 90000
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    generate-ddl: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+
+  data:
+    redis:
+      host: 100.126.105.106
+      port: 6379
+      timeout: 60000
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: feedzmore.helpdesk@gmail.com
+    password: xonklbrmdytyhnuk
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+
+secret:
+  key: 6L9AYq7f9JS9KYRSu7oL416WYSJPLuYaavlhgRnBbAY=
+
+otp:
+  retry-time-in-seconds: 60
+
+minio:
+  endpoint: http://100.126.105.106:9000
+  bucket: test-bucket
+  access-key: rizkysiregar
+  secret-key: siregar123
