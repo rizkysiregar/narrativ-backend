@@ -71,35 +71,41 @@ public class PostServiceImpl implements PostService {
     @Override
     public AddPostDTO addNewPost(AddPostRequest addPostRequest, MultipartFile image) throws Exception {
         log.info("::. Entering PostServiceImpl.addNewPost by : {}", addPostRequest.getUsername());
-        if (image.isEmpty()) {
-            log.error("Image is empty");
+
+        if (userRepository.findByUsername(addPostRequest.getUsername()).isPresent()) {
+            if (image.isEmpty()) {
+                log.error("Image is empty");
+                throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+            }
+
+            if (image.getSize() > 5 * 1024 * 1024) { // Limit to max 5 mb
+                log.error("Image too large");
+                throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
+            }
+
+            String objectName = fileStorageService.uploadFile(image, addPostRequest.getUsername(), ObjectStorageTypeGroup.POST_FEED);
+            Optional<UserEntity> user = userRepository.findByUsername(addPostRequest.getUsername());
+            user.ifPresentOrElse(
+                    userEntity -> {
+                        PostEntity postEntity = PostEntity.builder()
+                                .caption(addPostRequest.getCaption())
+                                .createdAt(LocalDateTime.now())
+                                .imageUrl(objectName)
+                                .user(userEntity)
+                                .build();
+                        postCrudRepository.save(postEntity);
+                    },
+                    () -> {
+                        throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+                    }
+            );
+
+            return AddPostDTO.builder()
+                    .status(GlobalMessage.CREATED.getMessage())
+                    .build();
+        } else {
+            log.error("::. Username not found {}", addPostRequest.getUsername());
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
-
-        if (image.getSize() > 5 * 1024 * 1024) { // Limit to max 5 mb
-            log.error("Image too large");
-            throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
-        }
-
-        String objectName = fileStorageService.uploadFile(image, addPostRequest.getUsername(), ObjectStorageTypeGroup.POST_FEED);
-        Optional<UserEntity> user = userRepository.findByUsername(addPostRequest.getUsername());
-        user.ifPresentOrElse(
-                userEntity -> {
-                    PostEntity postEntity = PostEntity.builder()
-                            .caption(addPostRequest.getCaption())
-                            .createdAt(LocalDateTime.now())
-                            .imageUrl(objectName)
-                            .user(userEntity)
-                            .build();
-                    postCrudRepository.save(postEntity);
-                },
-                () -> {
-                    throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-                }
-        );
-
-        return AddPostDTO.builder()
-                .status(GlobalMessage.CREATED.getMessage())
-                .build();
     }
 }
