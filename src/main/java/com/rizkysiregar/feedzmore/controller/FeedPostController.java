@@ -19,8 +19,11 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/posts")
 public class FeedPostController {
-    @Autowired
-    private PostService postService;
+
+    private final PostService postService;
+    public FeedPostController(PostService postService) {
+        this.postService = postService;
+    }
 
     @GetMapping
     public PaginatedResponse<PostDTO> getAllPosts(

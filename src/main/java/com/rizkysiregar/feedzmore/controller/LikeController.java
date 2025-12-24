@@ -12,8 +12,11 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/post")
 public class LikeController {
-    @Autowired
-    private LikeUnlikeService likeUnlikeService;
+
+    private final LikeUnlikeService likeUnlikeService;
+    public LikeController(LikeUnlikeService likeUnlikeService) {
+        this.likeUnlikeService = likeUnlikeService;
+    }
 
     @PostMapping("/like")
     public Operation likePost(@RequestBody LikeUnlikePostRequest likeUnlikePostRequest) {

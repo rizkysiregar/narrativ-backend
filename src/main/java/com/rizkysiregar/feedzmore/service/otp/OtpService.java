@@ -29,24 +29,22 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class OtpService implements IOtpService {
 
-    @Autowired
-    private OtpCodeRepository otpCodeRepository;
-
-    @Autowired
-    private IEmailService emailService;
-
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private RedisUtil redisUtil;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+    private final OtpCodeRepository otpCodeRepository;
+    private final IEmailService emailService;
+    private final UserRepository userRepository;
+    private final RedisUtil redisUtil;
+    private final ObjectMapper objectMapper;
 
     @Value("${otp.retry-time-in-seconds}")
     String otpRetryTimeInSeconds;
+
+    public OtpService(OtpCodeRepository otpCodeRepository, IEmailService emailService, UserRepository userRepository, RedisUtil redisUtil, ObjectMapper objectMapper) {
+        this.otpCodeRepository = otpCodeRepository;
+        this.emailService = emailService;
+        this.userRepository = userRepository;
+        this.redisUtil = redisUtil;
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     public SentOtpDTO sendOtp(String email) {

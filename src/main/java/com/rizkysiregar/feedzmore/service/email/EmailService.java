@@ -24,11 +24,13 @@ public class EmailService implements IEmailService {
 //    @Value("${mail.username}")
 //    String fromEmail;
 
-    @Autowired
-    JavaMailSender mailSender;
+    private final JavaMailSender mailSender;
+    private final TemplateEngine templateEngine;
 
-    @Autowired
-    private TemplateEngine templateEngine;
+    public EmailService(JavaMailSender mailSender, TemplateEngine templateEngine) {
+        this.mailSender = mailSender;
+        this.templateEngine = templateEngine;
+    }
 
     @Override
     public void sendEmail(String to, String subject, String body) {

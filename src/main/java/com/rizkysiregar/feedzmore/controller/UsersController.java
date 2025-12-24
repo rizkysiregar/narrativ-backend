@@ -28,11 +28,13 @@ import org.springframework.web.bind.annotation.*;
 @SecurityRequirement(name = "Bearer Authentication")
 public class UsersController {
 
-    @Autowired
-    UsersService usersService;
+    final UsersService usersService;
+    private final IOtpService otpService;
 
-    @Autowired
-    private IOtpService otpService;
+    public UsersController(UsersService usersService, IOtpService otpService) {
+        this.usersService = usersService;
+        this.otpService = otpService;
+    }
 
 
     @ApiOperation(value = "Register a new user", notes = "use this to register a new user")
