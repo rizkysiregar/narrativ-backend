@@ -2,16 +2,20 @@ package com.rizkysiregar.feedzmore.service;
 
 import com.rizkysiregar.feedzmore.config.RedisUtil;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
+import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserRegisterDto;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.ResetPasswordRequest;
 import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
+import com.rizkysiregar.feedzmore.model.request.UserSearchRequest;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.util.Operation;
+import jakarta.persistence.criteria.Predicate;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -21,22 +25,28 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @Slf4j
 public class UsersService {
 
-    @Autowired
-    UserRepository userRepository;
-    @Autowired
-    AuthenticationManager authManager;
-    @Autowired
-    JWTService jwtService;
-    @Autowired
-    private RedisUtil redisUtil;
+    final UserRepository userRepository;
+    final AuthenticationManager authManager;
+    final JWTService jwtService;
+    private final RedisUtil redisUtil;
 
-    private BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
+    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
+
+    public UsersService(UserRepository userRepository, AuthenticationManager authManager, JWTService jwtService, RedisUtil redisUtil) {
+        this.userRepository = userRepository;
+        this.authManager = authManager;
+        this.jwtService = jwtService;
+        this.redisUtil = redisUtil;
+    }
 
     public UserRegisterDto register(UserEntity userEntity) {
         if (userEntity.getUsername() == null || userEntity.getPassword() == null) {
@@ -97,6 +107,41 @@ public class UsersService {
         userRepository.save(user);
 
         return Operation.UPDATED;
+    }
+
+    public UserDetailDTO getUserById(String userId) {
+        log.info("Getting user by userId: {}", userId);
+        return userRepository.findById(UUID.fromString(userId))
+                .map(UserDetailDTO::from)
+                .orElseThrow(() ->
+                        new BusinessException(
+                                GlobalMessage.NOT_FOUND,
+                                HttpStatus.NOT_FOUND
+                        )
+                );
+    }
+
+    public Page<UserDetailDTO> search(UserSearchRequest request, Pageable pageable) {
+        log.info("## search users request: {}", request);
+
+        Page<UserEntity> users = userRepository.findAll((root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (request.username() != null) {
+                predicates.add(cb.like(
+                        cb.lower(root.get("username")),
+                        "%" + request.username().toLowerCase() + "%"
+                ));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        }, pageable);
+
+        if (users.isEmpty()) {
+            throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
+        }
+
+        return users.map(UserDetailDTO::from);
     }
 
 }

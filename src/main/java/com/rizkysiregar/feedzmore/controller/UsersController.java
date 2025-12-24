@@ -4,19 +4,20 @@ import com.rizkysiregar.feedzmore.model.dto.*;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.ResetPasswordRequest;
 import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
+import com.rizkysiregar.feedzmore.model.request.UserSearchRequest;
 import com.rizkysiregar.feedzmore.model.request.VerifyOtpRequest;
 import com.rizkysiregar.feedzmore.service.UsersService;
 import com.rizkysiregar.feedzmore.service.otp.IOtpService;
 import com.rizkysiregar.feedzmore.util.Operation;
 import io.swagger.annotations.ApiOperation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -66,4 +67,25 @@ public class UsersController {
     public Operation confirmResetPassword(@Valid @RequestBody ResetPasswordRequest resetPasswordRequest) {
         return usersService.confirmResetPassword(resetPasswordRequest);
     }
+
+    @ApiOperation(value = "Getting user details data by userId", notes = "pass userId that you got from login response")
+    @GetMapping("/user/{userId}")
+    public UserDetailDTO getUserById(@PathVariable String userId) {
+        return usersService.getUserById(userId);
+    }
+
+
+    @ApiOperation(value = "Getting registered user base on some data that its have", notes = "the argument is dynamic, can be change base on requirement")
+    @GetMapping("/users")
+    public Page<UserDetailDTO> searchUsers(
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String name,
+            @Parameter(hidden = true) Pageable pageable
+    ) {
+        return usersService.search(
+                new UserSearchRequest(username, name),
+                pageable
+        );
+    }
+
 }
