@@ -1,5 +1,8 @@
 # Use this env for ubuntu-server
 
+server:
+  forward-headers-strategy: framework
+
 spring:
   datasource:
     url: jdbc:postgresql://192.168.1.50:5432/feedzmore
@@ -44,8 +47,6 @@ spring:
 secret:
   key: 6L9AYq7f9JS9KYRSu7oL416WYSJPLuYaavlhgRnBbAY=
 
-
-
 logging:
   #  level:
   #    org.hibernate.SQL: DEBUG
@@ -63,3 +64,7 @@ minio:
   bucket: test-bucket
   access-key: rizkysiregar
   secret-key: siregar123
+
+springdoc:
+  swagger-ui:
+    use-root-path: true
