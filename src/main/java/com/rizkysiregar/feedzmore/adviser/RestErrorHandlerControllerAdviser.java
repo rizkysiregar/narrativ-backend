@@ -28,7 +28,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ExceptionHandler(Exception.class)
     @ResponseStatus(value = HttpStatus.INTERNAL_SERVER_ERROR)
     public ResponseEntity<?> exception(Exception e) {
-        log.error("Exception = {}", e.getMessage());
+        log.error("Exception = ", e);
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.INTERNAL_ERROR.getCode())
                 .message(HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase())
@@ -39,7 +39,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ExceptionHandler(BusinessException.class)
     @ResponseStatus(value = HttpStatus.INTERNAL_SERVER_ERROR)
     public ResponseEntity<?> businessException(BusinessException e) {
-        log.error("BusinessException = {}", e.getMessage());
+        log.error("BusinessException = ", e);
         return new ResponseEntity<>(
                 BaseResponse.builder()
                         .code(e.getCode())
@@ -52,7 +52,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ExceptionHandler(BadCredentialsException.class)
     @ResponseStatus(value = HttpStatus.UNAUTHORIZED)
     public ResponseEntity<?> badCredentialsException(BadCredentialsException e) {
-        log.warn("BadCredentialsException = {}", e.getMessage());
+        log.warn("BadCredentialsException = ", e);
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.UNAUTHORIZED.getCode())
                 .message(e.getMessage())
@@ -85,7 +85,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ExceptionHandler(ConstraintViolationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<?> handleConstraintViolationException(ConstraintViolationException ex) {
-        log.warn("## handleConstraintViolationException {}", ex.getMessage());
+        log.warn("## handleConstraintViolationException = ", ex);
 //        Map<String, String> errors = new HashMap<>();
 //        ex.getConstraintViolations().forEach(cv -> {
 //            String field = cv.getPropertyPath().iterator().next().getName();

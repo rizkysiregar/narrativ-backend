@@ -111,14 +111,22 @@ public class UsersService {
 
     public UserDetailDTO getUserById(String userId) {
         log.info("Getting user by userId: {}", userId);
-        return userRepository.findById(UUID.fromString(userId))
-                .map(UserDetailDTO::from)
-                .orElseThrow(() ->
-                        new BusinessException(
-                                GlobalMessage.NOT_FOUND,
-                                HttpStatus.NOT_FOUND
-                        )
-                );
+        try {
+            return userRepository.findById(UUID.fromString(userId))
+                    .map(UserDetailDTO::from)
+                    .orElseThrow(() ->
+                            new BusinessException(
+                                    GlobalMessage.NOT_FOUND,
+                                    HttpStatus.NOT_FOUND
+                            )
+                    );
+        } catch (IllegalArgumentException illegalArgumentException) { // not a valid UUID Pattern
+            log.error("Illegal argument exception", illegalArgumentException);
+            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        } catch (Exception e) {
+            log.error("Error while getting user by userId: {}", userId, e);
+            throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     public Page<UserDetailDTO> search(UserSearchRequest request, Pageable pageable) {
