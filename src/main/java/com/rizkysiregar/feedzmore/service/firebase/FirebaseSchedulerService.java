@@ -3,41 +3,44 @@ package com.rizkysiregar.feedzmore.service.firebase;
 
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
-import com.rizkysiregar.feedzmore.model.entity.FcmBroadcastEntity;
 import com.rizkysiregar.feedzmore.model.entity.JobExecutionLog;
-import com.rizkysiregar.feedzmore.repository.FcmBroadcastMessageRepository;
+import com.rizkysiregar.feedzmore.model.entity.NotificationTemplateEntity;
 import com.rizkysiregar.feedzmore.repository.JobExecutionLogRepository;
+import com.rizkysiregar.feedzmore.repository.NotificationTemplateRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
 @Slf4j
 public class FirebaseSchedulerService {
     private final FirebaseNotificationService notificationService;
-    private final FcmBroadcastMessageRepository broadcastMessageRepository;
     private final JobExecutionLogRepository jobExecutionLogRepository;
+    private final NotificationTemplateRepository notificationTemplateRepository;
     private static final String FIREBASE_BROADCAST_JOB = "firebase_broadcast_job";
     private static final Duration INTERVAL_BROADCAST = Duration.ofHours(8);
+//    private static final Duration INTERVAL_BROADCAST = Duration.ofMillis(10);
 
 
     public FirebaseSchedulerService(FirebaseNotificationService notificationService,
-                                    FcmBroadcastMessageRepository broadcastMessageRepository,
-                                    JobExecutionLogRepository jobExecutionLogRepository
+                                    JobExecutionLogRepository jobExecutionLogRepository,
+                                    NotificationTemplateRepository notificationTemplateRepository
     ) {
         this.notificationService = notificationService;
-        this.broadcastMessageRepository = broadcastMessageRepository;
         this.jobExecutionLogRepository = jobExecutionLogRepository;
+        this.notificationTemplateRepository = notificationTemplateRepository;
     }
 
-    @Scheduled(fixedRate = 60 * 60 * 1000) // Check every hour
-    //@Scheduled(fixedRate = 8 * 60 * 60 * 1000) // Every 8 hours or (28,800,000 ms)
-    //@Scheduled(fixedRate = 30 * 1000) // Runs every 30 seconds or (30,000 ms) for testing
+    //@Scheduled(fixedRate = 60 * 60 * 1000) // Check every hour
+    @Scheduled(fixedRate = 8 * 60 * 60 * 1000) // Every 8 hours or (28,800,000 ms)
+    //@Scheduled(fixedRate = 10 * 1000) // Runs every 10 seconds or (10,000 ms) for testing
     public void sendSchedulerNotification() {
         log.info("## schedule messaging called!");
         Optional<JobExecutionLog> logOpt = jobExecutionLogRepository.findById(FIREBASE_BROADCAST_JOB);
@@ -48,30 +51,27 @@ public class FirebaseSchedulerService {
 
         JobExecutionLog jobExecutionLog = logOpt.get();
         if (jobExecutionLog.getLastExecutedAt().plus(INTERVAL_BROADCAST).isBefore(now)) {
-            String messageName = "REUSABLE-GREETINGS";
-            Optional<FcmBroadcastEntity> entity = broadcastMessageRepository.findByMessageName(messageName);
-            if (entity.isPresent()) {
+
+            List<NotificationTemplateEntity> casualTemplate = notificationTemplateRepository.findRandomCasual();
+            if (!casualTemplate.isEmpty()) {
+                NotificationTemplateEntity notificationTemplateEntity = casualTemplate.get(0);
                 Mono<String> responseMono = notificationService.sendNotificationToTopic(
-                        entity.get().getTopic(),
-                        entity.get().getTitle(),
-                        entity.get().getBody()
+                        "global",
+                        notificationTemplateEntity.getTitle(),
+                        notificationTemplateEntity.getBody()
                 );
 
                 responseMono.subscribe(
                         response -> log.info("Scheduler Notification Response {}", response),
                         error -> log.error("Error sending scheduler notification", error)
                 );
-
                 jobExecutionLog.setLastExecutedAt(now);
                 jobExecutionLogRepository.save(jobExecutionLog);
             } else {
-                log.error("## ERROR Broadcast with message : {} NOT FOUND !", messageName);
-                throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
+                log.warn("No casual notification template found for notification template");
             }
         } else {
             log.info("## Not yet time to broadcast a message");
         }
     }
-
-
 }
