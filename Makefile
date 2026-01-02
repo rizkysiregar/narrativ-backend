@@ -34,3 +34,9 @@ stop:
 # Clean up dangling images
 clean:
 	docker system prune -f
+
+
+sonar-verify:
+	 mvn clean verify sonar:sonar \
+      -Dsonar.host.url=http://192.168.1.50:9001 \
+      -Dsonar.login=squ_cb8ca84be08e1ef1cf41db8a19338108a7d34c9a
