@@ -52,16 +52,20 @@ public class OtpService implements IOtpService {
         log.info("## retry in seconds: {}", otpRetryTimeInSeconds);
         Optional<UserEntity> byEmail = userRepository.findByEmail(email);
         if (byEmail.isPresent()) {
-            if (Boolean.TRUE.equals(redisUtil.hasKey("otp:" + email))) {
+            if (redisUtil.hasKey("otp:" + email)) {
                 throw new BusinessException(GlobalMessage.TOO_MANY_REQUEST_OTP, HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
             }
 
             String otp = generateOtp();
             LocalDateTime expirationTime = LocalDateTime.now().plusSeconds(Long.parseLong(otpRetryTimeInSeconds));
 
-//            String message = "Your password reset OTP is: " + otp;
-//            emailService.sendEmail(email, "Password Reset OTP", message);
-            emailService.sendOtpEmail(email, otp);
+            // sending otp via email
+            boolean sendStatus = emailService.sendOtpEmail(email, otp);
+
+            if (!sendStatus) {
+                log.error("## Failed to send OTP to email: {}", email);
+                throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+            }
 
             OtpCode otpCode = OtpCode.builder()
                     .email(email)
