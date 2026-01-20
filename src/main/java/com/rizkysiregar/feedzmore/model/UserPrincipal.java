@@ -7,12 +7,18 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.UUID;
 
 public class UserPrincipal implements UserDetails {
 
     private UserEntity userEntity;
     public UserPrincipal(UserEntity userEntity) {
         this.userEntity = userEntity;
+    }
+
+    // customer
+    public UUID getUserId() {
+        return this.userEntity.getId();
     }
 
     @Override
