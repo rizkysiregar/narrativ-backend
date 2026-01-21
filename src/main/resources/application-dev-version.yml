@@ -60,7 +60,8 @@ otp:
   retry-time-in-seconds: 60
 
 minio:
-  endpoint: http://minio:9000
+  #endpoint: http://minio:9000
+  endpoint: https://minio-feedzmore-dev.rizkysiregar.my.id/
   bucket: test-bucket
   access-key: rizkysiregar
   secret-key: siregar123
