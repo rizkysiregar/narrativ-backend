@@ -51,8 +51,7 @@ public class PostServiceImpl implements PostService {
         // Transform content.imageUrl with presign URLs
         List<PostDTO> updatedContent = postPage.getContent().stream().peek(post -> {
             try {
-                //String url = fileStorageService.getPresignUrl(post.getImageUrl());
-                post.setImageUrl(post.getImageUrl());
+                post.setImageUrl(fileStorageService.getPresignUrl(post.getImageUrl()));
             } catch (Exception e) {
                 log.error("## cannot get presign url for objectName= {}, because of= {}", post.getImageUrl(), e.getMessage());
             }
