@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.service.firebase;
 
+import com.rizkysiregar.feedzmore.service.UserDeviceService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,9 @@ public class FirebaseNotificationServiceTest {
     @Mock
     private FirebaseTokenService firebaseTokenService;
 
+    @Mock
+    private UserDeviceService userDeviceService;
+
     private FirebaseNotificationService notificationService;
 
     @BeforeEach
@@ -33,7 +37,7 @@ public class FirebaseNotificationServiceTest {
         when(webClientBuilder.baseUrl("https://fcm.googleapis.com/v1")).thenReturn(webClientBuilder);
         when(webClientBuilder.build()).thenReturn(webClient);
         // Manually construct service after stubbing builder
-        notificationService = new FirebaseNotificationService(webClientBuilder, firebaseTokenService);
+        notificationService = new FirebaseNotificationService(webClientBuilder, firebaseTokenService, userDeviceService);
     }
     
     @Test
