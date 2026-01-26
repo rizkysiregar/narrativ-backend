@@ -3,6 +3,8 @@ package com.rizkysiregar.feedzmore.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rizkysiregar.feedzmore.config.RedisUtil;
+import com.rizkysiregar.feedzmore.constant.GlobalMessage;
+import com.rizkysiregar.feedzmore.model.dto.ResetTokenDTO;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.repository.OtpCodeRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
@@ -60,6 +62,7 @@ public class OtpServiceTest {
         ReflectionTestUtils.setField(otpService, "otpRetryTimeInSeconds", "60");
 
         ArgumentCaptor<String> otpCaptor = ArgumentCaptor.forClass(String.class);
+        java.time.LocalDateTime beforeCall = java.time.LocalDateTime.now();
 
         // Act
         SentOtpDTO result = otpService.sendOtp(email);
@@ -77,6 +80,12 @@ public class OtpServiceTest {
         Assertions.assertEquals(email, saved.getEmail());
         Assertions.assertEquals(generatedOtp, saved.getOtp());
         Assertions.assertNotNull(saved.getExpirationTime());
+        // expiration should be roughly now + 60 seconds (allow generous window to avoid flakiness)
+        java.time.LocalDateTime lowerBound = beforeCall.plusSeconds(45);
+        java.time.LocalDateTime upperBound = beforeCall.plusSeconds(90);
+        Assertions.assertTrue(!saved.getExpirationTime().isBefore(lowerBound)
+                        && !saved.getExpirationTime().isAfter(upperBound),
+                "Expiration time should be within 45-90 seconds from before-call timestamp");
 
         // Verify Redis set with ttl 60
         verify(redisUtil, times(1)).set("otp:" + email, generatedOtp, 60);
@@ -141,5 +150,82 @@ public class OtpServiceTest {
         verify(otpCodeRepository, never()).save(any());
         verify(redisUtil, never()).set(anyString(), any(), anyInt());
     }
+
+    @Test
+    void verifyOtp_Success() {
+        // Arrange
+        String email = "test@mail.com";
+        String otp = "123456";
+        when(redisUtil.get("otp:" + email)).thenReturn(otp);
+
+        // Act
+        ResetTokenDTO resetTokenDTO = otpService.verifyOtp(email, otp);
+
+        // Assert
+        Assertions.assertNotNull(resetTokenDTO);
+        Assertions.assertNotNull(resetTokenDTO.getResetToken());
+        // verify redis get and set interactions
+        verify(redisUtil, times(1)).get("otp:" + email);
+        verify(redisUtil, times(1)).set("reset_token:" + email, resetTokenDTO.getResetToken(), 600);
+        // reset token should look like a UUID
+        Assertions.assertTrue(resetTokenDTO.getResetToken().matches("[a-f0-9\\-]{36}"), "Reset token should be a UUID string");
+    }
+
+
+    @Test
+    void verifyOtp_Otp_Not_Found_Or_Expired() {
+        // Arrange
+        String email = "test@mail.com";
+        String otp = "123456";
+        when(redisUtil.get("otp:" + email)).thenReturn(null);
+
+        // Act & Assert
+        BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.verifyOtp(email, otp));
+        Assertions.assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        Assertions.assertEquals(GlobalMessage.OTP_EXPIRED.getMessage(), ex.getMessage());
+        verify(redisUtil, times(1)).get("otp:" + email);
+    }
+
+    @Test
+    void verifyOtp_Otp_Not_Match() {
+        // Arrange
+        String email = "test@mail.com";
+        String otp = "123456";
+        when(redisUtil.get("otp:" + email)).thenReturn("12345");
+
+        // Act & Assert
+        BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.verifyOtp(email, otp));
+        Assertions.assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        Assertions.assertEquals(GlobalMessage.INVALID_OTP.getMessage(), ex.getMessage());
+        verify(redisUtil, times(1)).get("otp:" + email);
+    }
+
+
+    @Test
+    void verifyOtp_Null_Input_Should_Return_InvalidOtp() {
+        // Arrange
+        String email = "test@mail.com";
+        when(redisUtil.get("otp:" + email)).thenReturn("654321");
+
+        // Act & Assert
+        BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.verifyOtp(email, null));
+        Assertions.assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        Assertions.assertEquals(GlobalMessage.INVALID_OTP.getMessage(), ex.getMessage());
+        verify(redisUtil, times(1)).get("otp:" + email);
+    }
+
+    @Test
+    void verifyOtp_Empty_Input_Should_Return_InvalidOtp() {
+        // Arrange
+        String email = "test@mail.com";
+        when(redisUtil.get("otp:" + email)).thenReturn("654321");
+
+        // Act & Assert
+        BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.verifyOtp(email, ""));
+        Assertions.assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        Assertions.assertEquals(GlobalMessage.INVALID_OTP.getMessage(), ex.getMessage());
+        verify(redisUtil, times(1)).get("otp:" + email);
+    }
+
 
 }
