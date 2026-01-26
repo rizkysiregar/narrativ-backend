@@ -48,11 +48,6 @@ secret:
   key: 6L9AYq7f9JS9KYRSu7oL416WYSJPLuYaavlhgRnBbAY=
 
 logging:
-  #  level:
-  #    org.hibernate.SQL: DEBUG
-  #    org.hibernate.type.descriptor.sql: TRACE
-  #    org.springframework.orm.jpa: DEBUG
-  config: classpath:logback.xml
   file:
     path: /home/rizkysiregar/feedzmore/logs
 

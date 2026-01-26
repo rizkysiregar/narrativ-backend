@@ -52,3 +52,7 @@ minio:
   bucket: test-bucket
   access-key: rizkysiregar
   secret-key: siregar123
+
+logging:
+  file:
+    path: ./logs

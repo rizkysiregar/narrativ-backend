@@ -20,7 +20,18 @@ spring:
     active: dev-version
 #    active: prod-version
 
+logging:
+  config: classpath:logback-spring.xml
+
 management:
+  tracing:
+    sampling:
+      probability: 1.0 # trace every request
+
+  zipkin:
+    tracing:
+      endpoint: http://192.168.1.50:9412/api/v2/spans
+
   endpoints:
     web:
       exposure:
