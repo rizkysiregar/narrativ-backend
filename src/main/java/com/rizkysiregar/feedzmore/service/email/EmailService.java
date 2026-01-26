@@ -49,7 +49,7 @@ public class EmailService implements IEmailService {
     }
 
     @Override
-    public void sendOtpEmail(String to, String otpCode) {
+    public boolean sendOtpEmail(String to, String otpCode) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -66,10 +66,10 @@ public class EmailService implements IEmailService {
 
             helper.setText(htmlContent, true);
             mailSender.send(message);
-        } catch (MessagingException e) {
+            return true;
+        } catch (Exception e) {
             log.error("## EmailService.sendOtpEmail: " + e.getMessage());
+            return false;
         }
     }
-
-
 }
