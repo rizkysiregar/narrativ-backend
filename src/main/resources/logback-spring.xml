@@ -5,7 +5,8 @@
     <!-- Console JSON logs -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <customFields>{"app":"feedzmore-app","env":"${spring.profiles.active:-local}"}</customFields>
+<!--            <customFields>{"app":"feedzmore-app"}</customFields>-->
+            <includeLevelValue>false</includeLevelValue>
             <fieldNames>
                 <trace>traceId</trace>
                 <span>spanId</span>
@@ -17,7 +18,8 @@
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_PATH}/application.json.log</file>
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <customFields>{"app":"feedzmore-app","env":"${spring.profiles.active:-local}"}</customFields>
+<!--            <customFields>{"app":"feedzmore-app"}</customFields>-->
+            <includeLevelValue>false</includeLevelValue>
             <fieldNames>
                 <trace>traceId</trace>
                 <span>spanId</span>
