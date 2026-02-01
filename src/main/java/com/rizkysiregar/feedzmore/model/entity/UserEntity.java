@@ -16,10 +16,10 @@ public class UserEntity {
     @UuidGenerator
     private UUID id;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(nullable = false, unique = true, length = 16)
     @NotBlank(message = "Username is required")
     @NotEmpty(message = "Username cannot be empty")
-    @Size(min = 3, max = 15, message = "The length of the username should be between 3 and 15")
+    @Size(min = 3, max = 16, message = "The length of the username should be between 3 and 15")
     private String username;
 
     private String password;

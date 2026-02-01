@@ -1,0 +1,1 @@
+CREATE TABLE test_dummy (id BIGSERIAL PRIMARY KEY);

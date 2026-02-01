@@ -217,7 +217,11 @@
             <version>7.4</version>
         </dependency>
 
-
+        <!--   DATABASE MIGRATION - FLY WAY    -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
 
 
     </dependencies>
