@@ -33,9 +33,9 @@ management:
     sampling:
       probability: 1.0 # trace every request
 
-  zipkin:
-    tracing:
-      endpoint: http://192.168.1.50:9412/api/v2/spans
+#  zipkin:
+#    tracing:
+#      endpoint: http://192.168.1.50:9412/api/v2/spans
 
   endpoints:
     web:

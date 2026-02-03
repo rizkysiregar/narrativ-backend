@@ -46,6 +46,11 @@ secret:
 otp:
   retry-time-in-seconds: 60
 
+management:
+  zipkin:
+    tracing:
+      endpoint: http://192.168.1.50:9412/api/v2/spans
+
 minio:
 #  endpoint: http://192.168.1.50:9000
   endpoint: https://minio-feedzmore-dev.rizkysiregar.my.id/

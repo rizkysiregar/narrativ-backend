@@ -46,8 +46,18 @@ secret:
 otp:
   retry-time-in-seconds: 60
 
+management:
+  zipkin:
+    tracing:
+      endpoint: http://100.126.105.106:9412/api/v2/spans
+
 minio:
-  endpoint: http://100.126.105.106:9000
+  #  endpoint: http://192.168.1.50:9000
+  endpoint: https://minio-feedzmore-dev.rizkysiregar.my.id/
   bucket: test-bucket
   access-key: rizkysiregar
   secret-key: siregar123
+
+logging:
+  file:
+    path: ./logs

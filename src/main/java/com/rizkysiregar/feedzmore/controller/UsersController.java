@@ -2,10 +2,7 @@ package com.rizkysiregar.feedzmore.controller;
 
 import com.rizkysiregar.feedzmore.model.dto.*;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
-import com.rizkysiregar.feedzmore.model.request.ResetPasswordRequest;
-import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
-import com.rizkysiregar.feedzmore.model.request.UserSearchRequest;
-import com.rizkysiregar.feedzmore.model.request.VerifyOtpRequest;
+import com.rizkysiregar.feedzmore.model.request.*;
 import com.rizkysiregar.feedzmore.service.UsersService;
 import com.rizkysiregar.feedzmore.service.otp.IOtpService;
 import com.rizkysiregar.feedzmore.util.Operation;
@@ -39,9 +36,9 @@ public class UsersController {
 
     @ApiOperation(value = "Register a new user", notes = "use this to register a new user")
     @PostMapping("/register")
-    public UserRegisterDto register(@Valid @RequestBody UserEntity userEntity) {
+    public UserRegisterDto register(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
         log.info("::. Entering /register users");
-        return usersService.register(userEntity);
+        return usersService.register(registerUserRequest);
     }
 
     @ApiOperation(value = "User login", notes = "use this to gain jwt credentials for user validity")

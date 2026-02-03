@@ -6,6 +6,7 @@ import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserRegisterDto;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
+import com.rizkysiregar.feedzmore.model.request.RegisterUserRequest;
 import com.rizkysiregar.feedzmore.model.request.ResetPasswordRequest;
 import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
 import com.rizkysiregar.feedzmore.model.request.UserSearchRequest;
@@ -66,28 +67,37 @@ public class UsersServiceTest {
         userEntity.setUsername("testuser");
         userEntity.setPassword("password");
 
+        RegisterUserRequest request = new RegisterUserRequest();
+        request.setUsername("testuser");
+        request.setPassword("password");
+        request.setEmail("test@mail.com");
+        request.setFirstName("John");
+        request.setLastName("Doe");
+        request.setPhoneNumber("1234567890");
+        request.setProfileImage("profile.png");
+
         when(userRepository.save(any(UserEntity.class)))
                 .thenReturn(userEntity);
 
-
         // Act
-        UserRegisterDto result = usersService.register(userEntity);
+        UserRegisterDto result = usersService.register(request);
 
         // Assert
         assertNotNull(result);
         assertEquals("testuser", result.getUsername());
         verify(userRepository, times(1))
-                .save(userEntity);
+                .save(any(UserEntity.class));
     }
 
 
     @Test
     void testRegister_Failure_MissingUsernameOrPassword() {
         // Arrange
-        UserEntity userEntity = new UserEntity(); // no username or password set
+//        UserEntity userEntity = new UserEntity(); // no username or password set
+        RegisterUserRequest registerUserRequest = new RegisterUserRequest();
 
         // Act & Assert
-        BusinessException exception = assertThrows(BusinessException.class, () -> usersService.register(userEntity));
+        BusinessException exception = assertThrows(BusinessException.class, () -> usersService.register(registerUserRequest));
         assertEquals("Bad Request", exception.getMessage());
         verify(userRepository, never())
                 .save(any(UserEntity.class));

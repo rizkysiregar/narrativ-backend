@@ -63,7 +63,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(value = HttpStatus.BAD_REQUEST)
     public ResponseEntity<?> methodArgumentNotValidException(MethodArgumentNotValidException manve) {
-        log.warn("Method Arguments not Valid Exception = ", manve);
+        log.error("Method Arguments not Valid Exception  {}", manve.getMessage());
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.BAD_REQUEST.getCode())
                 .message(HttpStatus.BAD_REQUEST.getReasonPhrase())

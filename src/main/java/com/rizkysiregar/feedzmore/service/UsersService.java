@@ -7,6 +7,7 @@ import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserRegisterDto;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
+import com.rizkysiregar.feedzmore.model.request.RegisterUserRequest;
 import com.rizkysiregar.feedzmore.model.request.ResetPasswordRequest;
 import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
 import com.rizkysiregar.feedzmore.model.request.UserSearchRequest;
@@ -48,15 +49,26 @@ public class UsersService {
         this.redisUtil = redisUtil;
     }
 
-    public UserRegisterDto register(UserEntity userEntity) {
-        if (userEntity.getUsername() == null || userEntity.getPassword() == null) {
+    public UserRegisterDto register(RegisterUserRequest registerUserRequest) {
+
+        if (registerUserRequest.getUsername() == null || registerUserRequest.getPassword() == null) {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
-        userEntity.setPassword(encoder.encode(userEntity.getPassword()));
-        userRepository.save(userEntity);
+        UserEntity entity = new UserEntity();
+        entity.setUsername(registerUserRequest.getUsername());
+        entity.setPassword(encoder.encode(registerUserRequest.getPassword()));
+        entity.setEmail(registerUserRequest.getEmail());
+        entity.setFirstName(registerUserRequest.getFirstName());
+        entity.setLastName(registerUserRequest.getLastName());
+        entity.setPhoneNumber(registerUserRequest.getPhoneNumber());
+        entity.setProfileImage(registerUserRequest.getProfileImage());
+
+
+//        userEntity.setPassword(encoder.encode(userEntity.getPassword()));
+        userRepository.save(entity);
         return UserRegisterDto.builder()
-                .username(userEntity.getUsername())
+                .username(registerUserRequest.getUsername())
                 .build();
     }
 
