@@ -14,8 +14,7 @@ public class Constants {
             "/forgot-password",
             "/verify-otp",
             "/reset-password",
-            "/actuator/health",
-            "/actuator/prometheus"
+            "/actuator/**"
     );
 
     public static final List<String> METHOD_LIST = List.of(
