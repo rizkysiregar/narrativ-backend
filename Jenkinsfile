@@ -1,85 +1,92 @@
 pipeline {
-    agent any
-
-    tools {
-        maven 'Maven3' // name you set in Global Tool Config
+    agent {
+        kubernetes {
+            yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: maven
+    image: maven:3.9.6-eclipse-temurin-21
+    command: ['sleep']
+    args: ['99d']
+  - name: buildah
+    image: quay.io/buildah/stable:latest
+    workingDir: /home/jenkins/agent
+    securityContext:
+      privileged: true
+    command: ['sleep']
+    args: ['99d']
+    volumeMounts:
+    - name: varlibcontainers
+      mountPath: /var/lib/containers
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    command: ['sleep']
+    args: ['99d']
+    workingDir: /home/jenkins/agent
+    securityContext:
+      runAsUser: 1000
+  volumes:
+  - name: varlibcontainers
+    emptyDir: {}
+"""
+        }
     }
 
     environment {
-        GIT_CREDENTIALS = 'rizkysiregar-github-pat'
-        DOCKER_HUB_CREDENTIALS = 'rizkysiregar-dockerhub-pat'
-        SSH_CREDENTIALS = 'rizkysiregar-ubuntu-docker-host-pat'
         IMAGE_NAME = "rizkysiregar/feedzmore-service"
-//         IMAGE_TAG = "${env.BUILD_NUMBER}"
         IMAGE_TAG = "${env.GIT_COMMIT.take(7)}"
-
-        SERVER_HOST = "192.168.1.50"
+        DOCKER_CREDS = credentials('rizkysiregar-dockerhub-pat')
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'master', credentialsId: "${GIT_CREDENTIALS}", url: 'https://github.com/rizkysiregar/feedzmore-backend.git'
+                git branch: 'master',
+                    credentialsId: 'rizkysiregar-github-pat',
+                    url: 'https://github.com/rizkysiregar/feedzmore-backend.git'
             }
         }
 
-        stage('Build & Test') {
-                   steps {
-                       sh 'mvn clean package -DskipTests'
-                   }
-        }
-
-        stage('Build Docker Image') {
+        stage('Maven Build') {
             steps {
-                sh "docker build -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest ."
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                withDockerRegistry([credentialsId: "${DOCKER_HUB_CREDENTIALS}", url: '']) {
-                    // sh "docker push $IMAGE_NAME:$IMAGE_TAG" // comment for now, pushing 2 image take a long time
-                    sh "docker push $IMAGE_NAME:latest"
+                container('maven') {
+                    sh 'mvn clean package -DskipTests'
                 }
             }
         }
 
-   stage('Deploy') {
-       steps {
-           sshagent(credentials: ['ssh-ubuntu-server']) {
-               sh 'ssh -o StrictHostKeyChecking=no rizkysiregar@192.168.1.50 /home/rizkysiregar/feedzmore/deploy.sh'
-           }
-       }
-   }
+        stage('Build & Push Image') {
+            steps {
+                container('buildah') {
+                    sh """
+                        # Tell Buildah to use VFS driver to avoid kernel permission issues
+                        export BUILDAH_ISOLATION=chroot
 
+                        # 1. Login
+                        echo \$DOCKER_CREDS_PSW | buildah --storage-driver vfs login -u \$DOCKER_CREDS_USR --password-stdin docker.io
 
-// if want to use ssh into server, but since jenkins and feedzmore are on the same host so just directly run docker command here
-//         stage('Deploy on Server') {
-//             steps {
-//                 sshagent (credentials: ["${SSH_CREDENTIALS}"]) {
-//                     sh """
-//                         ssh -o StrictHostKeyChecking=no rizkysiregar@${SERVER_HOST} '
-//                             cd /home/rizkysiregar/feedzmore &&
-//                             docker compose pull &&
-//                             docker compose up -d --force-recreate &&
-//                             docker image prune -af
-//                         '
-//                     """
-//                 }
-//             }
-//         }
+                        # 2. Build with VFS driver
+                        buildah --storage-driver vfs bud -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .
 
-
-
-
-    }
-
-    post {
-        success {
-            echo "Deployment successful: $IMAGE_NAME:$IMAGE_TAG"
+                        # 3. Push with VFS driver
+                        buildah --storage-driver vfs push $IMAGE_NAME:$IMAGE_TAG
+                        buildah --storage-driver vfs push $IMAGE_NAME:latest
+                    """
+                }
+            }
         }
-        failure {
-            echo "Deployment failed!"
+
+        stage('Deploy to K3s') {
+            steps {
+                container('kubectl') {
+                    sh """
+                        kubectl set image deployment/feedzmore-app feedzmore-app=$IMAGE_NAME:$IMAGE_TAG -n app
+                        kubectl rollout status deployment/feedzmore-app -n app
+                    """
+                }
+            }
         }
     }
 }
