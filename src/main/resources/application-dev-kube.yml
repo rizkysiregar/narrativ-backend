@@ -57,7 +57,7 @@ otp:
 management:
   zipkin:
     tracing:
-      endpoint: http://zipkin.observability.svc.cluster.local:9411
+      endpoint: http://zipkin.observability.svc.cluster.local:9411/api/v2/spans
 
 minio:
   #endpoint: http://minio:9000
