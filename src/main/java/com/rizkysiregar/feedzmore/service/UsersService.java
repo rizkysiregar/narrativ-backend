@@ -49,7 +49,7 @@ public class UsersService {
         this.redisUtil = redisUtil;
     }
 
-    public UserRegisterDto register(RegisterUserRequest registerUserRequest) {
+    public Operation register(RegisterUserRequest registerUserRequest) {
 
         if (registerUserRequest.getUsername() == null || registerUserRequest.getPassword() == null) {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
@@ -63,13 +63,9 @@ public class UsersService {
         entity.setLastName(registerUserRequest.getLastName());
         entity.setPhoneNumber(registerUserRequest.getPhoneNumber());
         entity.setProfileImage(registerUserRequest.getProfileImage());
-
-
-//        userEntity.setPassword(encoder.encode(userEntity.getPassword()));
         userRepository.save(entity);
-        return UserRegisterDto.builder()
-                .username(registerUserRequest.getUsername())
-                .build();
+
+        return Operation.CREATED;
     }
 
     public UserLoginDTO verify(UserLoginRequest userLoginRequest) {

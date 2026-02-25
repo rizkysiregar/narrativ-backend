@@ -36,7 +36,7 @@ public class UsersController {
 
     @ApiOperation(value = "Register a new user", notes = "use this to register a new user")
     @PostMapping("/register")
-    public UserRegisterDto register(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
+    public Operation register(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
         log.info("::. Entering /register users");
         return usersService.register(registerUserRequest);
     }

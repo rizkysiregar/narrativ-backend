@@ -1,8 +1,11 @@
-# Use this env for local but using service on the ubuntu server
+# Use this env for ubuntu-server
+
+server:
+  forward-headers-strategy: framework
 
 spring:
   datasource:
-    url: jdbc:postgresql://192.168.1.50:5432/feedzmore
+    url: jdbc:postgresql://localhost:5432/feedzmore
     username: postgres
     password: postgres
     hikari:
@@ -21,7 +24,7 @@ spring:
 
   data:
     redis:
-      host: 192.168.1.50
+      host: localhost
       port: 6379
       timeout: 60000
 
@@ -40,8 +43,13 @@ spring:
           timeout: 10000
           writetimeout: 10000
 
+
 secret:
   key: 6L9AYq7f9JS9KYRSu7oL416WYSJPLuYaavlhgRnBbAY=
+
+#logging:
+#  file:
+#    path: /home/rizkysiregar/feedzmore/logs
 
 otp:
   retry-time-in-seconds: 60
@@ -49,15 +57,16 @@ otp:
 management:
   zipkin:
     tracing:
-      endpoint: http://192.168.1.50:9412/api/v2/spans
+      endpoint: http://localhost:9411/api/v2/spans
 
 minio:
-#  endpoint: http://192.168.1.50:9000
-  endpoint: https://minio-feedzmore-dev.rizkysiregar.my.id/
+  #endpoint: http://minio:9000
+  #  endpoint: http://minio.database.svc.cluster.local:9000
+  endpoint: https://kube-dev-minio.rizkysiregar.my.id/
   bucket: test-bucket
   access-key: rizkysiregar
   secret-key: siregar123
 
-logging:
-  file:
-    path: ./logs
+springdoc:
+  swagger-ui:
+    use-root-path: true

@@ -80,11 +80,11 @@ public class UsersServiceTest {
                 .thenReturn(userEntity);
 
         // Act
-        UserRegisterDto result = usersService.register(request);
+        Operation result = usersService.register(request);
 
         // Assert
         assertNotNull(result);
-        assertEquals("testuser", result.getUsername());
+        assertEquals(Operation.CREATED, result);
         verify(userRepository, times(1))
                 .save(any(UserEntity.class));
     }
