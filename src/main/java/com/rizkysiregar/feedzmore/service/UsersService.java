@@ -51,8 +51,12 @@ public class UsersService {
 
     public Operation register(RegisterUserRequest registerUserRequest) {
 
-        if (registerUserRequest.getUsername() == null || registerUserRequest.getPassword() == null) {
-            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        if (userRepository.findByUsername(registerUserRequest.getUsername()).isPresent()) {
+            throw new BusinessException(GlobalMessage.USERNAME_ALREADY_TAKEN, HttpStatus.BAD_REQUEST);
+        }
+
+        if (userRepository.findByEmail(registerUserRequest.getEmail()).isPresent()) {
+            throw new BusinessException(GlobalMessage.EMAIL_ALREADY_TAKEN, HttpStatus.BAD_REQUEST);
         }
 
         UserEntity entity = new UserEntity();
@@ -64,7 +68,6 @@ public class UsersService {
         entity.setPhoneNumber(registerUserRequest.getPhoneNumber());
         entity.setProfileImage(registerUserRequest.getProfileImage());
         userRepository.save(entity);
-
         return Operation.CREATED;
     }
 

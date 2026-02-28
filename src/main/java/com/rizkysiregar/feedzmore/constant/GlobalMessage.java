@@ -17,7 +17,10 @@ public enum GlobalMessage {
     PARAMETER_NOT_FOUND("404", "Parameter Not Found"),
     INVALID_OTP("400", "INVALID OTP"),
     OTP_EXPIRED("404", "OTP Expired, Please request a new one."),
-    INVALID_RESET_TOKEN("400", "Bad Request, Invalid Reset Token")
+    INVALID_RESET_TOKEN("400", "Bad Request, Invalid Reset Token"),
+    USERNAME_ALREADY_TAKEN("400", "Username already taken"),
+    EMAIL_ALREADY_TAKEN("400", "Email already taken"),
+
 
     ;
 
