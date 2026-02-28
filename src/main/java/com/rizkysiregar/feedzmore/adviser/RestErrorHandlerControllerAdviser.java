@@ -4,7 +4,6 @@ import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.response.BaseResponse;
 import jakarta.validation.ConstraintViolationException;
-import jakarta.validation.Path;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.servlet.error.ErrorController;
@@ -17,8 +16,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 @Slf4j
@@ -62,11 +60,18 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(value = HttpStatus.BAD_REQUEST)
-    public ResponseEntity<?> methodArgumentNotValidException(MethodArgumentNotValidException manve) {
-        log.error("Method Arguments not Valid Exception  {}", manve.getMessage());
+    public ResponseEntity<?> methodArgumentNotValidException(MethodArgumentNotValidException ex) {
+        String errorMessage = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .collect(Collectors.joining("; "));
+
+        log.warn("Validation failed: {}", errorMessage);
+
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.BAD_REQUEST.getCode())
-                .message(HttpStatus.BAD_REQUEST.getReasonPhrase())
+                .message(errorMessage)
                 .build(),
                 HttpStatus.BAD_REQUEST);
     }
