@@ -35,14 +35,14 @@ public class UsersController {
 
 
     @ApiOperation(value = "Register a new user", notes = "use this to register a new user")
-    @PostMapping("/register")
+    @PostMapping("/auth/register")
     public Operation register(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
         log.info("::. Entering /register users");
         return usersService.register(registerUserRequest);
     }
 
     @ApiOperation(value = "User login", notes = "use this to gain jwt credentials for user validity")
-    @PostMapping("/login")
+    @PostMapping("/auth/login")
     public UserLoginDTO login(@RequestBody UserLoginRequest userLoginRequest) {
         log.info("::. Entering /login users");
         log.info(":: " + userLoginRequest.toString());
@@ -50,19 +50,19 @@ public class UsersController {
     }
 
     @ApiOperation(value = "User validation and OTP Request", notes = "Use this for sending otp into user registered email")
-    @PostMapping("/forgot-password")
+    @PostMapping("/auth/password/forgot")
     public SentOtpDTO forgotPassword(@RequestBody @Valid EmailDTO emailDTO) {
         return otpService.sendOtp(emailDTO.getEmail());
     }
 
     @ApiOperation(value = "Verify OTP", notes = "Validate is OTP matched or not")
-    @PostMapping("/verify-otp")
+    @PostMapping("/auth/password/verify-otp")
     public ResetTokenDTO verifyOtp(@RequestBody @Valid VerifyOtpRequest request) {
         return otpService.verifyOtp(request.getEmail(), request.getOtp());
     }
 
     @ApiOperation(value = "New password", notes = "Take email and new password also resetToken is needed")
-    @PostMapping("/confirm-reset-password")
+    @PostMapping("/auth/password/reset")
     public Operation confirmResetPassword(@Valid @RequestBody ResetPasswordRequest resetPasswordRequest) {
         return usersService.confirmResetPassword(resetPasswordRequest);
     }
