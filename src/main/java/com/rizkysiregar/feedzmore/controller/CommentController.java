@@ -1,10 +1,13 @@
 package com.rizkysiregar.feedzmore.controller;
 
+import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.dto.CommentDTO;
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
+import com.rizkysiregar.feedzmore.model.request.AddCommentRequest;
 import com.rizkysiregar.feedzmore.service.CommentService;
 import com.rizkysiregar.feedzmore.util.Operation;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,12 +21,11 @@ public class CommentController {
 
     @PostMapping("/{postId}")
     public Operation addComment(
-            @PathVariable UUID postId,
-            @RequestParam UUID userId,
-            @RequestParam String content,
-            @RequestParam(required = false) UUID parentId
+            @RequestBody AddCommentRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        return commentService.addComment(postId, userId, content, parentId);
+        UUID userId = userPrincipal.getUserId();
+        return commentService.addComment(request.getPostId(), userId, request.getContent(), request.getParentId());
     }
 
 

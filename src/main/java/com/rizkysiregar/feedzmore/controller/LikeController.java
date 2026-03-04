@@ -1,10 +1,12 @@
 package com.rizkysiregar.feedzmore.controller;
 
+import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.dto.PostLikeCountDTO;
 import com.rizkysiregar.feedzmore.model.request.LikeUnlikePostRequest;
 import com.rizkysiregar.feedzmore.service.LikeUnlikeService;
 import com.rizkysiregar.feedzmore.util.Operation;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -14,6 +16,7 @@ import java.util.UUID;
 public class LikeController {
 
     private final LikeUnlikeService likeUnlikeService;
+
     public LikeController(LikeUnlikeService likeUnlikeService) {
         this.likeUnlikeService = likeUnlikeService;
     }
@@ -24,8 +27,11 @@ public class LikeController {
     }
 
     @DeleteMapping("/unlike")
-    public Operation unlikePost(@RequestParam UUID postId, @RequestParam UUID userId) {
-        return likeUnlikeService.unlikePost(postId, userId);
+    public Operation unlikePost(
+            @RequestParam UUID postId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return likeUnlikeService.unlikePost(postId, userPrincipal.getUserId());
     }
 
     @GetMapping("/likes/count")

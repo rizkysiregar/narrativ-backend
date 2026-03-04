@@ -82,9 +82,14 @@ public class UsersService {
                 throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
             }
 
+            String token = jwtService.generateToken(
+                    userEntity.get().getUsername(),
+                    userEntity.get().getId()
+            );
+
             return UserLoginDTO.builder()
-                    .token(jwtService.generateToken(userLoginRequest.getUsername()))
-                    .username(userLoginRequest.getUsername())
+                    .token(token)
+                    .username(userEntity.get().getUsername())
                     .userId(userEntity.get().getId().toString())
                     .build();
         }

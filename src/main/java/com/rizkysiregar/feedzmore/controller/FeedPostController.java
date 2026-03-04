@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.controller;
 
+import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.dto.AddPostDTO;
 import com.rizkysiregar.feedzmore.model.dto.PostDTO;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
@@ -11,6 +12,8 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,6 +24,7 @@ import java.util.UUID;
 public class FeedPostController {
 
     private final PostService postService;
+
     public FeedPostController(PostService postService) {
         this.postService = postService;
     }
@@ -29,7 +33,9 @@ public class FeedPostController {
     public PaginatedResponse<PostDTO> getAllPosts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam UUID userId) {
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        UUID userId = userPrincipal.getUserId();
         return postService.getAllPost(page, size, userId);
     }
 

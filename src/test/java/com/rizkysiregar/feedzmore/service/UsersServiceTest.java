@@ -123,7 +123,7 @@ public class UsersServiceTest {
         when(userRepository.findByUsername("testuser"))
                 .thenReturn(Optional.of(userEntity));
 
-        when(jwtService.generateToken(anyString())).thenReturn("mockedToken");
+        when(jwtService.generateToken(anyString(), UUID.randomUUID())).thenReturn("mockedToken");
 
         // Act
         UserLoginDTO result = usersService.verify(loginRequest);
