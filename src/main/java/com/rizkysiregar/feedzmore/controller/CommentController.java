@@ -4,6 +4,7 @@ import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.dto.CommentDTO;
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
 import com.rizkysiregar.feedzmore.model.request.AddCommentRequest;
+import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.service.CommentService;
 import com.rizkysiregar.feedzmore.util.Operation;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,7 @@ import java.util.UUID;
 public class CommentController {
     private final CommentService commentService;
 
-    @PostMapping("/{postId}")
+    @PostMapping()
     public Operation addComment(
             @RequestBody AddCommentRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal
@@ -29,13 +30,13 @@ public class CommentController {
     }
 
 
-    @GetMapping("/{postId}")
-    public List<CommentDTO> getComments(
-            @PathVariable UUID postId,
-            @RequestParam(defaultValue = "0") int page,
+    @GetMapping()
+    public PaginatedResponse<CommentDTO> getComments(
+            @RequestParam UUID postId,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return commentService.getCommentForPost(postId, page, size);
+        return commentService.getComment(postId, page, size);
     }
 
     @GetMapping("/replies/{commentId}")

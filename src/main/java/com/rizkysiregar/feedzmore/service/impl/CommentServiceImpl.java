@@ -5,6 +5,7 @@ import com.rizkysiregar.feedzmore.model.dto.CommentDTO;
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
+import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.CommentRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
@@ -13,6 +14,7 @@ import com.rizkysiregar.feedzmore.util.Operation;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -55,12 +57,20 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
-    public List<CommentDTO> getCommentForPost(UUID postId, int page, int size) {
-//        commentRepository.findByPostId(postId).orElseThrow(() -> new EntityNotFoundException("Post not found"));
-
+    public PaginatedResponse<CommentDTO> getComment(UUID postId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        List<CommentEntity> listOfComments =  commentRepository.findByPostIdAndParentIsNullOrderByCreatedAtAsc(postId, pageable);
-        return CommentMapper.toDtoList(listOfComments);
+        Page<CommentEntity> commentPage = commentRepository.findByPostIdAndParentIsNullOrderByCreatedAtAsc(postId, pageable);
+
+        List<CommentDTO> content = CommentMapper.toDtoList(commentPage.getContent());
+
+        return new PaginatedResponse<>(
+                content,
+                commentPage.getNumber(),
+                commentPage.getSize(),
+                commentPage.getTotalElements(),
+                commentPage.getTotalPages(),
+                commentPage.isLast()
+        );
     }
 
     @Override

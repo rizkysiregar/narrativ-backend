@@ -76,7 +76,7 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public String getPresignUrl(String objectName) throws Exception {
-        log.info(":: Trying to get presign url for {}", objectName);
+//        log.info(":: Trying to get presign url for {}", objectName);
         return minioClient.getPresignedObjectUrl(
                 GetPresignedObjectUrlArgs.builder()
                         .bucket(bucketName)
