@@ -41,6 +41,7 @@ public class FirebaseNotificationServiceTest {
     }
     
     @Test
+    @SuppressWarnings("unchecked")
     void sendNotificationToToken_Success() {
         // Stub token service
         when(firebaseTokenService.getAccessToken()).thenReturn(Mono.just("ACCESS_TOKEN"));

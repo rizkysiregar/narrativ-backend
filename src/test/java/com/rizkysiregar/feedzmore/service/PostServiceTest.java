@@ -63,6 +63,13 @@ public class PostServiceTest {
         when(postPaginationRepository.findAllWithCounts(any(Pageable.class), eq(userId)))
                 .thenReturn(postPage);
 
+        try {
+            when(fileStorageService.getPresignUrl("img1.jpg")).thenReturn("img1.jpg");
+            when(fileStorageService.getPresignUrl("img2.jpg")).thenReturn("img2.jpg");
+        } catch (Exception e) {
+            // do nothing
+        }
+
         // Act
         PaginatedResponse<PostDTO> response = postService.getAllPost(page, size, userId);
 

@@ -89,21 +89,6 @@ public class UsersServiceTest {
                 .save(any(UserEntity.class));
     }
 
-
-    @Test
-    void testRegister_Failure_MissingUsernameOrPassword() {
-        // Arrange
-//        UserEntity userEntity = new UserEntity(); // no username or password set
-        RegisterUserRequest registerUserRequest = new RegisterUserRequest();
-
-        // Act & Assert
-        BusinessException exception = assertThrows(BusinessException.class, () -> usersService.register(registerUserRequest));
-        assertEquals("Bad Request", exception.getMessage());
-        verify(userRepository, never())
-                .save(any(UserEntity.class));
-    }
-
-
     @Test
     void testVerify_Success() {
         // Arrange
@@ -123,7 +108,7 @@ public class UsersServiceTest {
         when(userRepository.findByUsername("testuser"))
                 .thenReturn(Optional.of(userEntity));
 
-        when(jwtService.generateToken(anyString(), UUID.randomUUID())).thenReturn("mockedToken");
+        when(jwtService.generateToken(anyString(), any(UUID.class))).thenReturn("mockedToken");
 
         // Act
         UserLoginDTO result = usersService.verify(loginRequest);

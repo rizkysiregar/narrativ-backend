@@ -2,16 +2,16 @@ server:
   port: 9091
   servlet:
     context-path: /api/v1
-    encoding:
-      enabled: true
-      charset: UTF-8
-      force: true
 
 spring:
   servlet:
     multipart:
       max-file-size: 100MB
       max-request-size: 100MB
+    encoding:
+      enabled: true
+      charset: UTF-8
+      force: true
   application:
     name: feedzmore-service
   profiles:
