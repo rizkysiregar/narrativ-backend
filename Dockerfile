@@ -1,5 +1,5 @@
 # Use Amazon Corretto 21 as the base image
-FROM docker.io/library/amazoncorretto:21
+FROM docker.io/library/amazoncorretto:25
 
 # Set the working directory inside the container
 WORKDIR /app

@@ -7,7 +7,7 @@ kind: Pod
 spec:
   containers:
   - name: maven
-    image: maven:3.9.6-eclipse-temurin-21
+    image: maven:3.9-eclipse-temurin-25
     command: ['sleep']
     args: ['99d']
   - name: buildah
