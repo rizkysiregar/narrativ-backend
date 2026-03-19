@@ -1,0 +1,45 @@
+image:
+  repository: rizkysiregar/feedzmore-service
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 2
+
+namespace: app
+
+service:
+  port: 80
+  targetPort: 9091
+
+resources:
+  requests:
+    cpu: "200m"
+    memory: "512Mi"
+  limits:
+    cpu: "500m"
+    memory: "1Gi"
+
+probes:
+  path: /api/v1/actuator/health
+  port: 9091
+  initialDelaySeconds: 60
+  periodSeconds: 15
+
+configmap:
+  SPRING_PROFILE_ACTIVE: dev-kube
+  SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+  SPRING_REDIS_HOST: redis-master.database.svc.cluster.local
+  SPRING_REDIS_PORT: "6379"
+  MINIO_ENDPOINT: https://kube-dev-minio.rizkysiregar.my.id/
+  MINIO_BUCKET: test-bucket
+  ZIPKIN_BASE_URL: http://zipkin.observability.svc.cluster.local:9411/api/v2/spans
+
+# Secrets — override these at deploy time via --set or Jenkins credentials
+# Never commit real values here
+secrets:
+  POSTGRES_USER: ""
+  POSTGRES_PASSWORD: ""
+  REDIS_PASSWORD: ""
+  MINIO_ACCESS_KEY: ""
+  MINIO_SECRET_KEY: ""
+  JWT_SECRET: ""
