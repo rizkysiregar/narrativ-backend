@@ -29,7 +29,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
         log.error("Exception = ", e);
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.INTERNAL_ERROR.getCode())
-                .message(HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase())
+                .message(GlobalMessage.INTERNAL_ERROR.getMessage())
                 .build(),
                 HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -53,7 +53,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
         log.warn("BadCredentialsException = ", e);
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.UNAUTHORIZED.getCode())
-                .message(e.getMessage())
+                .message(GlobalMessage.BAD_CREDENTIALS.getMessage())
                 .build(),
                 HttpStatus.UNAUTHORIZED);
     }
@@ -81,8 +81,8 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     public ResponseEntity<?> usernameNotFoundException(UsernameNotFoundException unfe) {
         log.warn("Method Arguments not Valid Exception = ", unfe);
         return new ResponseEntity<>(BaseResponse.builder()
-                .code(GlobalMessage.UNAUTHORIZED.getCode())
-                .message(unfe.getMessage())
+                .code(GlobalMessage.BAD_CREDENTIALS.getCode())
+                .message(GlobalMessage.BAD_CREDENTIALS.getMessage())
                 .build(),
                 HttpStatus.UNAUTHORIZED);
     }
@@ -100,7 +100,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
 
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.BAD_REQUEST.getCode())
-                .message(ex.getMessage())
+                .message(GlobalMessage.BAD_REQUEST.getMessage())
                 .build(),
                 HttpStatus.BAD_REQUEST);
     }
