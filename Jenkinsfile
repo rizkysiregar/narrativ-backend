@@ -96,6 +96,21 @@ spec:
                 git branch: 'master',
                         credentialsId: 'rizkysiregar-github-pat',   // GitHub PAT stored in Jenkins
                         url: 'https://github.com/rizkysiregar/feedzmore-backend.git'
+
+
+                // skip pipeline if this commit was made by Jenkins itself
+                // prevents infinite loop when Jenkins pushes values.yaml back to git
+                script {
+                    def commitAuthor = sh(
+                            script: 'git log -1 --pretty=format:%an',
+                            returnStdout: true
+                    ).trim()
+
+                    if (commitAuthor == 'Jenkins') {
+                        currentBuild.result = 'NOT_BUILT'
+                        error("Skipping pipeline — commit made by Jenkins CI")
+                    }
+                }
             }
         }
 
@@ -148,78 +163,49 @@ spec:
             }
         }
 
-        // ─────────────────────────────────────────────────────────
-        // STAGE 4: UPDATE CHART VERSION
-        // Updates the appVersion field inside Chart.yaml to reflect
-        // the current build version before deploying.
-        // - On regular commit: appVersion becomes the commit hash
-        // - On tag push:       appVersion becomes the tag (v1.0.0)
-        // This is done with sed (stream editor) which finds and
-        // replaces a line in the file directly.
-        // ─────────────────────────────────────────────────────────
-        stage('Update Chart Version') {
+
+        // Jenkins only updates git — ArgoCD handles the actual deploy
+        stage('Update Helm Values') {
             steps {
-                container('helm') {    // switch into the helm container
-                    sh '''
-                        APP_VER="''' + env.APP_VERSION + '''"
-
-                        # Find the line starting with "appVersion:" and replace it
-                        # with the current APP_VERSION value
-                        sed -i "s/^appVersion:.*/appVersion: \\"$APP_VER\\"/" ./helm/feedzmore/Chart.yaml
-
-                        echo "Chart updated - appVersion: $APP_VER"
-
-                        # Print Chart.yaml so we can verify it in the Jenkins log
-                        cat ./helm/feedzmore/Chart.yaml
-                    '''
-                }
-            }
-        }
-
-        // ─────────────────────────────────────────────────────────
-        // STAGE 5: DEPLOY TO K3S
-        // Uses Helm to deploy the app to your Kubernetes cluster.
-        // 'helm upgrade --install' means:
-        //   - if release doesn't exist → install it fresh
-        //   - if release exists        → upgrade it
-        // Secrets are injected at deploy time from Jenkins credentials
-        // so they are never stored in the repo or Chart files.
-        // --rollback-on-failure automatically reverts to the last
-        // working revision if this deploy fails.
-        // ─────────────────────────────────────────────────────────
-        stage('Deploy to K3s') {
-            steps {
-                container('helm') {    // switch into the helm container
-                    // Pull secrets from Jenkins credential store into
-                    // temporary shell variables for this step only.
-                    // They are masked as **** in the Jenkins logs.
+                container('helm') {
                     withCredentials([
-                            string(credentialsId: 'feedzmore-postgres-user', variable: 'POSTGRES_USER'),
-                            string(credentialsId: 'feedzmore-postgres-password', variable: 'POSTGRES_PASSWORD'),
-                            string(credentialsId: 'feedzmore-minio-access-key', variable: 'MINIO_ACCESS_KEY'),
-                            string(credentialsId: 'feedzmore-minio-secret-key', variable: 'MINIO_SECRET_KEY'),
-                            string(credentialsId: 'feedzmore-jwt-secret', variable: 'JWT_SECRET'),
+                            gitUsernamePassword(
+                                    credentialsId: 'rizkysiregar-github-pat',
+                                    gitToolName: 'Default'
+                            )
                     ]) {
-                        // Single quotes sh('') prevents Groovy from interpolating $VARIABLES
-                        // so secrets stay protected — the shell handles them instead of Jenkins.
-                        // env.IMAGE_TAG and env.APP_VERSION are safely concatenated outside
-                        // the single quote block since they are not sensitive values.
                         sh '''
-                            helm upgrade --install feedzmore ./helm/feedzmore \
-                                --namespace app \
-                                --set image.tag="''' + env.IMAGE_TAG + '''" \
-                                --set secrets.POSTGRES_USER="$POSTGRES_USER" \
-                                --set secrets.POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
-                                --set secrets.MINIO_ACCESS_KEY="$MINIO_ACCESS_KEY" \
-                                --set secrets.MINIO_SECRET_KEY="$MINIO_SECRET_KEY" \
-                                --set secrets.JWT_SECRET="$JWT_SECRET" \
-                                --description "Build #${BUILD_NUMBER} - ''' + env.APP_VERSION + '''" \
-                                --rollback-on-failure \
-                                --timeout 300s   # max time to wait for pods to be ready
-                        '''
+                    apk add --no-cache git
+
+                    cd "$WORKSPACE"
+
+                    # git security feature blocks access to repos owned by different users
+                    # since helm container runs as root (user 0) but workspace was created
+                    # by jnlp container (different user), we need to explicitly trust this path
+                    git config --global --add safe.directory "$WORKSPACE"
+
+                    # update image tag in values.yaml
+                    sed -i "s/^  tag:.*/  tag: ''' + env.IMAGE_TAG + '''/" ./helm/feedzmore/values.yaml
+
+                    # update appVersion in Chart.yaml
+                    APP_VER="''' + env.APP_VERSION + '''"
+                    sed -i "s/^appVersion:.*/appVersion: \\"$APP_VER\\"/" ./helm/feedzmore/Chart.yaml
+
+                    # configure git identity
+                    git config user.email "jenkins@feedzmore.ci"
+                    git config user.name "Jenkins"
+
+                    # commit and push back to master
+                    git add helm/feedzmore/values.yaml helm/feedzmore/Chart.yaml
+                    git commit -m "ci: update image tag to ''' + env.IMAGE_TAG + '''"
+                    git push origin master
+                '''
                     }
                 }
             }
         }
+
+
+
     }
 }
