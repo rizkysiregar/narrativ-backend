@@ -19,6 +19,7 @@ public enum GlobalMessage {
     OTP_EXPIRED("404", "OTP Expired, Please request a new one."),
     INVALID_RESET_TOKEN("400", "Bad Request, Invalid Reset Token"),
     USERNAME_ALREADY_TAKEN("400", "Username already taken"),
+    USER_NOT_FOUND("404", "User yang kamu cari tidak terdaftar"),
     EMAIL_ALREADY_TAKEN("400", "Email already taken"),
 
 
