@@ -41,7 +41,7 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public String uploadFile(MultipartFile file, String userId, String featureName) throws Exception {
-        log.info(":: Trying to upload file to minio: {}, {}", file.getOriginalFilename(), userId);
+        log.info(":: UPLOAD.MINIO: {}, {}", file.getOriginalFilename(), userId);
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String originalName = file.getOriginalFilename();
         String extension = "";
@@ -60,7 +60,6 @@ public class FileStorageServiceImpl implements FileStorageService {
             minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
         }
 
-        log.info(":: upload file with objectName: {}", objectName);
         // upload
         minioClient.putObject(
                 PutObjectArgs.builder()
@@ -76,7 +75,6 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public String getPresignUrl(String objectName) throws Exception {
-//        log.info(":: Trying to get presign url for {}", objectName);
         return minioClient.getPresignedObjectUrl(
                 GetPresignedObjectUrlArgs.builder()
                         .bucket(bucketName)

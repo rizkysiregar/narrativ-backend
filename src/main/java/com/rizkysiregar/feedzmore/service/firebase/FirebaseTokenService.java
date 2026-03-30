@@ -25,7 +25,7 @@ public class FirebaseTokenService {
 
     @PostConstruct
     public void init() {
-        log.info("## initial firebase token");
+        log.info("FIREBASE.INIT.TOKEN");
         refreshToken();
     }
 

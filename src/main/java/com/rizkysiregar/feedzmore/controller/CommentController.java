@@ -15,24 +15,23 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/comments")
 @RequiredArgsConstructor
 public class CommentController {
     private final CommentService commentService;
 
-    @PostMapping()
+    @PostMapping("/posts/{postId}/comments")
     public Operation addComment(
             @RequestBody AddCommentRequest request,
-            @AuthenticationPrincipal UserPrincipal userPrincipal
-    ) {
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable UUID postId) {
         UUID userId = userPrincipal.getUserId();
-        return commentService.addComment(request.getPostId(), userId, request.getContent(), request.getParentId());
+        return commentService.addComment(postId, userId, request.getContent(), request.getParentId());
     }
 
 
-    @GetMapping()
+    @GetMapping("/posts/{postId}/comments")
     public PaginatedResponse<CommentDTO> getComments(
-            @RequestParam UUID postId,
+            @PathVariable UUID postId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size
     ) {

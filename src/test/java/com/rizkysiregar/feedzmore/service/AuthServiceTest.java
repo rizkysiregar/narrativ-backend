@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class UsersServiceTest {
+public class AuthServiceTest {
 
     @Mock
     private UserRepository userRepository;
@@ -51,7 +51,7 @@ public class UsersServiceTest {
     private RedisUtil redisUtil;
 
     @InjectMocks
-    private UsersService usersService;
+    private AuthService authService;
 
 
     @BeforeEach
@@ -80,7 +80,7 @@ public class UsersServiceTest {
                 .thenReturn(userEntity);
 
         // Act
-        Operation result = usersService.register(request);
+        Operation result = authService.register(request);
 
         // Assert
         assertNotNull(result);
@@ -111,7 +111,7 @@ public class UsersServiceTest {
         when(jwtService.generateToken(anyString(), any(UUID.class))).thenReturn("mockedToken");
 
         // Act
-        UserLoginDTO result = usersService.verify(loginRequest);
+        UserLoginDTO result = authService.verify(loginRequest);
 
 
         // Assert
@@ -143,7 +143,7 @@ public class UsersServiceTest {
         when(redisUtil.get("reset_token:".concat("user@example.com"))).thenReturn("token-123");
 
         // Act
-        Operation result = usersService.confirmResetPassword(request);
+        Operation result = authService.confirmResetPassword(request);
 
         // Assert
         assertEquals(Operation.UPDATED, result);
@@ -162,7 +162,7 @@ public class UsersServiceTest {
         when(userRepository.findByEmail("missing@example.com")).thenReturn(Optional.empty());
 
         // Act & Assert
-        BusinessException ex = assertThrows(BusinessException.class, () -> usersService.confirmResetPassword(request));
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.confirmResetPassword(request));
         assertEquals("Data Not Found", ex.getMessage());
         verify(userRepository, never()).save(any());
     }
@@ -182,7 +182,7 @@ public class UsersServiceTest {
         when(redisUtil.get("reset_token:".concat("user@example.com"))).thenReturn(null);
 
         // Act & Assert
-        BusinessException ex = assertThrows(BusinessException.class, () -> usersService.confirmResetPassword(request));
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.confirmResetPassword(request));
         assertEquals("Bad Request, Invalid Reset Token", ex.getMessage());
         verify(userRepository, never()).save(any());
     }
@@ -202,7 +202,7 @@ public class UsersServiceTest {
         when(redisUtil.get("reset_token:".concat("user@example.com"))).thenReturn("token-123");
 
         // Act & Assert
-        BusinessException ex = assertThrows(BusinessException.class, () -> usersService.confirmResetPassword(request));
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.confirmResetPassword(request));
         assertEquals("Bad Request, Invalid Reset Token", ex.getMessage());
         verify(userRepository, never()).save(any());
     }
@@ -223,7 +223,7 @@ public class UsersServiceTest {
         when(userRepository.findById(id)).thenReturn(Optional.of(user));
 
         // Act
-        UserDetailDTO dto = usersService.getUserById(id.toString());
+        UserDetailDTO dto = authService.getUserById(id.toString());
 
         // Assert
         assertNotNull(dto);
@@ -240,7 +240,7 @@ public class UsersServiceTest {
         when(userRepository.findById(id)).thenReturn(Optional.empty());
 
         // Act & Assert
-        BusinessException ex = assertThrows(BusinessException.class, () -> usersService.getUserById(id.toString()));
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.getUserById(id.toString()));
         // Service wraps NOT_FOUND into INTERNAL_ERROR due to broad catch(Exception)
         assertEquals("Internal Server Error", ex.getMessage());
     }
@@ -248,7 +248,7 @@ public class UsersServiceTest {
     @Test
     void testGetUserById_InvalidUUID() {
         // Act & Assert
-        BusinessException ex = assertThrows(BusinessException.class, () -> usersService.getUserById("invalid-uuid"));
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.getUserById("invalid-uuid"));
         assertEquals("Bad Request", ex.getMessage());
     }
 
@@ -269,7 +269,7 @@ public class UsersServiceTest {
         when(userRepository.findAll((org.springframework.data.jpa.domain.Specification<UserEntity>) any(), eq(pageable))).thenReturn(page);
 
         // Act
-        PaginatedResponse<UserDetailDTO> result = usersService.search(request, pageable);
+        PaginatedResponse<UserDetailDTO> result = authService.search(request, pageable);
 
         // Assert
         assertNotNull(result);
@@ -285,7 +285,7 @@ public class UsersServiceTest {
         when(userRepository.findAll((org.springframework.data.jpa.domain.Specification<UserEntity>) any(), eq(pageable))).thenReturn(Page.empty(pageable));
 
         // Act & Assert
-        BusinessException ex = assertThrows(BusinessException.class, () -> usersService.search(request, pageable));
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.search(request, pageable));
         assertEquals("Data Not Found", ex.getMessage());
     }
 

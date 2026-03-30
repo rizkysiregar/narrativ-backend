@@ -3,7 +3,7 @@ package com.rizkysiregar.feedzmore.controller;
 import com.rizkysiregar.feedzmore.model.dto.*;
 import com.rizkysiregar.feedzmore.model.request.*;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
-import com.rizkysiregar.feedzmore.service.UsersService;
+import com.rizkysiregar.feedzmore.service.AuthService;
 import com.rizkysiregar.feedzmore.service.otp.IOtpService;
 import com.rizkysiregar.feedzmore.util.Operation;
 import io.swagger.annotations.ApiOperation;
@@ -18,68 +18,71 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @Slf4j
-@Tag(name = "Users API")
+@Tag(name = "Authentication API")
 @Validated
 @SecurityRequirement(name = "Bearer Authentication")
-public class UsersController {
+public class AuthController {
 
-    final UsersService usersService;
+    final AuthService authService;
     private final IOtpService otpService;
 
-    public UsersController(UsersService usersService, IOtpService otpService) {
-        this.usersService = usersService;
+    public AuthController(AuthService authService, IOtpService otpService) {
+        this.authService = authService;
         this.otpService = otpService;
     }
 
 
     @ApiOperation(value = "Register a new user", notes = "use this to register a new user")
-    @PostMapping("/auth/register")
+    @PostMapping("auth/register")
     public Operation register(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
         log.info("::. Entering /register users");
-        return usersService.register(registerUserRequest);
+        return authService.register(registerUserRequest);
     }
 
     @ApiOperation(value = "User login", notes = "use this to gain jwt credentials for user validity")
-    @PostMapping("/auth/login")
+    @PostMapping("auth/login")
     public UserLoginDTO login(@RequestBody UserLoginRequest userLoginRequest) {
         log.info("::. Entering /login users");
         log.info(":: " + userLoginRequest.toString());
-        return usersService.verify(userLoginRequest);
+        return authService.verify(userLoginRequest);
     }
 
     @ApiOperation(value = "User validation and OTP Request", notes = "Use this for sending otp into user registered email")
-    @PostMapping("/auth/password/forgot")
+    @PostMapping("auth/forgot-password")
     public SentOtpDTO forgotPassword(@RequestBody @Valid EmailDTO emailDTO) {
         return otpService.sendOtp(emailDTO.getEmail());
     }
 
     @ApiOperation(value = "Verify OTP", notes = "Validate is OTP matched or not")
-    @PostMapping("/auth/password/verify-otp")
+    @PostMapping("auth/verify-otp")
     public ResetTokenDTO verifyOtp(@RequestBody @Valid VerifyOtpRequest request) {
         return otpService.verifyOtp(request.getEmail(), request.getOtp());
     }
 
     @ApiOperation(value = "New password", notes = "Take email and new password also resetToken is needed")
-    @PostMapping("/auth/password/reset")
+    @PostMapping("auth/reset-password")
     public Operation confirmResetPassword(@Valid @RequestBody ResetPasswordRequest resetPasswordRequest) {
-        return usersService.confirmResetPassword(resetPasswordRequest);
+        return authService.confirmResetPassword(resetPasswordRequest);
     }
 
     @ApiOperation(value = "Getting user details data by userId", notes = "pass userId that you got from login response")
-    @GetMapping("/user/{userId}")
+    @GetMapping("users/{userId}")
     public UserDetailDTO getUserById(@PathVariable String userId) {
-        return usersService.getUserById(userId);
+        return authService.getUserById(userId);
     }
 
 
-    @ApiOperation(value = "Getting registered user base on some data that its have", notes = "the argument is dynamic, can be change base on requirement")
-    @GetMapping("/search/users")
+    @ApiOperation(
+            value = "Search users",
+            notes = "Filter by any combination of username and name. All params are optional."
+    )
+    @GetMapping("users")
     public PaginatedResponse<UserDetailDTO> searchUsers(
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String name,
             @Parameter(hidden = true) Pageable pageable
     ) {
-        return usersService.search(
+        return authService.search(
                 new UserSearchRequest(username, name),
                 pageable
         );

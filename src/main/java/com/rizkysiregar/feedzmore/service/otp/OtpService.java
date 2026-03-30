@@ -44,8 +44,6 @@ public class OtpService implements IOtpService {
 
     @Override
     public SentOtpDTO sendOtp(String email) {
-        log.info("## rcv: send otp to: {}", email);
-        log.info("## retry in seconds: {}", otpRetryTimeInSeconds);
         Optional<UserEntity> byEmail = userRepository.findByEmail(email);
         if (byEmail.isPresent()) {
             if (redisUtil.hasKey("otp:" + email)) {
@@ -73,7 +71,6 @@ public class OtpService implements IOtpService {
 
             return SentOtpDTO.builder()
                     .otpSendToEmailAddress(EmailMasking.maskEmail(email))
-                    // .expirationTimeInMinute(String.valueOf(Long.parseLong(otpRetryTimeInSeconds) / 60))
                     .expirationTimeInMinute("1")
                     .build();
         } else {
@@ -88,8 +85,6 @@ public class OtpService implements IOtpService {
     @Override
     public ResetTokenDTO verifyOtp(String email, String otp) {
         Object actualOtp = redisUtil.get("otp:" + email);
-        log.info("## Provided otp: {}", otp);
-        log.info("## Actual otp: {}", actualOtp);
 
         if (actualOtp == null) {
             throw new BusinessException(GlobalMessage.OTP_EXPIRED, HttpStatus.BAD_REQUEST);

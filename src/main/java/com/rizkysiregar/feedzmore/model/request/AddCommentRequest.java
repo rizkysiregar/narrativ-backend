@@ -8,7 +8,6 @@ import java.util.UUID;
 @Setter
 @Getter
 public class AddCommentRequest {
-    UUID postId;
     UUID parentId;
     String content;
 }

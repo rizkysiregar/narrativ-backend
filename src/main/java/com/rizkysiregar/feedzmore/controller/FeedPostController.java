@@ -30,6 +30,7 @@ public class FeedPostController {
         this.postService = postService;
     }
 
+    @Operation(summary = "Get all feed post for Home feed page")
     @GetMapping
     public PaginatedResponse<PostDTO> getAllPosts(
             @RequestParam(defaultValue = "0") int page,
@@ -40,17 +41,17 @@ public class FeedPostController {
         return postService.getAllPost(page, size, userId);
     }
 
-    @GetMapping("/user")
+    @Operation(summary = "Getting feed user specific feed post by username")
+    @GetMapping("/users/{username}/posts")
     public PaginatedResponse<PostDTO> getAllPostByUserId(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam String username
-    ) {
+            @PathVariable String username) {
         return postService.getAllPostByUserId(page, size, username);
     }
 
     @Operation(summary = "Upload new post feed")
-    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public AddPostDTO upload(
             @Parameter(
                     description = "Other payloads that related to the post",

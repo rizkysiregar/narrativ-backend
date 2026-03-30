@@ -44,7 +44,7 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public PaginatedResponse<PostDTO> getAllPost(int page, int size, UUID userId) {
-        log.info(":: Fetch All Post Feed =  {}, size= {} ,userId={}", page, size, userId);
+        log.info("FETCH.ALL.FEED: {}, size= {} ,userId={}", page, size, userId);
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<PostDTO> postPage = postPaginationRepository.findAllPost(pageable, userId);
         return buildPaginatedResponse(postPage);
@@ -52,7 +52,7 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public PaginatedResponse<PostDTO> getAllPostByUserId(int page, int size, String username) {
-        log.info(":: Fetch Post Feed by username =  {}, size= {} , username= {}", page, size, username);
+        log.info("FETCH.FEED.BY.USERNAME =  {}, size= {} , username= {}", page, size, username);
 
         UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
@@ -84,7 +84,7 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public AddPostDTO addNewPost(AddPostRequest addPostRequest, MultipartFile image) throws Exception {
-        log.info("::. Entering PostServiceImpl.addNewPost by : {}", addPostRequest.getUsername());
+        log.info("NEW.FEED.POST: {}", addPostRequest.getUsername());
 
         if (userRepository.findByUsername(addPostRequest.getUsername()).isPresent()) {
             if (image.isEmpty()) {
