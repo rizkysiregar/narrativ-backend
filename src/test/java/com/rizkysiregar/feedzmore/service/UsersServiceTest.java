@@ -4,12 +4,12 @@ package com.rizkysiregar.feedzmore.service;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
-import com.rizkysiregar.feedzmore.model.dto.UserRegisterDto;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.RegisterUserRequest;
 import com.rizkysiregar.feedzmore.model.request.ResetPasswordRequest;
 import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
 import com.rizkysiregar.feedzmore.model.request.UserSearchRequest;
+import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.util.Operation;
 import com.rizkysiregar.feedzmore.config.RedisUtil;
@@ -269,7 +269,7 @@ public class UsersServiceTest {
         when(userRepository.findAll((org.springframework.data.jpa.domain.Specification<UserEntity>) any(), eq(pageable))).thenReturn(page);
 
         // Act
-        Page<UserDetailDTO> result = usersService.search(request, pageable);
+        PaginatedResponse<UserDetailDTO> result = usersService.search(request, pageable);
 
         // Assert
         assertNotNull(result);
