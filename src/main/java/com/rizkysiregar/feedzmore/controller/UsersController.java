@@ -1,8 +1,8 @@
 package com.rizkysiregar.feedzmore.controller;
 
 import com.rizkysiregar.feedzmore.model.dto.*;
-import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.*;
+import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.service.UsersService;
 import com.rizkysiregar.feedzmore.service.otp.IOtpService;
 import com.rizkysiregar.feedzmore.util.Operation;
@@ -12,8 +12,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -75,8 +73,8 @@ public class UsersController {
 
 
     @ApiOperation(value = "Getting registered user base on some data that its have", notes = "the argument is dynamic, can be change base on requirement")
-    @GetMapping("/users")
-    public Page<UserDetailDTO> searchUsers(
+    @GetMapping("/search/users")
+    public PaginatedResponse<UserDetailDTO> searchUsers(
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String name,
             @Parameter(hidden = true) Pageable pageable

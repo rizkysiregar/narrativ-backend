@@ -23,7 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
+import javax.swing.text.html.Option;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -44,19 +44,34 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public PaginatedResponse<PostDTO> getAllPost(int page, int size, UUID userId) {
-        log.info(":: Fetching post pagination with page=  {}, size= {} ,userId={}", page, size, userId);
+        log.info(":: Fetch All Post Feed =  {}, size= {} ,userId={}", page, size, userId);
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<PostDTO> postPage = postPaginationRepository.findAllWithCounts(pageable, userId);
+        Page<PostDTO> postPage = postPaginationRepository.findAllPost(pageable, userId);
+        return buildPaginatedResponse(postPage);
+    }
 
-        // Transform content.imageUrl with presign URLs
-        List<PostDTO> updatedContent = postPage.getContent().stream().peek(post -> {
-            try {
-                post.setImageUrl(fileStorageService.getPresignUrl(post.getImageUrl()));
-            } catch (Exception e) {
-                log.error("## cannot get presign url for objectName= {}, because of= {}", post.getImageUrl(), e.getMessage());
-            }
-        }).toList();
+    @Override
+    public PaginatedResponse<PostDTO> getAllPostByUserId(int page, int size, String username) {
+        log.info(":: Fetch Post Feed by username =  {}, size= {} , username= {}", page, size, username);
 
+        UserEntity user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<PostDTO> postPage = postPaginationRepository.findAllPostByUserId(pageable, user.getId());
+        return buildPaginatedResponse(postPage);
+    }
+
+    private PaginatedResponse<PostDTO> buildPaginatedResponse(Page<PostDTO> postPage) {
+        List<PostDTO> updatedContent = postPage.getContent().stream()
+                .peek(post -> {
+                    try {
+                        post.setImageUrl(fileStorageService.getPresignUrl(post.getImageUrl()));
+                    } catch (Exception e) {
+                        log.error("## cannot get presign url for objectName= {}, because of= {}", post.getImageUrl(), e.getMessage());
+                    }
+
+                }).toList();
 
         return new PaginatedResponse<>(
                 updatedContent,

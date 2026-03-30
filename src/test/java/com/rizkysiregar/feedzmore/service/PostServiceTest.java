@@ -60,7 +60,7 @@ public class PostServiceTest {
         List<PostDTO> content = List.of(p1, p2);
         Page<PostDTO> postPage = new PageImpl<>(content, PageRequest.of(page, size), content.size());
 
-        when(postPaginationRepository.findAllWithCounts(any(Pageable.class), eq(userId)))
+        when(postPaginationRepository.findAllPost(any(Pageable.class), eq(userId)))
                 .thenReturn(postPage);
 
         try {
@@ -85,7 +85,7 @@ public class PostServiceTest {
         assertEquals("img2.jpg", response.getContent().get(1).getImageUrl());
 
         verify(postPaginationRepository, times(1))
-                .findAllWithCounts(any(Pageable.class), eq(userId));
+                .findAllPost(any(Pageable.class), eq(userId));
     }
 
     @Test

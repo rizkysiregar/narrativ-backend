@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.hibernate.validator.cfg.defs.UUIDDef;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -37,6 +38,15 @@ public class FeedPostController {
     ) {
         UUID userId = userPrincipal.getUserId();
         return postService.getAllPost(page, size, userId);
+    }
+
+    @GetMapping("/user")
+    public PaginatedResponse<PostDTO> getAllPostByUserId(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam String username
+    ) {
+        return postService.getAllPostByUserId(page, size, username);
     }
 
     @Operation(summary = "Upload new post feed")

@@ -4,13 +4,13 @@ import com.rizkysiregar.feedzmore.config.RedisUtil;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
-import com.rizkysiregar.feedzmore.model.dto.UserRegisterDto;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.RegisterUserRequest;
 import com.rizkysiregar.feedzmore.model.request.ResetPasswordRequest;
 import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
 import com.rizkysiregar.feedzmore.model.request.UserSearchRequest;
+import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.util.Operation;
 import jakarta.persistence.criteria.Predicate;
@@ -145,7 +145,7 @@ public class UsersService {
         }
     }
 
-    public Page<UserDetailDTO> search(UserSearchRequest request, Pageable pageable) {
+    public PaginatedResponse<UserDetailDTO> search(UserSearchRequest request, Pageable pageable) {
         log.info("## search users request: {}", request);
 
         Page<UserEntity> users = userRepository.findAll((root, query, cb) -> {
@@ -165,7 +165,18 @@ public class UsersService {
             throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
         }
 
-        return users.map(UserDetailDTO::from);
+        List<UserDetailDTO> usersContent = users.getContent().stream()
+                .map(UserDetailDTO::from)
+                .toList();
+
+        return new PaginatedResponse<>(
+                usersContent,
+                users.getNumber(),
+                users.getSize(),
+                users.getTotalElements(),
+                users.getTotalPages(),
+                users.isLast()
+        );
     }
 
 }
