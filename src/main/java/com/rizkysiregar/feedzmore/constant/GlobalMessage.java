@@ -20,6 +20,7 @@ public enum GlobalMessage {
     OTP_EXPIRED("404", "Kode OTP sudah tidak berlaku. Silakan minta kode yang baru."),
     INVALID_RESET_TOKEN("400", "Tautan perubahan kata sandi sudah tidak valid atau pernah digunakan."),
     USERNAME_ALREADY_TAKEN("400", "Nama pengguna ini sudah digunakan. Coba nama lain yang unik, ya!"),
+    USER_NOT_FOUND("404", "User yang kamu cari tidak terdaftar"),
     EMAIL_ALREADY_TAKEN("400", "Email ini sudah terdaftar. Silakan gunakan email lain atau masuk ke akun Anda."),
     ;
 
