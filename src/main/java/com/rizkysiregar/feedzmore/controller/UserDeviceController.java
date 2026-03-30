@@ -4,6 +4,7 @@ import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.request.RegisterDeviceRequest;
 import com.rizkysiregar.feedzmore.service.UserDeviceService;
 import com.rizkysiregar.feedzmore.util.Operation;
+import io.swagger.annotations.ApiOperation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +23,10 @@ public class UserDeviceController {
 
     private final UserDeviceService userDeviceService;
 
-    @PostMapping("/register")
+    @ApiOperation(
+            value = "Register or update users devices"
+    )
+    @PostMapping()
     public Operation registerDevice(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestBody @Valid RegisterDeviceRequest request

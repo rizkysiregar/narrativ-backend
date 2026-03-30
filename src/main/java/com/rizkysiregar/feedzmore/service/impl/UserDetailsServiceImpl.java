@@ -6,7 +6,7 @@ import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.constant.Constants;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -26,11 +26,10 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
 
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+    public @NonNull UserDetails loadUserByUsername(@NonNull String username) throws UsernameNotFoundException {
         Optional<UserEntity> user = userRepository.findByUsername(username);
 
         if (user.isEmpty()) {
-            log.error("::. user " + username + " not exist");
             throw new UsernameNotFoundException(Constants.INVALID_USERNAME_PASSWORD);
         }
 

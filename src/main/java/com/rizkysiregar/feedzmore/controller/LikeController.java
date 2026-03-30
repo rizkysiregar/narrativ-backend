@@ -2,8 +2,7 @@ package com.rizkysiregar.feedzmore.controller;
 
 import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.dto.PostLikeCountDTO;
-import com.rizkysiregar.feedzmore.model.request.LikeUnlikePostRequest;
-import com.rizkysiregar.feedzmore.service.LikeUnlikeService;
+import com.rizkysiregar.feedzmore.service.LikeDislikeService;
 import com.rizkysiregar.feedzmore.util.Operation;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -11,34 +10,33 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/post")
 public class LikeController {
 
-    private final LikeUnlikeService likeUnlikeService;
+    private final LikeDislikeService likeDislikeService;
 
-    public LikeController(LikeUnlikeService likeUnlikeService) {
-        this.likeUnlikeService = likeUnlikeService;
+    public LikeController(LikeDislikeService likeDislikeService) {
+        this.likeDislikeService = likeDislikeService;
     }
 
-    @PostMapping("/like")
+    @PostMapping("/posts/{postId}/like")
     public Operation likePost(
-            @RequestBody LikeUnlikePostRequest likeUnlikePostRequest,
+            @PathVariable UUID postId,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        return likeUnlikeService.likePost(likeUnlikePostRequest, userPrincipal.getUserId());
+        return likeDislikeService.likePost(postId, userPrincipal.getUserId());
     }
 
-    @DeleteMapping("/dislike")
+    @DeleteMapping("/posts/{postId}/dislike")
     public Operation dislikePost(
-            @RequestParam UUID postId,
+            @PathVariable UUID postId,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        return likeUnlikeService.dislikePost(postId, userPrincipal.getUserId());
+        return likeDislikeService.dislikePost(postId, userPrincipal.getUserId());
     }
 
-    @GetMapping("/likes/count")
-    public PostLikeCountDTO getLikePostCount(@RequestParam UUID postId) {
-        return likeUnlikeService.getLikePostCount(postId);
+    @GetMapping("/posts/{postId}/likes/count")
+    public PostLikeCountDTO getLikePostCount(@PathVariable UUID postId) {
+        return likeDislikeService.getLikePostCount(postId);
     }
 
 }

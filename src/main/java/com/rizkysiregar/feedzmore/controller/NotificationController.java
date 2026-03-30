@@ -13,12 +13,12 @@ import reactor.core.publisher.Mono;
  */
 
 @RestController
-@RequestMapping("/notification")
+@RequestMapping("/notifications")
 @RequiredArgsConstructor
 public class NotificationController {
     private final FirebaseNotificationService notificationService;
 
-    @PostMapping("/admin/broadcast/topic")
+    @PostMapping("broadcast")
     public Mono<String> adminBroadcastTopic(
             @RequestBody BroadcastNotificationRequest request
             ) {

@@ -31,7 +31,7 @@ public class EmailService implements IEmailService {
     @Override
     public void sendEmail(String to, String subject, String body) {
         try {
-            log.info("## sendEmail to:{}, subject:{}, body:{}", to, subject, body);
+            log.info("SEND.EMAIL :{}, subject:{}, body:{}", to, subject, body);
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(to);
             message.setSubject(subject);
@@ -39,7 +39,7 @@ public class EmailService implements IEmailService {
             message.setFrom("feedzmore.helpdesk@gmail.com");
             mailSender.send(message);
         } catch (Exception e) {
-            log.error("## error send email: " + e.getMessage());
+            log.error("EmailService.sendEmail {}",  e.getMessage());
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -64,7 +64,7 @@ public class EmailService implements IEmailService {
             mailSender.send(message);
             return true;
         } catch (Exception e) {
-            log.error("## EmailService.sendOtpEmail: " + e.getMessage());
+            log.error("EmailService.sendOtpEmail {} ", e.getMessage());
             return false;
         }
     }

@@ -33,7 +33,7 @@ import java.util.UUID;
 
 @Service
 @Slf4j
-public class UsersService {
+public class AuthService {
 
     final UserRepository userRepository;
     final AuthenticationManager authManager;
@@ -42,7 +42,7 @@ public class UsersService {
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
 
-    public UsersService(UserRepository userRepository, AuthenticationManager authManager, JWTService jwtService, RedisUtil redisUtil) {
+    public AuthService(UserRepository userRepository, AuthenticationManager authManager, JWTService jwtService, RedisUtil redisUtil) {
         this.userRepository = userRepository;
         this.authManager = authManager;
         this.jwtService = jwtService;

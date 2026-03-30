@@ -27,7 +27,7 @@ public class FileController {
     }
 
     @Operation(summary = "Upload file to Object Storage")
-    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public FileUploadResponse uploadFile(
             @RequestPart("file") MultipartFile file,
             @RequestPart("userId") String userId,
