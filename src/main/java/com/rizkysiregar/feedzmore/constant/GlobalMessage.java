@@ -10,6 +10,7 @@ public enum GlobalMessage {
     INTERNAL_ERROR("500", "Terjadi kendala pada server kami. Mohon tunggu sebentar dan coba lagi nanti."),
     BAD_REQUEST("400", "Maaf, ada kendala saat memproses data Anda. Periksa kembali input Anda."),
     TOO_MANY_REQUEST("429", "Terlalu banyak permintaan. Mohon istirahat sejenak sebelum mencoba lagi."),
+    RATE_LIMIT("429", "Tunggu sebenetar ya, lagi rame banget. Coba lagi %d detik lagi ya!"),
     TOO_MANY_REQUEST_OTP("429", "Anda telah mencapai batas percobaan. Silakan minta kode OTP baru dalam 5 menit."),
     BAD_REQUEST_FILE_TO_LARGE("400", "Ukuran file terlalu besar. Mohon unggah file dengan ukuran yang lebih kecil."),
     NOT_FOUND("404", "Ups, data yang Anda cari tidak ditemukan."),

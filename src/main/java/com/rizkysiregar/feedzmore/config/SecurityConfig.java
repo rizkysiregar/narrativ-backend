@@ -2,6 +2,7 @@ package com.rizkysiregar.feedzmore.config;
 
 import com.rizkysiregar.feedzmore.filter.JwtFilter;
 import com.rizkysiregar.feedzmore.constant.Constants;
+import com.rizkysiregar.feedzmore.filter.RateLimitFilter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -42,6 +43,9 @@ public class SecurityConfig {
     @Autowired
     private JwtFilter jwtFilter;
 
+    @Autowired
+    private RateLimitFilter rateLimitFilter;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
@@ -54,6 +58,7 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(rateLimitFilter, JwtFilter.class)
                 .build();
     }
 

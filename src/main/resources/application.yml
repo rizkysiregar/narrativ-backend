@@ -26,6 +26,13 @@ spring:
     baseline-on-migrate: true
     baseline-version: 1
 
+rate-limit:
+  feed: 2
+  post-create: 5
+  interaction: 10
+  default: 60
+
+
 logging:
   config: classpath:logback-spring.xml
 
