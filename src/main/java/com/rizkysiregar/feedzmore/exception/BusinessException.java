@@ -22,6 +22,13 @@ public class BusinessException extends RuntimeException {
         this.httpStatus = httpStatus;
     }
 
+    public BusinessException(GlobalMessage globalMessage, HttpStatus httpStatus, Object... args) {
+        super(String.format(globalMessage.getMessage(), args));
+        this.code = globalMessage.getCode();
+        this.message = String.format(globalMessage.getMessage(), args);
+        this.httpStatus = httpStatus;
+    }
+
     public BusinessException(GlobalMessage globalMessage, String additionalMessage, HttpStatus httpStatus) {
         super(globalMessage.getMessage() + " " + additionalMessage);
         this.code = globalMessage.getCode();
