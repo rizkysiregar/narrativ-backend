@@ -28,6 +28,12 @@ spring:
       port: 6379
       timeout: 60000
 
+  rabbitmq:
+    host: rabbit-prod.messaging.svc.cluster.local
+    port: 5672
+    username: rizkysiregar
+    password: siregar123
+
   mail:
     host: smtp.gmail.com
     port: 587
