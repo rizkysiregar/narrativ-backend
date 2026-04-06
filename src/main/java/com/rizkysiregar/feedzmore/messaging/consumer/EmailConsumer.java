@@ -27,6 +27,7 @@ public class EmailConsumer {
             );
         } catch (Exception e) {
             log.error("EMAIL FAILED {} ", e.getMessage());
+            throw e;
         }
     }
 }

@@ -28,6 +28,7 @@ public class NotificationConsumer {
             log.info("NOTIFICATION SENT for {}", event.getUsername());
         } catch (Exception e) {
             log.error("NOTIFICATION FAILED {}", e.getMessage());
+            throw e;
         }
     }
 }
