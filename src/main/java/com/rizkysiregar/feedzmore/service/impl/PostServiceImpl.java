@@ -4,6 +4,8 @@ package com.rizkysiregar.feedzmore.service.impl;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.constant.ObjectStorageTypeGroup;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
+import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
+import com.rizkysiregar.feedzmore.messaging.publisher.PostEventPublisher;
 import com.rizkysiregar.feedzmore.model.dto.AddPostDTO;
 import com.rizkysiregar.feedzmore.model.dto.PostDTO;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
@@ -23,10 +25,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.swing.text.html.Option;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
 
 
@@ -38,9 +40,8 @@ public class PostServiceImpl implements PostService {
     private final PostPaginationRepository postPaginationRepository;
     private final PostCrudRepository postCrudRepository;
     private final UserRepository userRepository;
-    private final LikeRepository likeRepository;
-    private final CommentRepository commentRepository;
     private final FileStorageService fileStorageService;
+    private final PostEventPublisher postEventPublisher;
 
     @Override
     public PaginatedResponse<PostDTO> getAllPost(int page, int size, UUID userId) {
@@ -83,43 +84,62 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public AddPostDTO addNewPost(AddPostRequest addPostRequest, MultipartFile image) throws Exception {
-        log.info("NEW.FEED.POST: {}", addPostRequest.getUsername());
+    public AddPostDTO addNewPost(AddPostRequest request, MultipartFile image) throws Exception {
+        log.info("NEW.FEED.POST: {}", request.getUsername());
 
-        if (userRepository.findByUsername(addPostRequest.getUsername()).isPresent()) {
-            if (image.isEmpty()) {
-                log.error("Image is empty");
-                throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-            }
+        UserEntity user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> {
+                    log.error("Username not found {}", request.getUsername());
+                    return new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+                });
 
-            if (image.getSize() > 5 * 1024 * 1024) { // Limit to max 5 mb
-                log.error("Image too large");
-                throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
-            }
-
-            String objectName = fileStorageService.uploadFile(image, addPostRequest.getUsername(), ObjectStorageTypeGroup.POST_FEED);
-            Optional<UserEntity> user = userRepository.findByUsername(addPostRequest.getUsername());
-            user.ifPresentOrElse(
-                    userEntity -> {
-                        PostEntity postEntity = PostEntity.builder()
-                                .caption(addPostRequest.getCaption())
-                                .createdAt(LocalDateTime.now())
-                                .imageUrl(objectName)
-                                .user(userEntity)
-                                .build();
-                        postCrudRepository.save(postEntity);
-                    },
-                    () -> {
-                        throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-                    }
-            );
-
-            return AddPostDTO.builder()
-                    .status(GlobalMessage.CREATED.getMessage())
-                    .build();
-        } else {
-            log.error("::. Username not found {}", addPostRequest.getUsername());
+        if (image.isEmpty()) {
+            log.error("Image is empty");
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
+
+        if (image.getSize() > 5 * 1024 * 1024) {
+            log.error("Image too large");
+            throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
+        }
+
+        Map<String, Object> emailProps = new HashMap<>();
+        emailProps.put("username", user.getUsername());
+        emailProps.put("isSuccess", true);
+        emailProps.put("postTitle", request.getCaption());
+
+        String objectName = fileStorageService.uploadFile(
+                image,
+                request.getUsername(),
+                ObjectStorageTypeGroup.POST_FEED
+        );
+
+        PostEntity postEntity = postCrudRepository.save(
+                PostEntity.builder()
+                        .caption(request.getCaption())
+                        .createdAt(LocalDateTime.now())
+                        .imageUrl(objectName)
+                        .user(user)
+                        .build()
+        );
+
+        // event to publish
+        PostCreatedEvent event = PostCreatedEvent.builder()
+                .postId(postEntity.getId())
+                .username(postEntity.getUser().getUsername())
+                .caption(postEntity.getCaption())
+                .imageUrl(postEntity.getImageUrl())
+                .createdAt(postEntity.getCreatedAt())
+                .email(user.getEmail())
+                .emailProps(emailProps)
+                .build();
+
+        // broadcast post created event, currently the consumer are: notification and email
+        postEventPublisher.publishPostCreatedEvent(event);
+
+
+        return AddPostDTO.builder()
+                .status(GlobalMessage.CREATED.getMessage())
+                .build();
     }
 }

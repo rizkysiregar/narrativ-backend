@@ -44,42 +44,43 @@ public class OtpService implements IOtpService {
 
     @Override
     public SentOtpDTO sendOtp(String email) {
-        Optional<UserEntity> byEmail = userRepository.findByEmail(email);
-        if (byEmail.isPresent()) {
-            if (redisUtil.hasKey("otp:" + email)) {
-                throw new BusinessException(GlobalMessage.TOO_MANY_REQUEST_OTP, HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
-            }
+        Optional<UserEntity> user = userRepository.findByEmail(email);
 
-            String otp = generateOtp();
-            LocalDateTime expirationTime = LocalDateTime.now().plusSeconds(Long.parseLong(otpRetryTimeInSeconds));
-
-            // sending otp via email
-            boolean sendStatus = emailService.sendOtpEmail(email, otp);
-
-            if (!sendStatus) {
-                log.error("## Failed to send OTP to email: {}", email);
-                throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
-            }
-
-            OtpCode otpCode = OtpCode.builder()
-                    .email(email)
-                    .otp(otp)
-                    .expirationTime(expirationTime)
-                    .build();
-            otpCodeRepository.save(otpCode);
-            redisUtil.set("otp:" + email, otp, 60);
-
-            return SentOtpDTO.builder()
-                    .otpSendToEmailAddress(EmailMasking.maskEmail(email))
-                    .expirationTimeInMinute("1")
-                    .build();
-        } else {
+        if (user.isEmpty()) {
             throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
         }
+
+        if (redisUtil.hasKey("otp:" + email)) {
+            throw new BusinessException(GlobalMessage.TOO_MANY_REQUEST_OTP, HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
+        }
+
+        String otp = generateOtp();
+        LocalDateTime expirationTime = LocalDateTime.now().plusSeconds(Long.parseLong(otpRetryTimeInSeconds));
+
+        // sending otp via email
+        boolean sendStatus = emailService.sendOtpEmail(email, otp);
+        if (!sendStatus) {
+            log.error("## Failed to send OTP to email: {}", email);
+            throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        OtpCode otpCode = OtpCode.builder()
+                .email(email)
+                .otp(otp)
+                .expirationTime(expirationTime)
+                .build();
+        otpCodeRepository.save(otpCode);
+        redisUtil.set("otp:" + email, otp, 60);
+
+        return SentOtpDTO.builder()
+                .otpSendToEmailAddress(EmailMasking.maskEmail(email))
+                .expirationTimeInMinute("1")
+                .build();
+
     }
 
     private String generateOtp() {
-       return String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        return String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
     }
 
     @Override

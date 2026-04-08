@@ -1,6 +1,7 @@
 package com.rizkysiregar.feedzmore.service.firebase;
 
 
+import com.rizkysiregar.feedzmore.constant.Constants;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.entity.JobExecutionLog;
@@ -56,7 +57,7 @@ public class FirebaseSchedulerService {
             if (!casualTemplate.isEmpty()) {
                 NotificationTemplateEntity notificationTemplateEntity = casualTemplate.get(0);
                 Mono<String> responseMono = notificationService.sendNotificationToTopic(
-                        "global",
+                        Constants.FIREBASE_TOPIC_GLOBAL,
                         notificationTemplateEntity.getTitle(),
                         notificationTemplateEntity.getBody()
                 );

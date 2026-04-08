@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import java.util.Map;
+
 @Service
 @Slf4j
 public class EmailService implements IEmailService {
@@ -29,6 +31,31 @@ public class EmailService implements IEmailService {
     }
 
     @Override
+    public void sendEmailTemplate(String to, String subject, String templateName, Map<String, Object> variables) {
+        log.info("SEND.TEMPLATE.EMAIL: to {} | subject: {} | templateName: {}", to, subject, templateName);
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject(subject);
+
+            // email context
+            Context context = new Context();
+            if (variables != null) {
+                variables.forEach(context::setVariable);
+            }
+
+            String htmlContent = templateEngine.process("email/"+templateName, context);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+        } catch (Exception e) {
+            log.error("FAILED SEND EMAIL: {} ", e.getMessage());
+        }
+    }
+
+    @Override
     public void sendEmail(String to, String subject, String body) {
         try {
             log.info("SEND.EMAIL :{}, subject:{}, body:{}", to, subject, body);
@@ -39,7 +66,7 @@ public class EmailService implements IEmailService {
             message.setFrom("feedzmore.helpdesk@gmail.com");
             mailSender.send(message);
         } catch (Exception e) {
-            log.error("EmailService.sendEmail {}",  e.getMessage());
+            log.error("EmailService.sendEmail {}", e.getMessage());
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
