@@ -1,6 +1,6 @@
 image:
   repository: rizkysiregar/feedzmore-service
-  tag: 3166fbd
+  tag: ff7ef42
   pullPolicy: Always
 
 replicaCount: 2
