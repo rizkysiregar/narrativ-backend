@@ -27,10 +27,10 @@ spring:
     baseline-version: 1
 
 rate-limit:
-  feed: 2
-  post-create: 5
-  interaction: 10
-  default: 60
+  feed: 20
+  post-create: 20
+  interaction: 20
+  default: 20
 
 
 logging:
