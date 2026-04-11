@@ -11,6 +11,9 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.validation.annotation.Validated;
@@ -18,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @Slf4j
-@Tag(name = "Authentication API")
+@Tag(name = "Authentication and User Related API's")
 @Validated
 @SecurityRequirement(name = "Bearer Authentication")
 public class AuthController {
@@ -67,23 +70,21 @@ public class AuthController {
 
     @ApiOperation(value = "Getting user details data by userId", notes = "pass userId that you got from login response")
     @GetMapping("users/{userId}")
-    public UserDetailDTO getUserById(@PathVariable String userId) {
+    public UserDetailDTO getUserById(@PathVariable @NotBlank String userId) {
         return authService.getUserById(userId);
     }
 
 
     @ApiOperation(
-            value = "Search users",
-            notes = "Filter by any combination of username and name. All params are optional."
+            value = "Search users by it's username"
     )
     @GetMapping("users")
     public PaginatedResponse<UserDetailDTO> searchUsers(
-            @RequestParam(required = false) String username,
-            @RequestParam(required = false) String name,
+            @RequestParam(required = false) @NotBlank  String username,
             @Parameter(hidden = true) Pageable pageable
     ) {
         return authService.search(
-                new UserSearchRequest(username, name),
+                new UserSearchRequest(username),
                 pageable
         );
     }

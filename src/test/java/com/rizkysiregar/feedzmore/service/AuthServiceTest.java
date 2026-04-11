@@ -255,7 +255,7 @@ public class AuthServiceTest {
     @Test
     void testSearch_Success() {
         // Arrange
-        UserSearchRequest request = new UserSearchRequest("john", null);
+        UserSearchRequest request = new UserSearchRequest("john");
         Pageable pageable = PageRequest.of(0, 10);
 
         UserEntity user = new UserEntity();
@@ -280,7 +280,7 @@ public class AuthServiceTest {
     @Test
     void testSearch_NotFound() {
         // Arrange
-        UserSearchRequest request = new UserSearchRequest("someone", null);
+        UserSearchRequest request = new UserSearchRequest("someone");
         Pageable pageable = PageRequest.of(0, 10);
         when(userRepository.findAll((org.springframework.data.jpa.domain.Specification<UserEntity>) any(), eq(pageable))).thenReturn(Page.empty(pageable));
 
