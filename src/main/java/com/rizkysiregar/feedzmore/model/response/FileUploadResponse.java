@@ -1,4 +1,4 @@
-package com.rizkysiregar.feedzmore.model.dto;
+package com.rizkysiregar.feedzmore.model.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,7 +14,8 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 @Builder
-public class FileUrlResponse {
+public class FileUploadResponse {
     private String fileName;
-    private String url;
+    private String objectPath;
+    private String message;
 }

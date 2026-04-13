@@ -1,6 +1,6 @@
 package com.rizkysiregar.feedzmore.service.otp;
 
-import com.rizkysiregar.feedzmore.config.RedisUtil;
+import com.rizkysiregar.feedzmore.util.RedisUtil;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.OtpCode;

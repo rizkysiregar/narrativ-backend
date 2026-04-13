@@ -12,7 +12,7 @@ import com.rizkysiregar.feedzmore.model.request.UserSearchRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.util.Operation;
-import com.rizkysiregar.feedzmore.config.RedisUtil;
+import com.rizkysiregar.feedzmore.util.RedisUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -90,7 +90,7 @@ public class AuthServiceTest {
     }
 
     @Test
-    void testVerify_Success() {
+    void testLogin_Success() {
         // Arrange
         UserLoginRequest loginRequest = new UserLoginRequest();
         loginRequest.setUsername("testuser");
@@ -111,7 +111,7 @@ public class AuthServiceTest {
         when(jwtService.generateToken(anyString(), any(UUID.class))).thenReturn("mockedToken");
 
         // Act
-        UserLoginDTO result = authService.verify(loginRequest);
+        UserLoginDTO result = authService.login(loginRequest);
 
 
         // Assert
