@@ -17,6 +17,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @Slf4j
 @Tag(name = "Authentication and User Related API's")
@@ -89,6 +91,19 @@ public class AuthController {
         return authService.search(
                 new UserSearchRequest(username),
                 pageable
+        );
+    }
+
+
+    @ApiOperation(
+            value = "Search user by username but return it as List not pagination"
+    )
+    @GetMapping("usersList")
+    public List<UserDetailDTO> searchUsersList(
+            @RequestParam(required = false) @NotBlank String username
+    ) {
+        return authService.searchList(
+                new UserSearchRequest(username)
         );
     }
 

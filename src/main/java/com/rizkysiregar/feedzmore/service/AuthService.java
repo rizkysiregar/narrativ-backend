@@ -222,4 +222,30 @@ public class AuthService {
         );
     }
 
+    // return classic List - untuk ica belajar
+    public List<UserDetailDTO> searchList(UserSearchRequest request) {
+        log.info("## search users list request: {}", request);
+
+        List<UserEntity> users = userRepository.findAll((root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (request.username() != null) {
+                predicates.add(cb.like(
+                        cb.lower(root.get("username")),
+                        "%" + request.username().toLowerCase() + "%"
+                ));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        });
+
+        if (users.isEmpty()) {
+            throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
+        }
+
+        return users.stream()
+                .map(UserDetailDTO::from)
+                .toList();
+    }
+
 }
