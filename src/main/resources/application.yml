@@ -26,6 +26,9 @@ spring:
     baseline-on-migrate: true
     baseline-version: 1
 
+google:
+  client-id: 1023550390414-g9rql6rv1lpkmob8ndmuq6n09qmqhjpe.apps.googleusercontent.com
+
 rate-limit:
   feed: 20
   post-create: 20

@@ -2,7 +2,7 @@ package com.rizkysiregar.feedzmore.service;
 
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rizkysiregar.feedzmore.config.RedisUtil;
+import com.rizkysiregar.feedzmore.util.RedisUtil;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.model.dto.ResetTokenDTO;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;

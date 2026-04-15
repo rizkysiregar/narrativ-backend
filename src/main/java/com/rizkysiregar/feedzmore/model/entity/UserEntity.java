@@ -22,6 +22,9 @@ public class UserEntity {
     @Size(min = 3, max = 16, message = "The length of the username should be between 3 and 15")
     private String username;
 
+    @NotBlank(message = "Password is required")
+    @NotEmpty(message = "Password cannot be empty")
+    @Size(min = 3)
     private String password;
 
     @Column(nullable = false, unique = true)
@@ -46,5 +49,9 @@ public class UserEntity {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     private String profileImage;
+
+    @Column(name = "google_id", unique = true)
+    private String googleId; // null for regular username/password
+
 
 }

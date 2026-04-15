@@ -12,8 +12,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.validation.annotation.Validated;
@@ -38,16 +36,21 @@ public class AuthController {
     @ApiOperation(value = "Register a new user", notes = "use this to register a new user")
     @PostMapping("auth/register")
     public Operation register(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
-        log.info("::. Entering /register users");
+       log.info("REGISTER.USER {}", registerUserRequest);
         return authService.register(registerUserRequest);
     }
 
     @ApiOperation(value = "User login", notes = "use this to gain jwt credentials for user validity")
     @PostMapping("auth/login")
-    public UserLoginDTO login(@RequestBody UserLoginRequest userLoginRequest) {
-        log.info("::. Entering /login users");
-        log.info(":: " + userLoginRequest.toString());
-        return authService.verify(userLoginRequest);
+    public UserLoginDTO login(@Valid @RequestBody UserLoginRequest userLoginRequest) {
+        log.info("LOGIN {} ", userLoginRequest);
+        return authService.login(userLoginRequest);
+    }
+
+    @ApiOperation(value = "Login with Google Account- Token ID")
+    @PostMapping("auth/google")
+    public UserLoginDTO googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
+        return authService.googleLogin(request);
     }
 
     @ApiOperation(value = "User validation and OTP Request", notes = "Use this for sending otp into user registered email")

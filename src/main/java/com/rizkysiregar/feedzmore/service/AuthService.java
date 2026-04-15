@@ -1,18 +1,18 @@
 package com.rizkysiregar.feedzmore.service;
 
-import com.rizkysiregar.feedzmore.config.RedisUtil;
+import com.rizkysiregar.feedzmore.model.dto.GoogleUserInfo;
+import com.rizkysiregar.feedzmore.model.request.*;
+import com.rizkysiregar.feedzmore.service.auth.GoogleTokenVerifierService;
+import com.rizkysiregar.feedzmore.util.RedisUtil;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
-import com.rizkysiregar.feedzmore.model.request.RegisterUserRequest;
-import com.rizkysiregar.feedzmore.model.request.ResetPasswordRequest;
-import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
-import com.rizkysiregar.feedzmore.model.request.UserSearchRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.util.Operation;
+import com.rizkysiregar.feedzmore.util.UsernameGenerator;
 import jakarta.persistence.criteria.Predicate;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -41,12 +41,16 @@ public class AuthService {
     private final RedisUtil redisUtil;
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
+    private final GoogleTokenVerifierService googleTokenVerifierService;
+    private final UsernameGenerator usernameGenerator;
 
-    public AuthService(UserRepository userRepository, AuthenticationManager authManager, JWTService jwtService, RedisUtil redisUtil) {
+    public AuthService(UserRepository userRepository, AuthenticationManager authManager, JWTService jwtService, RedisUtil redisUtil, GoogleTokenVerifierService googleTokenVerifierService, UsernameGenerator usernameGenerator) {
         this.userRepository = userRepository;
         this.authManager = authManager;
         this.jwtService = jwtService;
         this.redisUtil = redisUtil;
+        this.googleTokenVerifierService = googleTokenVerifierService;
+        this.usernameGenerator = usernameGenerator;
     }
 
     public Operation register(RegisterUserRequest registerUserRequest) {
@@ -71,7 +75,7 @@ public class AuthService {
         return Operation.CREATED;
     }
 
-    public UserLoginDTO verify(UserLoginRequest userLoginRequest) {
+    public UserLoginDTO login(UserLoginRequest userLoginRequest) {
         Authentication authentication =
                 authManager.authenticate(new UsernamePasswordAuthenticationToken(userLoginRequest.getUsername(), userLoginRequest.getPassword()));
 
@@ -95,6 +99,45 @@ public class AuthService {
         }
 
         throw new BadCredentialsException("Bad Credentials!");
+    }
+
+    public UserLoginDTO googleLogin(GoogleLoginRequest request) {
+        log.info("GOOGLE.LOGIN");
+        // Verify idToken with Google and extract user info from it
+        GoogleUserInfo googleUser = googleTokenVerifierService.verifyToken(request.getIdToken());
+
+        // find existing user by email or create a new one
+        UserEntity user = userRepository.findByEmail(googleUser.getEmail())
+                .map(existing -> {
+                    if (existing.getGoogleId() == null) {
+                        existing.setGoogleId(googleUser.getGoogleId());
+                        return userRepository.save(existing);
+                    }
+
+                    return existing;
+                })
+                .orElseGet(() -> createGoogleUser(googleUser));
+
+        // Generate JWT - same as regular login
+        String token = jwtService.generateToken(user.getUsername(), user.getId());
+        return UserLoginDTO.builder()
+                .token(token)
+                .username(user.getUsername())
+                .userId(user.getId().toString())
+                .build();
+    }
+
+    private UserEntity createGoogleUser(GoogleUserInfo googleUser) {
+        UserEntity entity = new UserEntity();
+        entity.setEmail(googleUser.getEmail());
+        entity.setUsername(usernameGenerator.generateFromEmail(googleUser.getEmail()));
+        entity.setFirstName(googleUser.getFirstName() != null ? googleUser.getFirstName() : "");
+        entity.setLastName(googleUser.getLastName() != null ? googleUser.getLastName() : "");
+        entity.setProfileImage(googleUser.getPicture());
+
+        // random unusable password - Google uses authenticate via token, not password
+        entity.setPassword(encoder.encode(UUID.randomUUID().toString()));
+        return userRepository.save(entity);
     }
 
 

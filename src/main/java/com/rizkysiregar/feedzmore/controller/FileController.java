@@ -1,8 +1,8 @@
 package com.rizkysiregar.feedzmore.controller;
 
 
-import com.rizkysiregar.feedzmore.model.dto.FileUploadResponse;
-import com.rizkysiregar.feedzmore.model.dto.FileUrlResponse;
+import com.rizkysiregar.feedzmore.model.response.FileUploadResponse;
+import com.rizkysiregar.feedzmore.model.response.FileUrlResponse;
 import com.rizkysiregar.feedzmore.service.FileStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.MediaType;
