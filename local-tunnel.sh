@@ -17,6 +17,7 @@ kubectl port-forward -n observability svc/zipkin 9411:9411 &
 kubectl port-forward -n database pod/redisinsight-5d496f8648-dnz44 8001:5540 &
 kubectl port-forward -n messaging service/rabbit-prod 15672:15672 &
 kubectl port-forward -n messaging service/rabbit-prod 5672:5672 &
+kubectl port-forward -n infra svc/elasticsearch 9200:9200 &
 
 echo "Tunnels open. Press Ctrl+C to stop all."
 
