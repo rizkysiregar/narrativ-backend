@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.model.entity;
 
+import com.rizkysiregar.feedzmore.model.enums.Role;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.Data;
@@ -53,5 +54,8 @@ public class UserEntity {
     @Column(name = "google_id", unique = true)
     private String googleId; // null for regular username/password
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Role role = Role.USER;
 
 }

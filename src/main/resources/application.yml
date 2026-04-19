@@ -28,16 +28,18 @@ spring:
 
 google:
   client-id: 1023550390414-g9rql6rv1lpkmob8ndmuq6n09qmqhjpe.apps.googleusercontent.com
-
-rate-limit:
-  feed: 20
-  post-create: 20
-  interaction: 20
-  default: 20
+app:
+  rate-limit:
+    feed: 20
+    post-create: 20
+    interaction: 20
+    default: 20
 
 
 logging:
   config: classpath:logback-spring.xml
+  level:
+    org.flywaydb: DEBUG
 
 management:
   tracing:

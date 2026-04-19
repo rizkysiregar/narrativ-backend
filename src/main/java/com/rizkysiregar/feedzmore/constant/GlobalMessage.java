@@ -15,6 +15,7 @@ public enum GlobalMessage {
     BAD_REQUEST_FILE_TO_LARGE("400", "Ukuran file terlalu besar. Mohon unggah file dengan ukuran yang lebih kecil."),
     NOT_FOUND("404", "Ups, data yang Anda cari tidak ditemukan."),
     UNAUTHORIZED("401", "Sesi Anda telah berakhir. Silakan masuk (login) kembali."),
+    ACCESS_DENIED("403", "Access Denied: you don't have permission to access this resource"),
     GOOGLE_UNAUTHORIZED("401", "Invalid Google Token"),
     GOOGLE_TOKEN_MISS_MATCH("401", "Token client miss match"),
     GOOGLE_TOKEN_FAILED_TO_VERIFY("401", "Failed to verify Google token"),

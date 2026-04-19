@@ -3,8 +3,10 @@ package com.rizkysiregar.feedzmore.service;
 
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
+import com.rizkysiregar.feedzmore.messaging.publisher.PostEventPublisher;
 import com.rizkysiregar.feedzmore.model.dto.AddPostDTO;
 import com.rizkysiregar.feedzmore.model.dto.PostDTO;
+import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
@@ -45,6 +47,8 @@ public class PostServiceTest {
     private CommentRepository commentRepository;
     @Mock
     private FileStorageService fileStorageService;
+    @Mock
+    private PostEventPublisher postEventPublisher;
 
     @InjectMocks
     private PostServiceImpl postService;
@@ -102,11 +106,22 @@ public class PostServiceTest {
 
         UserEntity user = new UserEntity();
         user.setUsername("testuser");
+        user.setEmail("test@mail.com");
 
         when(userRepository.findByUsername("testuser"))
                 .thenReturn(Optional.of(user));
         when(fileStorageService.uploadFile(eq(image), eq("testuser"), anyString()))
                 .thenReturn("object/name.jpg");
+
+        PostEntity postEntity = PostEntity.builder()
+                .id(UUID.randomUUID())
+                .caption("My first post")
+                .imageUrl("object/name.jpg")
+                .user(user)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(postCrudRepository.save(any(PostEntity.class))).thenReturn(postEntity);
 
         // Act
         AddPostDTO result = postService.addNewPost(request, image);
@@ -117,7 +132,49 @@ public class PostServiceTest {
         verify(fileStorageService, times(1))
                 .uploadFile(eq(image), eq("testuser"), anyString());
         verify(postCrudRepository, times(1))
-                .save(any());
+                .save(any(PostEntity.class));
+        verify(postEventPublisher, times(1)).publishPostCreatedEvent(any());
+    }
+
+    @Test
+    void testGetAllPostByUserId_Success() {
+        // Arrange
+        int page = 0;
+        int size = 2;
+        String username = "testuser";
+        UUID userId = UUID.randomUUID();
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setUsername(username);
+
+        PostDTO p1 = new PostDTO(UUID.randomUUID(), username, "hello", "img1.jpg", LocalDateTime.now(), 3, 1, true);
+        List<PostDTO> content = List.of(p1);
+        Page<PostDTO> postPage = new PageImpl<>(content, PageRequest.of(page, size), content.size());
+
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(postPaginationRepository.findAllPostByUserId(any(Pageable.class), eq(userId)))
+                .thenReturn(postPage);
+
+        // Act
+        PaginatedResponse<PostDTO> response = postService.getAllPostByUserId(page, size, username);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(username, response.getContent().get(0).getUsername());
+        verify(userRepository).findByUsername(username);
+        verify(postPaginationRepository).findAllPostByUserId(any(Pageable.class), eq(userId));
+    }
+
+    @Test
+    void testGetAllPostByUserId_UserNotFound_ThrowsBusinessException() {
+        // Arrange
+        String username = "nouser";
+        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> postService.getAllPostByUserId(0, 10, username));
+        assertEquals(GlobalMessage.USER_NOT_FOUND.getMessage(), ex.getMessage());
     }
 
     @Test

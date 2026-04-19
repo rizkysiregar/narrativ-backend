@@ -1,6 +1,7 @@
 package com.rizkysiregar.feedzmore.service;
 
 import com.rizkysiregar.feedzmore.model.dto.GoogleUserInfo;
+import com.rizkysiregar.feedzmore.model.enums.Role;
 import com.rizkysiregar.feedzmore.model.request.*;
 import com.rizkysiregar.feedzmore.service.auth.GoogleTokenVerifierService;
 import com.rizkysiregar.feedzmore.util.RedisUtil;
@@ -61,7 +62,7 @@ public class AuthService {
         this.userSearchService = userSearchService;
     }
 
-    public Operation register(RegisterUserRequest registerUserRequest) {
+    public Operation register(RegisterUserRequest registerUserRequest, Boolean isAdmin) {
 
         if (userRepository.findByUsername(registerUserRequest.getUsername()).isPresent()) {
             throw new BusinessException(GlobalMessage.USERNAME_ALREADY_TAKEN, HttpStatus.BAD_REQUEST);
@@ -69,6 +70,13 @@ public class AuthService {
 
         if (userRepository.findByEmail(registerUserRequest.getEmail()).isPresent()) {
             throw new BusinessException(GlobalMessage.EMAIL_ALREADY_TAKEN, HttpStatus.BAD_REQUEST);
+        }
+
+        Role role = Role.USER;
+
+        if (isAdmin) {
+            log.info("register.role.admin");
+            role = Role.ADMIN;
         }
 
         UserEntity entity = new UserEntity();
@@ -79,6 +87,7 @@ public class AuthService {
         entity.setLastName(registerUserRequest.getLastName());
         entity.setPhoneNumber(registerUserRequest.getPhoneNumber());
         entity.setProfileImage(registerUserRequest.getProfileImage());
+        entity.setRole(role);
 
         userRepository.save(entity);
         userSearchService.indexUser(entity); // dual write into ES
@@ -89,26 +98,28 @@ public class AuthService {
         Authentication authentication =
                 authManager.authenticate(new UsernamePasswordAuthenticationToken(userLoginRequest.getUsername(), userLoginRequest.getPassword()));
 
-        if (authentication.isAuthenticated()) {
-            Optional<UserEntity> userEntity = userRepository.findByUsername(userLoginRequest.getUsername());
 
-            if (userEntity.isEmpty()) {
-                throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-            }
-
-            String token = jwtService.generateToken(
-                    userEntity.get().getUsername(),
-                    userEntity.get().getId()
-            );
-
-            return UserLoginDTO.builder()
-                    .token(token)
-                    .username(userEntity.get().getUsername())
-                    .userId(userEntity.get().getId().toString())
-                    .build();
+        if (!authentication.isAuthenticated()) {
+            throw new BadCredentialsException("Bad Credentials!");
         }
 
-        throw new BadCredentialsException("Bad Credentials!");
+        Optional<UserEntity> userEntity = userRepository.findByUsername(userLoginRequest.getUsername());
+
+        if (userEntity.isEmpty()) {
+            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        }
+
+        String token = jwtService.generateToken(
+                userEntity.get().getUsername(),
+                userEntity.get().getId(),
+                userEntity.get().getRole()
+        );
+
+        return UserLoginDTO.builder()
+                .token(token)
+                .username(userEntity.get().getUsername())
+                .userId(userEntity.get().getId().toString())
+                .build();
     }
 
     public UserLoginDTO googleLogin(GoogleLoginRequest request) {
@@ -128,8 +139,10 @@ public class AuthService {
                 })
                 .orElseGet(() -> createGoogleUser(googleUser));
 
+        userRepository.save(user);
+        userSearchService.indexUser(user);
         // Generate JWT - same as regular login
-        String token = jwtService.generateToken(user.getUsername(), user.getId());
+        String token = jwtService.generateToken(user.getUsername(), user.getId(), user.getRole());
         return UserLoginDTO.builder()
                 .token(token)
                 .username(user.getUsername())
@@ -147,7 +160,8 @@ public class AuthService {
 
         // random unusable password - Google uses authenticate via token, not password
         entity.setPassword(encoder.encode(UUID.randomUUID().toString()));
-        return userRepository.save(entity);
+        entity.setRole(Role.USER);
+        return entity;
     }
 
 
@@ -192,6 +206,8 @@ public class AuthService {
         } catch (IllegalArgumentException illegalArgumentException) { // not a valid UUID Pattern
             log.error("Illegal argument exception", illegalArgumentException);
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error while getting user by userId: {}", userId, e);
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
