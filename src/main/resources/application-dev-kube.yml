@@ -49,6 +49,10 @@ spring:
           timeout: 10000
           writetimeout: 10000
 
+  elasticsearch:
+    uris: http://elasticsearch.infra.svc.cluster.local:9200
+    username: elastic
+    password: siregar123
 
 secret:
   key: 6L9AYq7f9JS9KYRSu7oL416WYSJPLuYaavlhgRnBbAY=

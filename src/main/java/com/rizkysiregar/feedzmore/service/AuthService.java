@@ -39,18 +39,26 @@ public class AuthService {
     final AuthenticationManager authManager;
     final JWTService jwtService;
     private final RedisUtil redisUtil;
-
+    private final UserSearchService userSearchService;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
     private final GoogleTokenVerifierService googleTokenVerifierService;
     private final UsernameGenerator usernameGenerator;
 
-    public AuthService(UserRepository userRepository, AuthenticationManager authManager, JWTService jwtService, RedisUtil redisUtil, GoogleTokenVerifierService googleTokenVerifierService, UsernameGenerator usernameGenerator) {
+    public AuthService(UserRepository userRepository,
+                       AuthenticationManager authManager,
+                       JWTService jwtService,
+                       RedisUtil redisUtil,
+                       GoogleTokenVerifierService googleTokenVerifierService,
+                       UsernameGenerator usernameGenerator,
+                       UserSearchService userSearchService
+    ) {
         this.userRepository = userRepository;
         this.authManager = authManager;
         this.jwtService = jwtService;
         this.redisUtil = redisUtil;
         this.googleTokenVerifierService = googleTokenVerifierService;
         this.usernameGenerator = usernameGenerator;
+        this.userSearchService = userSearchService;
     }
 
     public Operation register(RegisterUserRequest registerUserRequest) {
@@ -71,7 +79,9 @@ public class AuthService {
         entity.setLastName(registerUserRequest.getLastName());
         entity.setPhoneNumber(registerUserRequest.getPhoneNumber());
         entity.setProfileImage(registerUserRequest.getProfileImage());
+
         userRepository.save(entity);
+        userSearchService.indexUser(entity); // dual write into ES
         return Operation.CREATED;
     }
 
