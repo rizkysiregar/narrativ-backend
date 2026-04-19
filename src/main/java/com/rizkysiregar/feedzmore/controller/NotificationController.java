@@ -3,6 +3,7 @@ package com.rizkysiregar.feedzmore.controller;
 import com.rizkysiregar.feedzmore.model.request.BroadcastNotificationRequest;
 import com.rizkysiregar.feedzmore.service.firebase.FirebaseNotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
@@ -19,6 +20,7 @@ public class NotificationController {
     private final FirebaseNotificationService notificationService;
 
     @PostMapping("broadcast")
+    @PreAuthorize("hasRole('ADMIN')")
     public Mono<String> adminBroadcastTopic(
             @RequestBody BroadcastNotificationRequest request
             ) {

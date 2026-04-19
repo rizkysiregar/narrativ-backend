@@ -2,17 +2,18 @@ package com.rizkysiregar.feedzmore.service;
 
 
 import com.rizkysiregar.feedzmore.exception.BusinessException;
+import com.rizkysiregar.feedzmore.model.dto.GoogleUserInfo;
 import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
-import com.rizkysiregar.feedzmore.model.request.RegisterUserRequest;
-import com.rizkysiregar.feedzmore.model.request.ResetPasswordRequest;
-import com.rizkysiregar.feedzmore.model.request.UserLoginRequest;
-import com.rizkysiregar.feedzmore.model.request.UserSearchRequest;
+import com.rizkysiregar.feedzmore.model.enums.Role;
+import com.rizkysiregar.feedzmore.model.request.*;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
+import com.rizkysiregar.feedzmore.service.auth.GoogleTokenVerifierService;
 import com.rizkysiregar.feedzmore.util.Operation;
 import com.rizkysiregar.feedzmore.util.RedisUtil;
+import com.rizkysiregar.feedzmore.util.UsernameGenerator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,6 +51,15 @@ public class AuthServiceTest {
     @Mock
     private RedisUtil redisUtil;
 
+    @Mock
+    private UserSearchService userSearchService;
+
+    @Mock
+    private GoogleTokenVerifierService googleTokenVerifierService;
+
+    @Mock
+    private UsernameGenerator usernameGenerator;
+
     @InjectMocks
     private AuthService authService;
 
@@ -80,7 +90,7 @@ public class AuthServiceTest {
                 .thenReturn(userEntity);
 
         // Act
-        Operation result = authService.register(request);
+        Operation result = authService.register(request, false);
 
         // Assert
         assertNotNull(result);
@@ -108,7 +118,7 @@ public class AuthServiceTest {
         when(userRepository.findByUsername("testuser"))
                 .thenReturn(Optional.of(userEntity));
 
-        when(jwtService.generateToken(anyString(), any(UUID.class))).thenReturn("mockedToken");
+        when(jwtService.generateToken(anyString(), any(UUID.class), any(Role.class))).thenReturn("mockedToken");
 
         // Act
         UserLoginDTO result = authService.login(loginRequest);
@@ -163,7 +173,7 @@ public class AuthServiceTest {
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.confirmResetPassword(request));
-        assertEquals("Data Not Found", ex.getMessage());
+        assertEquals("Ups, data yang Anda cari tidak ditemukan.", ex.getMessage());
         verify(userRepository, never()).save(any());
     }
 
@@ -183,7 +193,7 @@ public class AuthServiceTest {
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.confirmResetPassword(request));
-        assertEquals("Bad Request, Invalid Reset Token", ex.getMessage());
+        assertEquals("Tautan perubahan kata sandi sudah tidak valid atau pernah digunakan.", ex.getMessage());
         verify(userRepository, never()).save(any());
     }
 
@@ -203,7 +213,7 @@ public class AuthServiceTest {
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.confirmResetPassword(request));
-        assertEquals("Bad Request, Invalid Reset Token", ex.getMessage());
+        assertEquals("Tautan perubahan kata sandi sudah tidak valid atau pernah digunakan.", ex.getMessage());
         verify(userRepository, never()).save(any());
     }
 
@@ -241,15 +251,14 @@ public class AuthServiceTest {
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.getUserById(id.toString()));
-        // Service wraps NOT_FOUND into INTERNAL_ERROR due to broad catch(Exception)
-        assertEquals("Internal Server Error", ex.getMessage());
+        assertEquals("Ups, data yang Anda cari tidak ditemukan.", ex.getMessage());
     }
 
     @Test
     void testGetUserById_InvalidUUID() {
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.getUserById("invalid-uuid"));
-        assertEquals("Bad Request", ex.getMessage());
+        assertEquals("Maaf, ada kendala saat memproses data Anda. Periksa kembali input Anda.", ex.getMessage());
     }
 
     @Test
@@ -286,7 +295,85 @@ public class AuthServiceTest {
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.search(request, pageable));
-        assertEquals("Data Not Found", ex.getMessage());
+        assertEquals("Ups, data yang Anda cari tidak ditemukan.", ex.getMessage());
+    }
+
+    @Test
+    void testGoogleLogin_Success_ExistingUser() {
+        // Arrange
+        GoogleLoginRequest request = new GoogleLoginRequest();
+        request.setIdToken("valid-id-token");
+
+        GoogleUserInfo googleUserInfo = GoogleUserInfo.builder()
+                .email("test@mail.com")
+                .firstName("John")
+                .lastName("Doe")
+                .picture("profile.png")
+                .googleId("google-id-123")
+                .build();
+
+        UserEntity existingUser = new UserEntity();
+        existingUser.setId(UUID.randomUUID());
+        existingUser.setEmail("test@mail.com");
+        existingUser.setUsername("testuser");
+        existingUser.setRole(Role.USER);
+        existingUser.setGoogleId("google-id-123");
+
+        when(googleTokenVerifierService.verifyToken("valid-id-token")).thenReturn(googleUserInfo);
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(existingUser));
+        when(userRepository.save(any(UserEntity.class))).thenReturn(existingUser);
+        when(jwtService.generateToken(anyString(), any(), any(Role.class))).thenReturn("mock-jwt-token");
+
+        // Act
+        UserLoginDTO result = authService.googleLogin(request);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals("mock-jwt-token", result.getToken());
+        assertEquals("testuser", result.getUsername());
+        verify(userRepository).save(any(UserEntity.class));
+        verify(userSearchService).indexUser(existingUser);
+    }
+
+    @Test
+    void testGoogleLogin_Success_NewUser() {
+        // Arrange
+        GoogleLoginRequest request = new GoogleLoginRequest();
+        request.setIdToken("valid-id-token");
+
+        GoogleUserInfo googleUserInfo = GoogleUserInfo.builder()
+                .email("new@mail.com")
+                .firstName("New")
+                .lastName("User")
+                .picture("profile.png")
+                .googleId("google-id-456")
+                .build();
+
+        UserEntity newUser = new UserEntity();
+        newUser.setId(UUID.randomUUID());
+        newUser.setEmail("new@mail.com");
+        newUser.setUsername("newuser");
+        newUser.setRole(Role.USER);
+
+        when(googleTokenVerifierService.verifyToken("valid-id-token")).thenReturn(googleUserInfo);
+        when(userRepository.findByEmail("new@mail.com")).thenReturn(Optional.empty());
+        when(usernameGenerator.generateFromEmail("new@mail.com")).thenReturn("newuser");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> {
+            UserEntity u = invocation.getArgument(0);
+            if (u.getId() == null) u.setId(UUID.randomUUID());
+            return u;
+        });
+        when(jwtService.generateToken(anyString(), any(), any(Role.class))).thenReturn("mock-jwt-token");
+
+        // Act
+        UserLoginDTO result = authService.googleLogin(request);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals("mock-jwt-token", result.getToken());
+        assertEquals("newuser", result.getUsername());
+        verify(userRepository).save(any(UserEntity.class));
+        verify(userSearchService).indexUser(any(UserEntity.class));
     }
 
 }

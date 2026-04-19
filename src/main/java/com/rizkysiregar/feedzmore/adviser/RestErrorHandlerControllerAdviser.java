@@ -10,6 +10,7 @@ import org.springframework.boot.webmvc.error.ErrorController;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -56,6 +57,17 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
                 .message(GlobalMessage.BAD_CREDENTIALS.getMessage())
                 .build(),
                 HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<?> handleAccessDenied(AuthorizationDeniedException ex) {
+        log.warn("AuthorizationDeniedException Adviser Handler");
+        return new ResponseEntity<>(BaseResponse.builder()
+                .code(GlobalMessage.ACCESS_DENIED.getCode())
+                .message(GlobalMessage.ACCESS_DENIED.getMessage())
+                .build(),
+                HttpStatus.FORBIDDEN
+        );
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.service;
 
+import com.rizkysiregar.feedzmore.model.enums.Role;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -32,15 +33,18 @@ public class JWTService {
         }
     }
 
-    public String generateToken(String username, UUID userId) {
+    public String generateToken(String username, UUID userId, Role role) {
 
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId.toString());
+        claims.put("role", role.name());
 
         return Jwts.builder()
                 .claims()
                 .add(claims)
                 .subject(username)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24)) // 24 Hours expiry
                 .and()
                 .signWith(getKey())
                 .compact();

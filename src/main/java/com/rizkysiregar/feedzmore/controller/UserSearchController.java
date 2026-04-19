@@ -17,7 +17,7 @@ import java.util.List;
 
 @RestController
 @AllArgsConstructor
-@RequestMapping("/api/v1/users")
+@RequestMapping("/users")
 public class UserSearchController {
 
     final AuthService authService;
@@ -35,7 +35,7 @@ public class UserSearchController {
         );
     }
     @ApiOperation(value = "Getting user details data by userId", notes = "pass userId that you got from login response")
-    @GetMapping("/{userId}")
+    @GetMapping("{userId}")
     public UserDetailDTO getUserById(@PathVariable @NotBlank String userId) {
         return authService.getUserById(userId);
     }

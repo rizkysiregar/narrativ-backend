@@ -12,16 +12,16 @@ import java.util.function.Supplier;
 @Service
 public class RateLimiterService {
 
-    @Value("${rate-limit.feed}")
+    @Value("${app.rate-limit.feed}")
     private int feedLimit;
 
-    @Value("${rate-limit.post-create}")
+    @Value("${app.rate-limit.post-create}")
     private int postCreateLimit;
 
-    @Value("${rate-limit.interaction}")
+    @Value("${app.rate-limit.interaction}")
     private int interactionLimit;
 
-    @Value("${rate-limit.default}")
+    @Value("${app.rate-limit.default}")
     private int defaultLimit;
 
     private final ProxyManager<String> proxyManager;

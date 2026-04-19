@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,7 +35,15 @@ public class AuthController {
     @PostMapping("auth/register")
     public Operation register(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
        log.info("REGISTER.USER {}", registerUserRequest);
-        return authService.register(registerUserRequest);
+        return authService.register(registerUserRequest, false);
+    }
+
+    @ApiOperation(value = "Register a new user", notes = "use this to register a new user")
+    @PostMapping("auth/register-admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Operation registerAdmin(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
+        log.info("REGISTER.ADMIN {}", registerUserRequest);
+        return authService.register(registerUserRequest, true);
     }
 
     @ApiOperation(value = "User login", notes = "use this to gain jwt credentials for user validity")
