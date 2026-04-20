@@ -4,6 +4,7 @@ import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.dto.PostLikeCountDTO;
 import com.rizkysiregar.feedzmore.service.LikeDislikeService;
 import com.rizkysiregar.feedzmore.util.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +20,7 @@ public class LikeController {
     }
 
     @PostMapping("/posts/{postId}/like")
+    @PreAuthorize("hasRole('USER')")
     public Operation likePost(
             @PathVariable UUID postId,
             @AuthenticationPrincipal UserPrincipal userPrincipal
@@ -27,6 +29,7 @@ public class LikeController {
     }
 
     @DeleteMapping("/posts/{postId}/dislike")
+    @PreAuthorize("hasRole('USER')")
     public Operation dislikePost(
             @PathVariable UUID postId,
             @AuthenticationPrincipal UserPrincipal userPrincipal

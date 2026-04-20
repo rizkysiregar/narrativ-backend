@@ -40,7 +40,6 @@ public class AuthController {
 
     @ApiOperation(value = "Register a new user", notes = "use this to register a new user")
     @PostMapping("auth/register-admin")
-    @PreAuthorize("hasRole('ADMIN')")
     public Operation registerAdmin(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
         log.info("REGISTER.ADMIN {}", registerUserRequest);
         return authService.register(registerUserRequest, true);

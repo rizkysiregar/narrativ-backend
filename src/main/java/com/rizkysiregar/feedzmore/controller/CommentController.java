@@ -8,6 +8,7 @@ import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.service.CommentService;
 import com.rizkysiregar.feedzmore.util.Operation;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,6 +21,7 @@ public class CommentController {
     private final CommentService commentService;
 
     @PostMapping("/posts/{postId}/comments")
+    @PreAuthorize("hasRole('USER')")
     public Operation addComment(
             @RequestBody AddCommentRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal,
