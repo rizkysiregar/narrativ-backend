@@ -2,4 +2,4 @@ apiVersion: v2
 name: feedzmore
 description: Feedzmore Backend Service
 version: 0.1.0
-appVersion: "d7469c2"
+appVersion: "f465e22"
