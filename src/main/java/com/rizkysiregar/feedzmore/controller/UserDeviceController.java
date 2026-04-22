@@ -23,8 +23,8 @@ public class UserDeviceController {
 
     private final UserDeviceService userDeviceService;
 
-    @ApiOperation(
-            value = "Register or update users devices"
+    @io.swagger.v3.oas.annotations.Operation(
+            summary = "Register or update users devices"
     )
     @PostMapping()
     public Operation registerDevice(

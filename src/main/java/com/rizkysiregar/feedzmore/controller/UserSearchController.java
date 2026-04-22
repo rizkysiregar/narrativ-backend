@@ -7,6 +7,7 @@ import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.service.AuthService;
 import com.rizkysiregar.feedzmore.service.UserSearchService;
 import io.swagger.annotations.ApiOperation;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -23,10 +24,10 @@ public class UserSearchController {
     final AuthService authService;
     final UserSearchService userSearchService;
 
-    @ApiOperation(value = "Search users by it's username")
+    @Operation(summary = "Get user all user or filtered with username, pass username to get filtered response")
     @GetMapping()
     public PaginatedResponse<UserDetailDTO> searchUsers(
-            @RequestParam(required = false) @NotBlank String username,
+            @RequestParam(required = false) String username,
             @Parameter(hidden = true) Pageable pageable
     ) {
         return authService.search(
@@ -34,13 +35,14 @@ public class UserSearchController {
                 pageable
         );
     }
-    @ApiOperation(value = "Getting user details data by userId", notes = "pass userId that you got from login response")
+
+    @Operation(summary = "Getting user details data by userId, pass userId that you got from login response")
     @GetMapping("{userId}")
     public UserDetailDTO getUserById(@PathVariable @NotBlank String userId) {
         return authService.getUserById(userId);
     }
 
-    @ApiOperation(value = "Search user by username but return it as List not pagination")
+    @Operation(summary = "Search user by username but return it as List not pagination")
     @GetMapping("usersList")
     public List<UserDetailDTO> searchUsersList(
             @RequestParam(required = false) @NotBlank String username
@@ -50,6 +52,7 @@ public class UserSearchController {
         );
     }
 
+    @Operation(summary = "Get user by name or username with fuzziness by elastic search")
     @GetMapping("search-elastic-search")
     public List<UserDocument> searchUsersViaES(
             @RequestParam String query

@@ -20,6 +20,7 @@ import java.util.UUID;
 public class CommentController {
     private final CommentService commentService;
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "comment on a post")
     @PostMapping("/posts/{postId}/comments")
     @PreAuthorize("hasRole('USER')")
     public Operation addComment(
@@ -31,6 +32,7 @@ public class CommentController {
     }
 
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "Getting comments of a post")
     @GetMapping("/posts/{postId}/comments")
     public PaginatedResponse<CommentDTO> getComments(
             @PathVariable UUID postId,
@@ -40,10 +42,9 @@ public class CommentController {
         return commentService.getComment(postId, page, size);
     }
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "Get a replay of a comment")
     @GetMapping("/replies/{commentId}")
     List<CommentEntity> getReplies(@PathVariable UUID commentId) {
         return commentService.getReplies(commentId);
     }
-
-
 }

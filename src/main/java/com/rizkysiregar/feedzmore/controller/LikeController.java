@@ -19,6 +19,7 @@ public class LikeController {
         this.likeDislikeService = likeDislikeService;
     }
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "Like a post")
     @PostMapping("/posts/{postId}/like")
     @PreAuthorize("hasRole('USER')")
     public Operation likePost(
@@ -28,6 +29,7 @@ public class LikeController {
         return likeDislikeService.likePost(postId, userPrincipal.getUserId());
     }
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "If you already like a post and want to undo or dislike, hit this api")
     @DeleteMapping("/posts/{postId}/dislike")
     @PreAuthorize("hasRole('USER')")
     public Operation dislikePost(
@@ -37,6 +39,7 @@ public class LikeController {
         return likeDislikeService.dislikePost(postId, userPrincipal.getUserId());
     }
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "Get likes count of a post")
     @GetMapping("/posts/{postId}/likes/count")
     public PostLikeCountDTO getLikePostCount(@PathVariable UUID postId) {
         return likeDislikeService.getLikePostCount(postId);

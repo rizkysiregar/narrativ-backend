@@ -5,12 +5,10 @@ import com.rizkysiregar.feedzmore.model.request.*;
 import com.rizkysiregar.feedzmore.service.AuthService;
 import com.rizkysiregar.feedzmore.service.otp.IOtpService;
 import com.rizkysiregar.feedzmore.util.Operation;
-import io.swagger.annotations.ApiOperation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,46 +29,46 @@ public class AuthController {
     }
 
 
-    @ApiOperation(value = "Register a new user", notes = "use this to register a new user")
+    @io.swagger.v3.oas.annotations.Operation(summary = "Register a new user")
     @PostMapping("auth/register")
     public Operation register(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
        log.info("REGISTER.USER {}", registerUserRequest);
         return authService.register(registerUserRequest, false);
     }
 
-    @ApiOperation(value = "Register a new user", notes = "use this to register a new user")
+    @io.swagger.v3.oas.annotations.Operation(summary = "Register a admin user")
     @PostMapping("auth/register-admin")
     public Operation registerAdmin(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
         log.info("REGISTER.ADMIN {}", registerUserRequest);
         return authService.register(registerUserRequest, true);
     }
 
-    @ApiOperation(value = "User login", notes = "use this to gain jwt credentials for user validity")
+    @io.swagger.v3.oas.annotations.Operation(summary = "User login", description = "use this to gain jwt credentials for user validity")
     @PostMapping("auth/login")
     public UserLoginDTO login(@Valid @RequestBody UserLoginRequest userLoginRequest) {
         log.info("LOGIN {} ", userLoginRequest);
         return authService.login(userLoginRequest);
     }
 
-    @ApiOperation(value = "Login with Google Account- Token ID")
+    @io.swagger.v3.oas.annotations.Operation(summary = "Login with Google Account- Token ID")
     @PostMapping("auth/google")
     public UserLoginDTO googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
         return authService.googleLogin(request);
     }
 
-    @ApiOperation(value = "User validation and OTP Request", notes = "Use this for sending otp into user registered email")
+    @io.swagger.v3.oas.annotations.Operation(summary = "User validation and OTP Request", description = "Use this for sending otp into user registered email")
     @PostMapping("auth/forgot-password")
     public SentOtpDTO forgotPassword(@RequestBody @Valid EmailDTO emailDTO) {
         return otpService.sendOtp(emailDTO.getEmail());
     }
 
-    @ApiOperation(value = "Verify OTP", notes = "Validate is OTP matched or not")
+    @io.swagger.v3.oas.annotations.Operation(summary = "Verify OTP", description = "Validate is OTP matched or not")
     @PostMapping("auth/verify-otp")
     public ResetTokenDTO verifyOtp(@RequestBody @Valid VerifyOtpRequest request) {
         return otpService.verifyOtp(request.getEmail(), request.getOtp());
     }
 
-    @ApiOperation(value = "New password", notes = "Take email and new password also resetToken is needed")
+    @io.swagger.v3.oas.annotations.Operation(summary = "New password", description = "Take email and new password also resetToken is needed")
     @PostMapping("auth/reset-password")
     public Operation confirmResetPassword(@Valid @RequestBody ResetPasswordRequest resetPasswordRequest) {
         return authService.confirmResetPassword(resetPasswordRequest);
