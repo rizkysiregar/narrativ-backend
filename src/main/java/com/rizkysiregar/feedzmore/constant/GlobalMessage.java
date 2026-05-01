@@ -20,6 +20,7 @@ public enum GlobalMessage {
     GOOGLE_TOKEN_MISS_MATCH("401", "Token client miss match"),
     GOOGLE_TOKEN_FAILED_TO_VERIFY("401", "Failed to verify Google token"),
     BAD_CREDENTIALS("401", "Email atau kata sandi yang Anda masukkan salah. Silakan coba lagi."),
+    USER_DISABLED("401", "Akun Anda sudah dinonaktifkan. Silakan hubungi admin untuk mengaktifkan kembali akun Anda."),
     PARAMETER_NOT_FOUND("404", "Data pendukung tidak ditemukan. Mohon ulangi proses dari awal."),
     INVALID_OTP("400", "Kode OTP yang Anda masukkan salah. Periksa kembali kodenya, ya."),
     OTP_EXPIRED("404", "Kode OTP sudah tidak berlaku. Silakan minta kode yang baru."),

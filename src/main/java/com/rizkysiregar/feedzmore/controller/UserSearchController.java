@@ -24,7 +24,7 @@ public class UserSearchController {
     final AuthService authService;
     final UserSearchService userSearchService;
 
-    @Operation(summary = "Get user all user or filtered with username, pass username to get filtered response")
+    @Operation(summary = "Get all active users or filter active users by username")
     @GetMapping()
     public PaginatedResponse<UserDetailDTO> searchUsers(
             @RequestParam(required = false) String username,
@@ -36,13 +36,13 @@ public class UserSearchController {
         );
     }
 
-    @Operation(summary = "Getting user details data by userId, pass userId that you got from login response")
+    @Operation(summary = "Get active user details by userId")
     @GetMapping("{userId}")
     public UserDetailDTO getUserById(@PathVariable @NotBlank String userId) {
         return authService.getUserById(userId);
     }
 
-    @Operation(summary = "Search user by username but return it as List not pagination")
+    @Operation(summary = "Search active users by username but return it as List not pagination")
     @GetMapping("usersList")
     public List<UserDetailDTO> searchUsersList(
             @RequestParam(required = false) @NotBlank String username

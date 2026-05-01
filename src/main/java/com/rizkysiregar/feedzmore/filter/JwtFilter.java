@@ -1,63 +1,111 @@
 package com.rizkysiregar.feedzmore.filter;
 
-
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rizkysiregar.feedzmore.constant.GlobalMessage;
+import com.rizkysiregar.feedzmore.model.response.BaseResponse;
 import com.rizkysiregar.feedzmore.service.JWTService;
 import com.rizkysiregar.feedzmore.service.impl.UserDetailsServiceImpl;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
-    @Autowired
-    private JWTService jwtService;
-
-    @Autowired
-    private ApplicationContext context;
-
-    @Value("${spring.profiles.active}}")
-    private String activeProfile;
+    private final JWTService jwtService;
+    private final UserDetailsServiceImpl userDetailsService;
+    private final ObjectMapper objectMapper;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        String authHeader = request.getHeader("Authorization");
-        String token = null;
-        String username = null;
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
+        String token = extractBearerToken(request);
 
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
-            username = jwtService.extractUsername(token);
+        if (token == null) {
+            filterChain.doFilter(request, response);
+            return;
         }
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = context.getBean(UserDetailsServiceImpl.class).loadUserByUsername(username);
+        try {
+            String username = jwtService.extractUsername(token);
 
-            if (jwtService.validateToken(token, userDetails)) {
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                validateUserIsEnabled(userDetails);
+
+                if (jwtService.validateToken(token, userDetails)) {
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+
+            filterChain.doFilter(request, response);
+        } catch (DisabledException exception) {
+            log.warn("Rejected JWT request because user is disabled: {}", exception.getMessage());
+            writeUnauthorizedResponse(response, GlobalMessage.USER_DISABLED);
+        } catch (UsernameNotFoundException exception) {
+            log.warn("Rejected JWT request because user was not found: {}", exception.getMessage());
+            writeUnauthorizedResponse(response, GlobalMessage.BAD_CREDENTIALS);
+        } catch (JwtException | IllegalArgumentException exception) {
+            log.warn("Rejected JWT request because token is invalid: {}", exception.getMessage());
+            writeUnauthorizedResponse(response, GlobalMessage.UNAUTHORIZED);
+        }
+    }
+
+    private String extractBearerToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return null;
         }
 
-        filterChain.doFilter(request, response);
+        return authHeader.substring(7);
+    }
 
+    private void validateUserIsEnabled(UserDetails userDetails) {
+        if (!userDetails.isEnabled()) {
+            throw new DisabledException("User is disabled");
+        }
+    }
+
+    private void writeUnauthorizedResponse(HttpServletResponse response, GlobalMessage message) throws IOException {
+        if (response.isCommitted()) {
+            return;
+        }
+
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        BaseResponse<?> body = BaseResponse.builder()
+                .code(message.getCode())
+                .message(message.getMessage())
+                .build();
+
+        objectMapper.writeValue(response.getWriter(), body);
     }
 }
