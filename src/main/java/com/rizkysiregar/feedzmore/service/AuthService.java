@@ -220,6 +220,8 @@ public class AuthService {
         Page<UserEntity> users = userRepository.findAll((root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
+            predicates.add(cb.isFalse(root.get("isDeleted")));
+
             if (request.username() != null) {
                 predicates.add(cb.like(
                         cb.lower(root.get("username")),
@@ -254,6 +256,8 @@ public class AuthService {
 
         List<UserEntity> users = userRepository.findAll((root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            predicates.add(cb.isFalse(root.get("isDeleted")));
 
             if (request.username() != null) {
                 predicates.add(cb.like(

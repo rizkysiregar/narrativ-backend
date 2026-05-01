@@ -4,12 +4,15 @@ import com.rizkysiregar.feedzmore.model.enums.Role;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Data
+@Setter
+@Getter
 @Entity(name = "users")
 public class UserEntity {
     @Id
@@ -57,5 +60,8 @@ public class UserEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role = Role.USER;
+
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted;
 
 }
