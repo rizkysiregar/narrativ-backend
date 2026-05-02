@@ -119,7 +119,18 @@ public class AuthService {
                 .token(token)
                 .username(userEntity.get().getUsername())
                 .userId(userEntity.get().getId().toString())
+                .role(userEntity.get().getRole())
                 .build();
+    }
+
+    public UserLoginDTO adminLogin(UserLoginRequest request) {
+        UserLoginDTO loginResult = login(request);
+
+        if (!loginResult.getRole().equals(Role.ADMIN)) {
+            throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);
+        }
+
+        return loginResult;
     }
 
     public UserLoginDTO googleLogin(GoogleLoginRequest request) {

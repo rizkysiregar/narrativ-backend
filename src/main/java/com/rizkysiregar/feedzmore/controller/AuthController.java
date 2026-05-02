@@ -43,6 +43,12 @@ public class AuthController {
         return authService.register(registerUserRequest, true);
     }
 
+    @PostMapping("auth/admin/login")
+    public UserLoginDTO adminLogin(@Valid @RequestBody UserLoginRequest userLoginRequest) {
+        log.info("ADMIN LOGIN {}", userLoginRequest);
+        return authService.adminLogin(userLoginRequest);
+    }
+
     @io.swagger.v3.oas.annotations.Operation(summary = "User login", description = "use this to gain jwt credentials for user validity")
     @PostMapping("auth/login")
     public UserLoginDTO login(@Valid @RequestBody UserLoginRequest userLoginRequest) {
