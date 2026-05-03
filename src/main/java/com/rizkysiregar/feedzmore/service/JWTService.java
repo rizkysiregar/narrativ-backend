@@ -1,12 +1,19 @@
 package com.rizkysiregar.feedzmore.service;
 
 import com.rizkysiregar.feedzmore.model.enums.Role;
+import com.rizkysiregar.feedzmore.service.impl.UserDetailsServiceImpl;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -22,11 +29,17 @@ public class JWTService {
     @Value("${secret.key}")
     private String secretKey;
 
-    JWTService() {
+    private final UserDetailsServiceImpl userDetailsService;
+
+
+    JWTService(
+            UserDetailsServiceImpl userDetailsService
+    ) {
         try {
             KeyGenerator keyGen = KeyGenerator.getInstance("HmacSHA256");
             SecretKey sk = keyGen.generateKey();
 //            secretKey = Base64.getEncoder().encodeToString(sk.getEncoded()); // for generate
+            this.userDetailsService = userDetailsService;
 
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
@@ -92,4 +105,28 @@ public class JWTService {
     private Date extractExpiration(String token) {
         return extractClaims(token, Claims::getExpiration);
     }
+
+    public Authentication validateAndGetAuthentication(String token) {
+        String username = extractUsername(token);
+
+        if (username == null) {
+            throw new JwtException("Invalid token payload");
+        }
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+        if (!userDetails.isEnabled()) {
+            throw new DisabledException("User is disabled");
+        }
+
+        if (!validateToken(token, userDetails)) {
+            throw new JwtException("Token validation failed");
+        }
+
+        return new UsernamePasswordAuthenticationToken(
+                userDetails, null, userDetails.getAuthorities()
+        );
+    }
+
+
 }

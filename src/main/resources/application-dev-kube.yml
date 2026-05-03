@@ -33,6 +33,7 @@ spring:
     port: 5672
     username: rizkysiregar
     password: siregar123
+    stomp-relay-port: 61613
 
   mail:
     host: smtp.gmail.com
@@ -71,7 +72,7 @@ management:
 
 minio:
   #endpoint: http://minio:9000
-#  endpoint: http://minio.database.svc.cluster.local:9000
+  #  endpoint: http://minio.database.svc.cluster.local:9000
   endpoint: https://kube-dev-minio.rizkysiregar.my.id/
   bucket: test-bucket
   access-key: ${MINIO_ACCESS_KEY}
@@ -80,3 +81,11 @@ minio:
 springdoc:
   swagger-ui:
     use-root-path: true
+
+# Custom chat settings
+chat:
+  cache:
+    recent-messages-ttl-minutes: 30
+    conversation-list-ttl-minutes: 5
+  message:
+    page-size: 30

@@ -1,4 +1,4 @@
-package com.rizkysiregar.feedzmore.repository;
+package com.rizkysiregar.feedzmore.repository.elasticsearch;
 
 import com.rizkysiregar.feedzmore.model.document.UserDocument;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;

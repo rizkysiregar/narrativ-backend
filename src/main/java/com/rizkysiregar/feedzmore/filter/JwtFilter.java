@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -41,39 +42,25 @@ public class JwtFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String token = extractBearerToken(request);
 
-        if (token == null) {
-            filterChain.doFilter(request, response);
-            return;
-        }
+        if (token != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            try {
+                Authentication auth = jwtService.validateAndGetAuthentication(token);
 
-        try {
-            String username = jwtService.extractUsername(token);
-
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-                validateUserIsEnabled(userDetails);
-
-                if (jwtService.validateToken(token, userDetails)) {
-                    UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-
+                // Set details specific to Web/HTTP
+                if (auth instanceof UsernamePasswordAuthenticationToken authToken) {
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
-            }
 
-            filterChain.doFilter(request, response);
-        } catch (DisabledException exception) {
-            log.warn("Rejected JWT request because user is disabled: {}", exception.getMessage());
-            writeUnauthorizedResponse(response, GlobalMessage.USER_DISABLED);
-        } catch (UsernameNotFoundException exception) {
-            log.warn("Rejected JWT request because user was not found: {}", exception.getMessage());
-            writeUnauthorizedResponse(response, GlobalMessage.BAD_CREDENTIALS);
-        } catch (JwtException | IllegalArgumentException exception) {
-            log.warn("Rejected JWT request because token is invalid: {}", exception.getMessage());
-            writeUnauthorizedResponse(response, GlobalMessage.UNAUTHORIZED);
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            } catch (DisabledException e) {
+                writeUnauthorizedResponse(response, GlobalMessage.USER_DISABLED);
+                return;
+            } catch (Exception e) {
+                writeUnauthorizedResponse(response, GlobalMessage.UNAUTHORIZED);
+                return;
+            }
         }
+        filterChain.doFilter(request, response);
     }
 
     private String extractBearerToken(HttpServletRequest request) {
@@ -84,12 +71,6 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         return authHeader.substring(7);
-    }
-
-    private void validateUserIsEnabled(UserDetails userDetails) {
-        if (!userDetails.isEnabled()) {
-            throw new DisabledException("User is disabled");
-        }
     }
 
     private void writeUnauthorizedResponse(HttpServletResponse response, GlobalMessage message) throws IOException {
@@ -108,4 +89,6 @@ public class JwtFilter extends OncePerRequestFilter {
 
         objectMapper.writeValue(response.getWriter(), body);
     }
+
+
 }

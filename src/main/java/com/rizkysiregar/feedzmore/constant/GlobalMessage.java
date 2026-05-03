@@ -28,6 +28,13 @@ public enum GlobalMessage {
     USERNAME_ALREADY_TAKEN("400", "Nama pengguna ini sudah digunakan. Coba nama lain yang unik, ya!"),
     USER_NOT_FOUND("404", "User yang kamu cari tidak terdaftar"),
     EMAIL_ALREADY_TAKEN("400", "Email ini sudah terdaftar. Silakan gunakan email lain atau masuk ke akun Anda."),
+
+
+    // chat
+    CHAT_NOT_A_PARTICIPANT("400", "Anda bukan bagian dari obrolan ini. Silakan bergabung terlebih dahulu."),
+
+
+
     ;
 
 

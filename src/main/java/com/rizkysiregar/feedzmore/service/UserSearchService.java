@@ -2,7 +2,7 @@ package com.rizkysiregar.feedzmore.service;
 
 import com.rizkysiregar.feedzmore.model.document.UserDocument;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
-import com.rizkysiregar.feedzmore.repository.UserSearchRepository;
+import com.rizkysiregar.feedzmore.repository.elasticsearch.UserSearchRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
