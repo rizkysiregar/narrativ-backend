@@ -5,9 +5,9 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://192.168.1.50:5432/feedzmore
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://192.168.1.50:5433/feedzmore
+    username: feedzmore
+    password: siregar123
     hikari:
       connection-timeout: 20000
       minimum-idle: 10
@@ -27,6 +27,17 @@ spring:
       host: 192.168.1.50
       port: 6379
       timeout: 60000
+
+  elasticsearch:
+    uris: http://192.168.1.50:9200
+
+
+  rabbitmq:
+    host: 192.168.1.50
+    port: 5672
+    username: feedzmore
+    password: ${RABBITMQ_FEEDZMORE_PASSWORD}
+    virtual-host: /feedzmore
 
   mail:
     host: smtp.gmail.com
@@ -57,14 +68,14 @@ otp:
 management:
   zipkin:
     tracing:
-      endpoint: http://192.168.1.50:9412/api/v2/spans
+      endpoint: http://192.168.1.50:9411/api/v2/spans
 
 minio:
   #endpoint: http://minio:9000
-  endpoint: https://minio-feedzmore-dev.rizkysiregar.my.id/
-  bucket: test-bucket
-  access-key: rizkysiregar
-  secret-key: siregar123
+  endpoint: https://infra-minio.rizkysiregar.my.id/
+  bucket: feedzmore-dev
+  access-key: infra_root
+  secret-key: Bandung2026!
 
 springdoc:
   swagger-ui:

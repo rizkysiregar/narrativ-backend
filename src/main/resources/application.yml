@@ -4,6 +4,8 @@ server:
     context-path: /api/v1
 
 spring:
+  config:
+    import: optional:file:./.env[.properties]
   servlet:
     multipart:
       max-file-size: 100MB
@@ -17,11 +19,11 @@ spring:
   profiles:
 #    active: local-version
 #    active: tailscale-version
-#    active: dev-version
-    active: dev-kube
+    active: dev-version
+#    active: dev-kube
 #    active: prod-version
   flyway:
-    enabled: true
+    enabled: false
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 1
