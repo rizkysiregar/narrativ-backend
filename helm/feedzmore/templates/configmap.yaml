@@ -4,10 +4,6 @@ metadata:
   name: feedzmore-config
   namespace: {{ .Values.namespace }}
 data:
-  SPRING_PROFILE_ACTIVE: {{ .Values.configmap.SPRING_PROFILE_ACTIVE | quote }}
-  SPRING_DATASOURCE_DRIVER_CLASS_NAME: {{ .Values.configmap.SPRING_DATASOURCE_DRIVER_CLASS_NAME | quote }}
-  SPRING_REDIS_HOST: {{ .Values.configmap.SPRING_REDIS_HOST | quote }}
-  SPRING_REDIS_PORT: {{ .Values.configmap.SPRING_REDIS_PORT | quote }}
-  MINIO_ENDPOINT: {{ .Values.configmap.MINIO_ENDPOINT | quote }}
-  MINIO_BUCKET: {{ .Values.configmap.MINIO_BUCKET | quote }}
-  ZIPKIN_BASE_URL: {{ .Values.configmap.ZIPKIN_BASE_URL | quote }}
+  {{- range $key, $value := .Values.configmap }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}

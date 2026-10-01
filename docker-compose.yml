@@ -30,7 +30,7 @@ services:
     container_name: feedzmore-app
     restart: always
     environment:
-      - SPRING_PROFILES_ACTIVE=dev-version
+      - SPRING_PROFILES_ACTIVE=local-dev
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/feedzmore
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres

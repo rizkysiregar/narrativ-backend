@@ -1,0 +1,75 @@
+# Run in Kubernetes while connecting to development infrastructure.
+
+server:
+  forward-headers-strategy: framework
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DEV_INFRA_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    hikari:
+      connection-timeout: ${POSTGRES_CONNECTION_TIMEOUT}
+      minimum-idle: ${POSTGRES_MINIMUM_IDLE}
+      maximum-pool-size: ${POSTGRES_MAXIMUM_POOL_SIZE}
+      idle-timeout: ${POSTGRES_IDLE_TIMEOUT}
+      max-lifetime: ${POSTGRES_MAX_LIFETIME}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    generate-ddl: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+  data:
+    redis:
+      host: ${DEV_INFRA_HOST}
+      port: ${REDIS_PORT}
+      timeout: ${REDIS_TIMEOUT}
+  elasticsearch:
+    uris: http://${DEV_INFRA_HOST}:${ELASTICSEARCH_PORT}
+  rabbitmq:
+    host: ${DEV_INFRA_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_FEEDZMORE_PASSWORD}
+    virtual-host: ${RABBITMQ_VIRTUAL_HOST}
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+
+secret:
+  key: ${SECRET_KEY}
+
+logging:
+  file:
+    path: ${LOGGING_FILE_PATH}
+
+otp:
+  retry-time-in-seconds: ${OTP_RETRY_TIME_IN_SECONDS}
+
+management:
+  zipkin:
+    tracing:
+      endpoint: http://${DEV_INFRA_HOST}:${ZIPKIN_PORT}/api/v2/spans
+
+minio:
+  endpoint: ${MINIO_ENDPOINT}
+  bucket: ${MINIO_BUCKET}
+  access-key: ${MINIO_ACCESS_KEY}
+  secret-key: ${MINIO_SECRET_KEY}
+
+springdoc:
+  swagger-ui:
+    use-root-path: true
