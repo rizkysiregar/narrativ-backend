@@ -1,5 +1,0 @@
-apiVersion: v2
-name: feedzmore
-description: Feedzmore Backend Service
-version: 0.1.0
-appVersion: "052634c"
