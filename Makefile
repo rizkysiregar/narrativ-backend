@@ -1,42 +1,43 @@
-# Define variables
-APP_NAME=feedzmore-service
-TAG=latest
-# Docker Hub username
-DOCKER_REPO=rizkysiregar
+APP_NAME ?= feedzmore-service
+DOCKER_REPO ?= rizkysiregar
+TAG ?= latest
+PLATFORM ?= linux/amd64
+IMAGE := $(DOCKER_REPO)/$(APP_NAME):$(TAG)
+MAVEN ?= ./mvnw
 
-# Build Docker image
-build:
-	docker build -t $(APP_NAME):$(TAG) .
+.PHONY: package image-build image-push build push update-latest run stop clean sonar-verify
 
-# Remove old latest tag if it exists
-rmi-latest:
-	-docker rmi -f $(DOCKER_REPO)/$(APP_NAME):$(TAG)
+# Builds the executable JAR expected by the Dockerfile.
+package:
+	$(MAVEN) clean package -DskipTests
 
-# Tag the image for Docker Hub
-tag:
-	docker tag $(APP_NAME):$(TAG) $(DOCKER_REPO)/$(APP_NAME):$(TAG)
+# Builds a Linux/AMD64 image and loads it into the local Docker daemon.
+# Use this target to inspect or run the image locally after cross-compilation.
+image-build: package
+	docker buildx build --platform $(PLATFORM) --load --tag $(IMAGE) .
 
-# Push the image to Docker Hub
-push: tag
-	docker push $(DOCKER_REPO)/$(APP_NAME):$(TAG)
+# Builds and pushes a Linux/AMD64 image directly to Docker Hub.
+# Docker Buildx handles ARM macOS to AMD64 Linux emulation.
+image-push: package
+	docker buildx build --platform $(PLATFORM) --push --tag $(IMAGE) .
 
-# Full update: Remove old image, build, tag, and push
-update-latest: rmi-latest build tag push
+# Backward-compatible aliases.
+build: image-build
+push: image-push
+update-latest: image-push
 
-# Run the container with Docker Compose
 run:
-	docker-compose up -d
+	docker compose up -d
 
-# Stop and remove containers
 stop:
-	docker-compose down
+	docker compose down
 
-# Clean up dangling images
 clean:
 	docker system prune -f
 
-
+# Usage: SONAR_TOKEN=... make sonar-verify
 sonar-verify:
-	 mvn clean verify sonar:sonar \
-      -Dsonar.host.url=http://192.168.1.50:9001 \
-      -Dsonar.login=squ_cb8ca84be08e1ef1cf41db8a19338108a7d34c9a
+	@test -n "$(SONAR_TOKEN)" || (echo "SONAR_TOKEN is required" && exit 1)
+	$(MAVEN) clean verify sonar:sonar \
+		-Dsonar.host.url=http://192.168.1.50:9001 \
+		-Dsonar.token=$(SONAR_TOKEN)
