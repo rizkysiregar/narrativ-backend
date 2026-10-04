@@ -20,7 +20,7 @@ docker version
 docker run --rm hello-world
 ```
 
-If Jenkins itself runs in Docker, it needs the Docker socket mounted and its runtime user must be allowed to access it. Mounting the socket gives that Jenkins instance privileged control over the Docker host, so only trusted repository users should be able to alter this pipeline.
+If Jenkins itself runs in Docker, it needs the Docker socket mounted and its runtime user must be allowed to access it. The pipeline uses `--volumes-from "$HOSTNAME"` so its short-lived Maven and `yq` containers see the Jenkins workspace volume; a host-path bind mount would incorrectly create an empty directory on the Docker host. If the Jenkins container has a custom hostname, set its container ID as the `JENKINS_CONTAINER_ID` environment variable in the Jenkins container. Mounting the socket gives that Jenkins instance privileged control over the Docker host, so only trusted repository users should be able to alter this pipeline.
 
 ## Required Jenkins credentials
 

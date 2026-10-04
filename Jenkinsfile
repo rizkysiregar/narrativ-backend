@@ -36,8 +36,8 @@ pipeline {
                 sh '''
                     docker run --rm \\
                       --user "$(id -u):$(id -g)" \\
-                      --volume "$WORKSPACE:/workspace" \\
-                      --workdir /workspace \\
+                      --volumes-from "${JENKINS_CONTAINER_ID:-$HOSTNAME}" \\
+                      --workdir "$WORKSPACE" \\
                       "$MAVEN_IMAGE" \\
                       mvn -B -Dmaven.repo.local=/tmp/.m2 clean test
                 '''
@@ -49,8 +49,8 @@ pipeline {
                 sh '''
                     docker run --rm \\
                       --user "$(id -u):$(id -g)" \\
-                      --volume "$WORKSPACE:/workspace" \\
-                      --workdir /workspace \\
+                      --volumes-from "${JENKINS_CONTAINER_ID:-$HOSTNAME}" \\
+                      --workdir "$WORKSPACE" \\
                       "$MAVEN_IMAGE" \\
                       mvn -B -Dmaven.repo.local=/tmp/.m2 package -DskipTests
                 '''
@@ -101,8 +101,8 @@ pipeline {
                         sh '''
                             docker run --rm \\
                               --user "$(id -u):$(id -g)" \\
-                              --volume "$PWD:/work" \\
-                              --workdir /work \\
+                              --volumes-from "${JENKINS_CONTAINER_ID:-$HOSTNAME}" \\
+                              --workdir "$PWD" \\
                               --env IMAGE_NAME \\
                               --env IMAGE_TAG \\
                               "$YQ_IMAGE" \\
