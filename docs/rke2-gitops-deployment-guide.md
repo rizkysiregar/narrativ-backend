@@ -381,7 +381,7 @@ curl -i https://api-dev-feedzmore.rizkysiregar.my.id/api/v1/actuator/health
 
 ## 13. Jenkins CI pipeline design
 
-The current Feedzmore Jenkinsfile updates the Helm chart inside the application repository. The GitOps workflow replaces that stage with an update to `homelabs-gitops/apps/feedzmore/kustomization.yaml`.
+The Feedzmore `Jenkinsfile` updates `homelabs-gitops/apps/feedzmore/kustomization.yaml`; it does not update the legacy Helm chart that was removed from this repository.
 
 Required stages:
 
@@ -391,11 +391,11 @@ Required stages:
 4. Build image `rizkysiregar/feedzmore-service:<short-git-sha>`.
 5. Push the immutable SHA image tag to Docker Hub. Updating `latest` is optional and must not be used by GitOps.
 6. Clone `homelabs-gitops` branch `main` using the existing GitHub PAT credential.
-7. Update only `images[0].newTag` in `apps/feedzmore/kustomization.yaml`; use `kustomize edit set image` or `yq`, not a broad `sed` replacement.
-8. Commit with a message such as `deploy: feedzmore <git-sha>` and push to `main`.
+7. Update only the matching `images[].newTag` value in `apps/feedzmore/kustomization.yaml` with `yq`.
+8. Commit with a message such as `deploy(feedzmore): <git-sha>` and push to `main`.
 9. Finish. Do not run `kubectl`, Helm upgrade, or Argo CD sync commands from Jenkins.
 
-The current test suite previously failed locally under Java 25 because Mockito/Byte Buddy could not self-attach an agent. Fix that issue or run CI with the necessary Java agent configuration before making unit tests a required pipeline gate. Do not silently rely on `-DskipTests` long-term.
+The pipeline uses the Java 25 Maven image declared in its configuration and makes tests a required gate. If tests fail, Jenkins stops before an image is published or a GitOps change is made. See `docs/jenkins-pipeline-setup.md` for the Jenkins credential and job setup.
 
 ## 14. Normal release procedure
 
@@ -740,7 +740,7 @@ The public health endpoint must return HTTP `200`. A response from portfolio ins
 
 **Do this**
 
-Update the Feedzmore Jenkinsfile to:
+Configure the Feedzmore Jenkins job to run the included Jenkinsfile. It will:
 
 1. Build and test Java code.
 2. Build and push `rizkysiregar/feedzmore-service:<commit-sha>`.

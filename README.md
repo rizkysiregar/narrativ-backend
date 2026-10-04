@@ -74,9 +74,9 @@ mvn clean verify sonar:sonar
 
 or 
 ````shell script
- mvn clean verify sonar:sonar \
+SONAR_TOKEN=your-token mvn clean verify sonar:sonar \
   -Dsonar.host.url=http://192.168.1.50:9001 \
-  -Dsonar.login=squ_cb8ca84be08e1ef1cf41db8a19338108a7d34c9a
+  -Dsonar.token=$SONAR_TOKEN
 ````
 
 ## 📦 Deployment
@@ -93,10 +93,10 @@ docker build -t feedzmore-backend .
 
 This project includes a `Jenkinsfile` for automated pipelines. The pipeline handles:
 
-1. Building the JAR.
-2. Running tests.
-3. SonarQube analysis.
-4. Docker image creation.
+1. Running tests and packaging the JAR with Java 25.
+2. Building and pushing an immutable AMD64 image to Docker Hub.
+3. Updating the image tag in `homelabs-gitops`.
+4. Leaving deployment to Argo CD; Jenkins has no Kubernetes credentials.
 
 ## 📄 Project Structure
 
