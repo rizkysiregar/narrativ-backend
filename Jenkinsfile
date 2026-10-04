@@ -106,6 +106,7 @@ pipeline {
                               --env IMAGE_NAME \\
                               --env IMAGE_TAG \\
                               "$YQ_IMAGE" \\
+                              -i \\
                               '(.images[] | select(.name == strenv(IMAGE_NAME))).newTag = strenv(IMAGE_TAG)' \\
                               "$GITOPS_MANIFEST"
 
