@@ -33,6 +33,7 @@ public interface PostPaginationRepository extends PagingAndSortingRepository<Pos
                                                          LEFT JOIN LikeEntity l ON p.id = l.post.id
                                                          LEFT JOIN CommentEntity c ON p.id = c.post.id
                                                          LEFT JOIN LikeEntity l2 ON p.id = l2.post.id AND l2.user.id = :userId
+                                                         WHERE p.isDeleted = false
                                                          GROUP BY p.id, p.user.username, p.caption, p.imageUrl, p.createdAt
                                                          ORDER BY p.createdAt DESC
             """)
@@ -57,7 +58,7 @@ public interface PostPaginationRepository extends PagingAndSortingRepository<Pos
                                                          LEFT JOIN LikeEntity l ON p.id = l.post.id
                                                          LEFT JOIN CommentEntity c ON p.id = c.post.id
                                                          LEFT JOIN LikeEntity l2 ON p.id = l2.post.id AND l2.user.id = :userId
-                                                         WHERE p.user.id = :userId
+                                                         WHERE p.user.id = :userId AND p.isDeleted = false
                                                          GROUP BY p.id, p.user.username, p.caption, p.imageUrl, p.createdAt
                                                          ORDER BY p.createdAt DESC
             """)

@@ -12,6 +12,7 @@ import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.*;
 import com.rizkysiregar.feedzmore.service.impl.PostServiceImpl;
+import com.rizkysiregar.feedzmore.util.Operation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -263,6 +264,49 @@ public class PostServiceTest {
         });
         assertEquals(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE.getMessage(), ex.getMessage());
         verify(fileStorageService, never()).uploadFile(any(), anyString(), anyString());
+        verify(postCrudRepository, never()).save(any());
+    }
+
+    @Test
+    void testDeletePost_OwnActivePost_SoftDeletes() {
+        UUID postId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        PostEntity post = PostEntity.builder()
+                .id(postId)
+                .user(user)
+                .imageUrl("object/name.jpg")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(postCrudRepository.findByIdAndIsDeletedFalse(postId)).thenReturn(Optional.of(post));
+
+        Operation result = postService.deletePost(postId, userId);
+
+        assertEquals(Operation.DELETED, result);
+        assertTrue(post.isDeleted());
+        verify(postCrudRepository).save(post);
+    }
+
+    @Test
+    void testDeletePost_OtherUsersPost_ThrowsAccessDenied() {
+        UUID postId = UUID.randomUUID();
+        UserEntity owner = new UserEntity();
+        owner.setId(UUID.randomUUID());
+        PostEntity post = PostEntity.builder()
+                .id(postId)
+                .user(owner)
+                .imageUrl("object/name.jpg")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(postCrudRepository.findByIdAndIsDeletedFalse(postId)).thenReturn(Optional.of(post));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> postService.deletePost(postId, UUID.randomUUID()));
+
+        assertEquals(GlobalMessage.ACCESS_DENIED.getMessage(), exception.getMessage());
         verify(postCrudRepository, never()).save(any());
     }
 }

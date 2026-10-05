@@ -34,7 +34,7 @@ public class CommentServiceImpl implements CommentService {
     @Override
     public Operation addComment(UUID postId, UUID userId, String content, UUID parentId) {
         // add new comment
-        PostEntity post = postCrudRepository.findById(postId)
+        PostEntity post = postCrudRepository.findByIdAndIsDeletedFalse(postId)
                 .orElseThrow(() -> new EntityNotFoundException("Post Not Found"));
 
         CommentEntity parentComment = null;
@@ -58,6 +58,9 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public PaginatedResponse<CommentDTO> getComment(UUID postId, int page, int size) {
+        if (!postCrudRepository.existsByIdAndIsDeletedFalse(postId)) {
+            throw new EntityNotFoundException("Post Not Found");
+        }
         Pageable pageable = PageRequest.of(page, size);
         Page<CommentEntity> commentPage = commentRepository.findByPostIdAndParentIsNullOrderByCreatedAtAsc(postId, pageable);
 
