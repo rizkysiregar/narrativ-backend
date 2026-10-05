@@ -15,6 +15,7 @@ import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.*;
 import com.rizkysiregar.feedzmore.service.FileStorageService;
 import com.rizkysiregar.feedzmore.service.PostService;
+import com.rizkysiregar.feedzmore.util.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -23,6 +24,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
@@ -141,5 +143,23 @@ public class PostServiceImpl implements PostService {
         return AddPostDTO.builder()
                 .status(GlobalMessage.CREATED.getMessage())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public Operation deletePost(UUID postId, UUID userId) {
+        log.info("SOFT.DELETE.FEED.POST: postId={}, userId={}", postId, userId);
+
+        PostEntity post = postCrudRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND));
+
+        if (!post.getUser().getId().equals(userId)) {
+            throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);
+        }
+
+        post.setDeleted(true);
+        postCrudRepository.save(post);
+
+        return Operation.DELETED;
     }
 }

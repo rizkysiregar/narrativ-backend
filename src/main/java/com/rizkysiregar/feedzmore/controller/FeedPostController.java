@@ -68,5 +68,15 @@ public class FeedPostController {
         return postService.addNewPost(addPostRequest, image);
     }
 
+    @Operation(summary = "Soft delete own feed post")
+    @DeleteMapping("/{postId}")
+    @PreAuthorize("hasRole('USER')")
+    public com.rizkysiregar.feedzmore.util.Operation deletePost(
+            @PathVariable UUID postId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return postService.deletePost(postId, userPrincipal.getUserId());
+    }
+
 
 }

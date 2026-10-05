@@ -36,7 +36,7 @@ public class LikeDislikeServiceImpl implements LikeDislikeService {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
-        if (!postCrudRepository.existsById(postId)) {
+        if (!postCrudRepository.existsByIdAndIsDeletedFalse(postId)) {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
@@ -71,6 +71,9 @@ public class LikeDislikeServiceImpl implements LikeDislikeService {
     @Override
     public PostLikeCountDTO getLikePostCount(UUID postId) {
         log.info("FEED.LIKE.COUNT: {}", postId);
+        if (!postCrudRepository.existsByIdAndIsDeletedFalse(postId)) {
+            throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
+        }
         return PostLikeCountDTO.builder()
                 .likesCount(likeRepository.countByPostId(postId))
                 .build();
