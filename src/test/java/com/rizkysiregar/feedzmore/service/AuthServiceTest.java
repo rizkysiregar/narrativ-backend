@@ -4,7 +4,7 @@ package com.rizkysiregar.feedzmore.service;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.dto.GoogleUserInfo;
 import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
-import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
+import com.rizkysiregar.feedzmore.model.response.LoginResponse;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.enums.Role;
 import com.rizkysiregar.feedzmore.model.request.*;
@@ -121,7 +121,7 @@ public class AuthServiceTest {
         when(jwtService.generateToken(anyString(), any(UUID.class), any(Role.class))).thenReturn("mockedToken");
 
         // Act
-        UserLoginDTO result = authService.login(loginRequest);
+        LoginResponse result = authService.login(loginRequest);
 
 
         // Assert
@@ -325,7 +325,7 @@ public class AuthServiceTest {
         when(jwtService.generateToken(anyString(), any(), any(Role.class))).thenReturn("mock-jwt-token");
 
         // Act
-        UserLoginDTO result = authService.googleLogin(request);
+        LoginResponse result = authService.googleLogin(request);
 
         // Assert
         assertNotNull(result);
@@ -366,7 +366,7 @@ public class AuthServiceTest {
         when(jwtService.generateToken(anyString(), any(), any(Role.class))).thenReturn("mock-jwt-token");
 
         // Act
-        UserLoginDTO result = authService.googleLogin(request);
+        LoginResponse result = authService.googleLogin(request);
 
         // Assert
         assertNotNull(result);

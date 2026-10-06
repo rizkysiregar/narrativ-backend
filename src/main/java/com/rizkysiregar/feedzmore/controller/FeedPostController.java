@@ -1,8 +1,8 @@
 package com.rizkysiregar.feedzmore.controller;
 
 import com.rizkysiregar.feedzmore.model.UserPrincipal;
-import com.rizkysiregar.feedzmore.model.dto.AddPostDTO;
-import com.rizkysiregar.feedzmore.model.dto.PostDTO;
+import com.rizkysiregar.feedzmore.model.response.CreatePostResponse;
+import com.rizkysiregar.feedzmore.model.response.PostFeedResponse;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.service.PostService;
@@ -30,7 +30,7 @@ public class FeedPostController {
 
     @Operation(summary = "Get all feed post for Home feed page")
     @GetMapping
-    public PaginatedResponse<PostDTO> getAllPosts(
+    public PaginatedResponse<PostFeedResponse> getAllPosts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal UserPrincipal userPrincipal
@@ -41,7 +41,7 @@ public class FeedPostController {
 
     @Operation(summary = "Getting feed user specific feed post by username")
     @GetMapping("/users/{username}/posts")
-    public PaginatedResponse<PostDTO> getAllPostByUserId(
+    public PaginatedResponse<PostFeedResponse> getAllPostByUserId(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @PathVariable String username) {
@@ -51,7 +51,7 @@ public class FeedPostController {
     @Operation(summary = "Upload new post feed")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('USER')")
-    public AddPostDTO upload(
+    public CreatePostResponse upload(
             @Parameter(
                     description = "Other payloads that related to the post",
                     required = true,

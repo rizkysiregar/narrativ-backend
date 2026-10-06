@@ -1,4 +1,4 @@
-package com.rizkysiregar.feedzmore.model.dto;
+package com.rizkysiregar.feedzmore.model.response;
 
 
 import com.rizkysiregar.feedzmore.model.enums.Role;
@@ -7,7 +7,7 @@ import lombok.Data;
 
 @Data
 @Builder
-public class UserLoginDTO {
+public class LoginResponse {
     private String token;
     private String username;
     private String userId;

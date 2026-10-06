@@ -4,8 +4,8 @@ package com.rizkysiregar.feedzmore.service;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.messaging.publisher.PostEventPublisher;
-import com.rizkysiregar.feedzmore.model.dto.AddPostDTO;
-import com.rizkysiregar.feedzmore.model.dto.PostDTO;
+import com.rizkysiregar.feedzmore.model.response.CreatePostResponse;
+import com.rizkysiregar.feedzmore.model.response.PostFeedResponse;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
@@ -60,10 +60,10 @@ public class PostServiceTest {
         int page = 0;
         int size = 2;
         UUID userId = UUID.randomUUID();
-        PostDTO p1 = new PostDTO(UUID.randomUUID(), "alice", "hello", "img1.jpg", LocalDateTime.now(), 3, 1, true);
-        PostDTO p2 = new PostDTO(UUID.randomUUID(), "bob", "world", "img2.jpg", LocalDateTime.now().minusMinutes(1), 0, 0, false);
-        List<PostDTO> content = List.of(p1, p2);
-        Page<PostDTO> postPage = new PageImpl<>(content, PageRequest.of(page, size), content.size());
+        PostFeedResponse p1 = new PostFeedResponse(UUID.randomUUID(), "alice", "hello", "img1.jpg", LocalDateTime.now(), 3, 1, true);
+        PostFeedResponse p2 = new PostFeedResponse(UUID.randomUUID(), "bob", "world", "img2.jpg", LocalDateTime.now().minusMinutes(1), 0, 0, false);
+        List<PostFeedResponse> content = List.of(p1, p2);
+        Page<PostFeedResponse> postPage = new PageImpl<>(content, PageRequest.of(page, size), content.size());
 
         when(postPaginationRepository.findAllPost(any(Pageable.class), eq(userId)))
                 .thenReturn(postPage);
@@ -76,7 +76,7 @@ public class PostServiceTest {
         }
 
         // Act
-        PaginatedResponse<PostDTO> response = postService.getAllPost(page, size, userId);
+        PaginatedResponse<PostFeedResponse> response = postService.getAllPost(page, size, userId);
 
         // Assert
         assertNotNull(response);
@@ -125,7 +125,7 @@ public class PostServiceTest {
         when(postCrudRepository.save(any(PostEntity.class))).thenReturn(postEntity);
 
         // Act
-        AddPostDTO result = postService.addNewPost(request, image);
+        CreatePostResponse result = postService.addNewPost(request, image);
 
         // Assert
         assertNotNull(result);
@@ -148,16 +148,16 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername(username);
 
-        PostDTO p1 = new PostDTO(UUID.randomUUID(), username, "hello", "img1.jpg", LocalDateTime.now(), 3, 1, true);
-        List<PostDTO> content = List.of(p1);
-        Page<PostDTO> postPage = new PageImpl<>(content, PageRequest.of(page, size), content.size());
+        PostFeedResponse p1 = new PostFeedResponse(UUID.randomUUID(), username, "hello", "img1.jpg", LocalDateTime.now(), 3, 1, true);
+        List<PostFeedResponse> content = List.of(p1);
+        Page<PostFeedResponse> postPage = new PageImpl<>(content, PageRequest.of(page, size), content.size());
 
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
         when(postPaginationRepository.findAllPostByUserId(any(Pageable.class), eq(userId)))
                 .thenReturn(postPage);
 
         // Act
-        PaginatedResponse<PostDTO> response = postService.getAllPostByUserId(page, size, username);
+        PaginatedResponse<PostFeedResponse> response = postService.getAllPostByUserId(page, size, username);
 
         // Assert
         assertNotNull(response);

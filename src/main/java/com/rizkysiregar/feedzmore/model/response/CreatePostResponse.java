@@ -1,4 +1,4 @@
-package com.rizkysiregar.feedzmore.model.dto;
+package com.rizkysiregar.feedzmore.model.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class AddPostDTO {
+public class CreatePostResponse {
     String status;
 }

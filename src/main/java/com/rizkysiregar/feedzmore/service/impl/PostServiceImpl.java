@@ -6,8 +6,8 @@ import com.rizkysiregar.feedzmore.constant.ObjectStorageTypeGroup;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
 import com.rizkysiregar.feedzmore.messaging.publisher.PostEventPublisher;
-import com.rizkysiregar.feedzmore.model.dto.AddPostDTO;
-import com.rizkysiregar.feedzmore.model.dto.PostDTO;
+import com.rizkysiregar.feedzmore.model.response.CreatePostResponse;
+import com.rizkysiregar.feedzmore.model.response.PostFeedResponse;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
@@ -46,27 +46,27 @@ public class PostServiceImpl implements PostService {
     private final PostEventPublisher postEventPublisher;
 
     @Override
-    public PaginatedResponse<PostDTO> getAllPost(int page, int size, UUID userId) {
+    public PaginatedResponse<PostFeedResponse> getAllPost(int page, int size, UUID userId) {
         log.info("FETCH.ALL.FEED: {}, size= {} ,userId={}", page, size, userId);
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<PostDTO> postPage = postPaginationRepository.findAllPost(pageable, userId);
+        Page<PostFeedResponse> postPage = postPaginationRepository.findAllPost(pageable, userId);
         return buildPaginatedResponse(postPage);
     }
 
     @Override
-    public PaginatedResponse<PostDTO> getAllPostByUserId(int page, int size, String username) {
+    public PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String username) {
         log.info("FETCH.FEED.BY.USERNAME =  {}, size= {} , username= {}", page, size, username);
 
         UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<PostDTO> postPage = postPaginationRepository.findAllPostByUserId(pageable, user.getId());
+        Page<PostFeedResponse> postPage = postPaginationRepository.findAllPostByUserId(pageable, user.getId());
         return buildPaginatedResponse(postPage);
     }
 
-    private PaginatedResponse<PostDTO> buildPaginatedResponse(Page<PostDTO> postPage) {
-        List<PostDTO> updatedContent = postPage.getContent().stream()
+    private PaginatedResponse<PostFeedResponse> buildPaginatedResponse(Page<PostFeedResponse> postPage) {
+        List<PostFeedResponse> updatedContent = postPage.getContent().stream()
                 .peek(post -> {
                     try {
                         post.setImageUrl(fileStorageService.getPresignUrl(post.getImageUrl()));
@@ -86,7 +86,7 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public AddPostDTO addNewPost(AddPostRequest request, MultipartFile image) throws Exception {
+    public CreatePostResponse addNewPost(AddPostRequest request, MultipartFile image) throws Exception {
         log.info("NEW.FEED.POST: {}", request.getUsername());
 
         UserEntity user = userRepository.findByUsername(request.getUsername())
@@ -140,7 +140,7 @@ public class PostServiceImpl implements PostService {
         postEventPublisher.publishPostCreatedEvent(event);
 
 
-        return AddPostDTO.builder()
+        return CreatePostResponse.builder()
                 .status(GlobalMessage.CREATED.getMessage())
                 .build();
     }

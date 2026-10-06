@@ -1,4 +1,4 @@
-package com.rizkysiregar.feedzmore.model.dto;
+package com.rizkysiregar.feedzmore.model.response;
 
 import lombok.*;
 
@@ -8,7 +8,7 @@ import java.util.UUID;
 
 @Getter
 @Setter
-public class PostDTO {
+public class PostFeedResponse {
     private UUID id;
     private String username;
     private String caption;
@@ -18,7 +18,7 @@ public class PostDTO {
     private long commentCount; // Use long instead of String
     private boolean isLiked;
 
-    public PostDTO(UUID id, String username, String caption, String imageUrl, LocalDateTime createdAt,
+    public PostFeedResponse(UUID id, String username, String caption, String imageUrl, LocalDateTime createdAt,
                    long likeCount, long commentCount, boolean isLiked) {
         this.id = id;
         this.username = username;
@@ -30,4 +30,3 @@ public class PostDTO {
         this.isLiked = isLiked;
     }
 }
-

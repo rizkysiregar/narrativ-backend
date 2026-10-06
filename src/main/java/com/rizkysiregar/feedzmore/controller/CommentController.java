@@ -1,7 +1,7 @@
 package com.rizkysiregar.feedzmore.controller;
 
 import com.rizkysiregar.feedzmore.model.UserPrincipal;
-import com.rizkysiregar.feedzmore.model.dto.CommentDTO;
+import com.rizkysiregar.feedzmore.model.response.CommentResponse;
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
 import com.rizkysiregar.feedzmore.model.request.AddCommentRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
@@ -34,7 +34,7 @@ public class CommentController {
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Getting comments of a post")
     @GetMapping("/posts/{postId}/comments")
-    public PaginatedResponse<CommentDTO> getComments(
+    public PaginatedResponse<CommentResponse> getComments(
             @PathVariable UUID postId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size

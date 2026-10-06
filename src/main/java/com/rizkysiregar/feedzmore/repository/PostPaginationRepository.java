@@ -1,6 +1,6 @@
 package com.rizkysiregar.feedzmore.repository;
 
-import com.rizkysiregar.feedzmore.model.dto.PostDTO;
+import com.rizkysiregar.feedzmore.model.response.PostFeedResponse;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,7 +16,7 @@ public interface PostPaginationRepository extends PagingAndSortingRepository<Pos
 
     // Find all post with like and commend count also find if related user already like the post or not
     @Query("""
-            SELECT new com.rizkysiregar.feedzmore.model.dto.PostDTO(
+            SELECT new com.rizkysiregar.feedzmore.model.response.PostFeedResponse(
                                                              p.id,
                                                              p.user.username,
                                                              p.caption,
@@ -37,11 +37,11 @@ public interface PostPaginationRepository extends PagingAndSortingRepository<Pos
                                                          GROUP BY p.id, p.user.username, p.caption, p.imageUrl, p.createdAt
                                                          ORDER BY p.createdAt DESC
             """)
-    Page<PostDTO> findAllPost(Pageable pageable, @Param("userId") UUID userId);
+    Page<PostFeedResponse> findAllPost(Pageable pageable, @Param("userId") UUID userId);
 
     // same as findAllPost but filtering only for user post.userId
     @Query("""
-            SELECT new com.rizkysiregar.feedzmore.model.dto.PostDTO(
+            SELECT new com.rizkysiregar.feedzmore.model.response.PostFeedResponse(
                                                              p.id,
                                                              p.user.username,
                                                              p.caption,
@@ -62,5 +62,5 @@ public interface PostPaginationRepository extends PagingAndSortingRepository<Pos
                                                          GROUP BY p.id, p.user.username, p.caption, p.imageUrl, p.createdAt
                                                          ORDER BY p.createdAt DESC
             """)
-    Page<PostDTO> findAllPostByUserId(Pageable pageable, @Param("userId") UUID userId);
+    Page<PostFeedResponse> findAllPostByUserId(Pageable pageable, @Param("userId") UUID userId);
 }

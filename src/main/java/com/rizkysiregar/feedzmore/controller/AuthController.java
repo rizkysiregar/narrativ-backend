@@ -2,6 +2,7 @@ package com.rizkysiregar.feedzmore.controller;
 
 import com.rizkysiregar.feedzmore.model.dto.*;
 import com.rizkysiregar.feedzmore.model.request.*;
+import com.rizkysiregar.feedzmore.model.response.LoginResponse;
 import com.rizkysiregar.feedzmore.service.AuthService;
 import com.rizkysiregar.feedzmore.service.otp.IOtpService;
 import com.rizkysiregar.feedzmore.util.Operation;
@@ -44,28 +45,28 @@ public class AuthController {
     }
 
     @PostMapping("auth/admin/login")
-    public UserLoginDTO adminLogin(@Valid @RequestBody UserLoginRequest userLoginRequest) {
+    public LoginResponse adminLogin(@Valid @RequestBody UserLoginRequest userLoginRequest) {
         log.info("ADMIN LOGIN {}", userLoginRequest);
         return authService.adminLogin(userLoginRequest);
     }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "User login", description = "use this to gain jwt credentials for user validity")
     @PostMapping("auth/login")
-    public UserLoginDTO login(@Valid @RequestBody UserLoginRequest userLoginRequest) {
+    public LoginResponse login(@Valid @RequestBody UserLoginRequest userLoginRequest) {
         log.info("LOGIN {} ", userLoginRequest);
         return authService.login(userLoginRequest);
     }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Login with Google Account- Token ID")
     @PostMapping("auth/google")
-    public UserLoginDTO googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
+    public LoginResponse googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
         return authService.googleLogin(request);
     }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "User validation and OTP Request", description = "Use this for sending otp into user registered email")
     @PostMapping("auth/forgot-password")
-    public SentOtpDTO forgotPassword(@RequestBody @Valid EmailDTO emailDTO) {
-        return otpService.sendOtp(emailDTO.getEmail());
+    public SentOtpDTO forgotPassword(@RequestBody @Valid ForgotPasswordRequest request) {
+        return otpService.sendOtp(request.getEmail());
     }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Verify OTP", description = "Validate is OTP matched or not")

@@ -1,11 +1,11 @@
-package com.rizkysiregar.feedzmore.model.dto;
+package com.rizkysiregar.feedzmore.model.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class CommentDTO {
+public class CommentResponse {
     String username;
     String imageUrl;
     String commentContent;
