@@ -63,9 +63,10 @@ public class FeedPostController {
             @RequestPart(value = "addPostRequest") AddPostRequest addPostRequest,
 
             @Parameter(description = "A image that want to post", required = true)
-            @RequestPart(value = "image") MultipartFile image
+            @RequestPart(value = "image") MultipartFile image,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) throws Exception {
-        return postService.addNewPost(addPostRequest, image);
+        return postService.addNewPost(userPrincipal.getUserId(), addPostRequest, image);
     }
 
     @Operation(summary = "Soft delete own feed post")

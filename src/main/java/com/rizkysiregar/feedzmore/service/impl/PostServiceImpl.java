@@ -6,6 +6,7 @@ import com.rizkysiregar.feedzmore.constant.ObjectStorageTypeGroup;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
 import com.rizkysiregar.feedzmore.messaging.publisher.PostEventPublisher;
+import com.rizkysiregar.feedzmore.model.dto.PostCountDTO;
 import com.rizkysiregar.feedzmore.model.response.CreatePostResponse;
 import com.rizkysiregar.feedzmore.model.response.PostFeedResponse;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
@@ -21,7 +22,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,9 +29,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -41,6 +44,8 @@ public class PostServiceImpl implements PostService {
 
     private final PostPaginationRepository postPaginationRepository;
     private final PostCrudRepository postCrudRepository;
+    private final LikeRepository likeRepository;
+    private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final PostEventPublisher postEventPublisher;
@@ -48,9 +53,9 @@ public class PostServiceImpl implements PostService {
     @Override
     public PaginatedResponse<PostFeedResponse> getAllPost(int page, int size, UUID userId) {
         log.info("FETCH.ALL.FEED: {}, size= {} ,userId={}", page, size, userId);
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<PostFeedResponse> postPage = postPaginationRepository.findAllPost(pageable, userId);
-        return buildPaginatedResponse(postPage);
+        Pageable pageable = PageRequest.of(page, size);
+        Page<PostEntity> postPage = postPaginationRepository.findAllActivePosts(pageable);
+        return buildPaginatedResponse(postPage, userId);
     }
 
     @Override
@@ -60,24 +65,45 @@ public class PostServiceImpl implements PostService {
         UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<PostFeedResponse> postPage = postPaginationRepository.findAllPostByUserId(pageable, user.getId());
-        return buildPaginatedResponse(postPage);
+        Pageable pageable = PageRequest.of(page, size);
+        Page<PostEntity> postPage = postPaginationRepository.findAllActivePostsByUserId(pageable, user.getId());
+        return buildPaginatedResponse(postPage, user.getId());
     }
 
-    private PaginatedResponse<PostFeedResponse> buildPaginatedResponse(Page<PostFeedResponse> postPage) {
-        List<PostFeedResponse> updatedContent = postPage.getContent().stream()
-                .peek(post -> {
-                    try {
-                        post.setImageUrl(fileStorageService.getPresignUrl(post.getImageUrl()));
-                    } catch (Exception e) {
-                        log.error("## cannot get presign url for objectName= {}, because of= {}", post.getImageUrl(), e.getMessage());
-                    }
+    private PaginatedResponse<PostFeedResponse> buildPaginatedResponse(Page<PostEntity> postPage, UUID statusUserId) {
+        List<PostEntity> posts = postPage.getContent();
+        List<PostFeedResponse> content = List.of();
 
-                }).toList();
+        if (!posts.isEmpty()) {
+            List<UUID> postIds = posts.stream().map(PostEntity::getId).toList();
+            Map<UUID, Long> likeCounts = likeRepository.countByPostIds(postIds).stream()
+                    .collect(Collectors.toMap(PostCountDTO::postId, PostCountDTO::count));
+            Map<UUID, Long> commentCounts = commentRepository.countByPostIds(postIds).stream()
+                    .collect(Collectors.toMap(PostCountDTO::postId, PostCountDTO::count));
+            Set<UUID> likedPostIds = new HashSet<>(likeRepository.findLikedPostIds(statusUserId, postIds));
+
+            content = posts.stream().map(post -> {
+                PostFeedResponse response = new PostFeedResponse(
+                        post.getId(),
+                        post.getUser().getUsername(),
+                        post.getCaption(),
+                        post.getImageUrl(),
+                        post.getCreatedAt(),
+                        likeCounts.getOrDefault(post.getId(), 0L),
+                        commentCounts.getOrDefault(post.getId(), 0L),
+                        likedPostIds.contains(post.getId())
+                );
+                try {
+                    response.setImageUrl(fileStorageService.getPresignUrl(response.getImageUrl()));
+                } catch (Exception e) {
+                    log.error("## cannot get presign url for objectName= {}, because of= {}", response.getImageUrl(), e.getMessage());
+                }
+                return response;
+            }).toList();
+        }
 
         return new PaginatedResponse<>(
-                updatedContent,
+                content,
                 postPage.getNumber(),
                 postPage.getSize(),
                 postPage.getTotalElements(),
@@ -86,12 +112,12 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public CreatePostResponse addNewPost(AddPostRequest request, MultipartFile image) throws Exception {
-        log.info("NEW.FEED.POST: {}", request.getUsername());
+    public CreatePostResponse addNewPost(UUID userId, AddPostRequest request, MultipartFile image) throws Exception {
+        log.info("NEW.FEED.POST: {}", userId);
 
-        UserEntity user = userRepository.findByUsername(request.getUsername())
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
                 .orElseThrow(() -> {
-                    log.error("Username not found {}", request.getUsername());
+                    log.error("Active user not found {}", userId);
                     return new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
                 });
 
@@ -112,7 +138,7 @@ public class PostServiceImpl implements PostService {
 
         String objectName = fileStorageService.uploadFile(
                 image,
-                request.getUsername(),
+                user.getUsername(),
                 ObjectStorageTypeGroup.POST_FEED
         );
 
