@@ -1,6 +1,8 @@
 package com.rizkysiregar.feedzmore.repository;
 
+import com.rizkysiregar.feedzmore.model.dto.PostCountDTO;
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
+import com.rizkysiregar.feedzmore.model.response.CommentResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,7 +16,23 @@ import java.util.UUID;
 
 @Repository
 public interface CommentRepository extends JpaRepository<CommentEntity, UUID> {
-    Page<CommentEntity> findByPostIdAndParentIsNullOrderByCreatedAtAsc(UUID postId, Pageable pageable); // fetch top-level comments
+    @Query(value = """
+            SELECT new com.rizkysiregar.feedzmore.model.response.CommentResponse(
+                c.user.username, c.user.profileImage, c.content)
+            FROM CommentEntity c
+            WHERE c.post.id = :postId AND c.parent IS NULL
+            ORDER BY c.createdAt ASC, c.id ASC
+            """, countQuery = """
+            SELECT COUNT(c) FROM CommentEntity c
+            WHERE c.post.id = :postId AND c.parent IS NULL
+            """)
+    Page<CommentResponse> findTopLevelCommentResponses(@Param("postId") UUID postId, Pageable pageable);
+
+    @Query("""
+            SELECT new com.rizkysiregar.feedzmore.model.dto.PostCountDTO(c.post.id, COUNT(c))
+            FROM CommentEntity c WHERE c.post.id IN :postIds GROUP BY c.post.id
+            """)
+    List<PostCountDTO> countByPostIds(@Param("postIds") List<UUID> postIds);
 
     List<CommentEntity> findByParentIdOrderByCreatedAtAsc(UUID parentId); // fetch replies comment
 

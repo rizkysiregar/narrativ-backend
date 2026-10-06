@@ -4,8 +4,8 @@ package com.rizkysiregar.feedzmore.service;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.messaging.publisher.PostEventPublisher;
-import com.rizkysiregar.feedzmore.model.dto.AddPostDTO;
-import com.rizkysiregar.feedzmore.model.dto.PostDTO;
+import com.rizkysiregar.feedzmore.model.response.CreatePostResponse;
+import com.rizkysiregar.feedzmore.model.response.PostFeedResponse;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
@@ -60,12 +60,18 @@ public class PostServiceTest {
         int page = 0;
         int size = 2;
         UUID userId = UUID.randomUUID();
-        PostDTO p1 = new PostDTO(UUID.randomUUID(), "alice", "hello", "img1.jpg", LocalDateTime.now(), 3, 1, true);
-        PostDTO p2 = new PostDTO(UUID.randomUUID(), "bob", "world", "img2.jpg", LocalDateTime.now().minusMinutes(1), 0, 0, false);
-        List<PostDTO> content = List.of(p1, p2);
-        Page<PostDTO> postPage = new PageImpl<>(content, PageRequest.of(page, size), content.size());
+        UserEntity alice = new UserEntity();
+        alice.setUsername("alice");
+        UserEntity bob = new UserEntity();
+        bob.setUsername("bob");
+        PostEntity p1 = PostEntity.builder().id(UUID.randomUUID()).user(alice).caption("hello")
+                .imageUrl("img1.jpg").createdAt(LocalDateTime.now()).build();
+        PostEntity p2 = PostEntity.builder().id(UUID.randomUUID()).user(bob).caption("world")
+                .imageUrl("img2.jpg").createdAt(LocalDateTime.now().minusMinutes(1)).build();
+        List<PostEntity> posts = List.of(p1, p2);
+        Page<PostEntity> postPage = new PageImpl<>(posts, PageRequest.of(page, size), posts.size());
 
-        when(postPaginationRepository.findAllPost(any(Pageable.class), eq(userId)))
+        when(postPaginationRepository.findAllActivePosts(any(Pageable.class)))
                 .thenReturn(postPage);
 
         try {
@@ -76,28 +82,28 @@ public class PostServiceTest {
         }
 
         // Act
-        PaginatedResponse<PostDTO> response = postService.getAllPost(page, size, userId);
+        PaginatedResponse<PostFeedResponse> response = postService.getAllPost(page, size, userId);
 
         // Assert
         assertNotNull(response);
         assertEquals(page, response.getPageNumber());
         assertEquals(size, response.getPageSize());
-        assertEquals(content.size(), response.getContent().size());
-        assertEquals(content.size(), response.getTotalElements());
+        assertEquals(posts.size(), response.getContent().size());
+        assertEquals(posts.size(), response.getTotalElements());
         assertEquals(1, response.getTotalPages());
         // image url should be kept as is
         assertEquals("img1.jpg", response.getContent().get(0).getImageUrl());
         assertEquals("img2.jpg", response.getContent().get(1).getImageUrl());
 
         verify(postPaginationRepository, times(1))
-                .findAllPost(any(Pageable.class), eq(userId));
+                .findAllActivePosts(any(Pageable.class));
     }
 
     @Test
     void testAddNewPost_Success() throws Exception {
         // Arrange
+        UUID userId = UUID.randomUUID();
         AddPostRequest request = AddPostRequest.builder()
-                .username("testuser")
                 .caption("My first post")
                 .build();
 
@@ -106,10 +112,11 @@ public class PostServiceTest {
         when(image.getSize()).thenReturn(1024L); // 1KB
 
         UserEntity user = new UserEntity();
+        user.setId(userId);
         user.setUsername("testuser");
         user.setEmail("test@mail.com");
 
-        when(userRepository.findByUsername("testuser"))
+        when(userRepository.findByIdAndIsDeletedFalse(userId))
                 .thenReturn(Optional.of(user));
         when(fileStorageService.uploadFile(eq(image), eq("testuser"), anyString()))
                 .thenReturn("object/name.jpg");
@@ -125,13 +132,14 @@ public class PostServiceTest {
         when(postCrudRepository.save(any(PostEntity.class))).thenReturn(postEntity);
 
         // Act
-        AddPostDTO result = postService.addNewPost(request, image);
+        CreatePostResponse result = postService.addNewPost(userId, request, image);
 
         // Assert
         assertNotNull(result);
         assertEquals(GlobalMessage.CREATED.getMessage(), result.getStatus());
         verify(fileStorageService, times(1))
                 .uploadFile(eq(image), eq("testuser"), anyString());
+        verify(userRepository).findByIdAndIsDeletedFalse(userId);
         verify(postCrudRepository, times(1))
                 .save(any(PostEntity.class));
         verify(postEventPublisher, times(1)).publishPostCreatedEvent(any());
@@ -148,22 +156,23 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername(username);
 
-        PostDTO p1 = new PostDTO(UUID.randomUUID(), username, "hello", "img1.jpg", LocalDateTime.now(), 3, 1, true);
-        List<PostDTO> content = List.of(p1);
-        Page<PostDTO> postPage = new PageImpl<>(content, PageRequest.of(page, size), content.size());
+        PostEntity p1 = PostEntity.builder().id(UUID.randomUUID()).user(user).caption("hello")
+                .imageUrl("img1.jpg").createdAt(LocalDateTime.now()).build();
+        List<PostEntity> posts = List.of(p1);
+        Page<PostEntity> postPage = new PageImpl<>(posts, PageRequest.of(page, size), posts.size());
 
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
-        when(postPaginationRepository.findAllPostByUserId(any(Pageable.class), eq(userId)))
+        when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(userId)))
                 .thenReturn(postPage);
 
         // Act
-        PaginatedResponse<PostDTO> response = postService.getAllPostByUserId(page, size, username);
+        PaginatedResponse<PostFeedResponse> response = postService.getAllPostByUserId(page, size, username);
 
         // Assert
         assertNotNull(response);
         assertEquals(username, response.getContent().get(0).getUsername());
         verify(userRepository).findByUsername(username);
-        verify(postPaginationRepository).findAllPostByUserId(any(Pageable.class), eq(userId));
+        verify(postPaginationRepository).findAllActivePostsByUserId(any(Pageable.class), eq(userId));
     }
 
     @Test
@@ -181,19 +190,19 @@ public class PostServiceTest {
     @Test
     void testAddNewPost_UserNotFound_ThrowsBadRequest() throws Exception {
         // Arrange
+        UUID userId = UUID.randomUUID();
         AddPostRequest request = AddPostRequest.builder()
-                .username("nouser")
                 .caption("caption")
                 .build();
         MultipartFile image = mock(MultipartFile.class);
 
-        when(userRepository.findByUsername("nouser"))
+        when(userRepository.findByIdAndIsDeletedFalse(userId))
                 .thenReturn(Optional.empty());
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> {
             try {
-                postService.addNewPost(request, image);
+                postService.addNewPost(userId, request, image);
             } catch (Exception e) {
                 if (e instanceof BusinessException be) {
                     throw be;
@@ -209,21 +218,21 @@ public class PostServiceTest {
     @Test
     void testAddNewPost_EmptyImage_ThrowsBadRequest() throws Exception {
         // Arrange
+        UUID userId = UUID.randomUUID();
         AddPostRequest request = AddPostRequest.builder()
-                .username("testuser")
                 .caption("caption")
                 .build();
 
         MultipartFile image = mock(MultipartFile.class);
         when(image.isEmpty()).thenReturn(true);
 
-        when(userRepository.findByUsername("testuser"))
+        when(userRepository.findByIdAndIsDeletedFalse(userId))
                 .thenReturn(Optional.of(new UserEntity()));
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> {
             try {
-                postService.addNewPost(request, image);
+                postService.addNewPost(userId, request, image);
             } catch (Exception e) {
                 if (e instanceof BusinessException be) {
                     throw be;
@@ -239,8 +248,8 @@ public class PostServiceTest {
     @Test
     void testAddNewPost_ImageTooLarge_ThrowsBadRequestFileTooLarge() throws Exception {
         // Arrange
+        UUID userId = UUID.randomUUID();
         AddPostRequest request = AddPostRequest.builder()
-                .username("testuser")
                 .caption("caption")
                 .build();
 
@@ -248,13 +257,13 @@ public class PostServiceTest {
         when(image.isEmpty()).thenReturn(false);
         when(image.getSize()).thenReturn(6L * 1024 * 1024); // 6MB
 
-        when(userRepository.findByUsername("testuser"))
+        when(userRepository.findByIdAndIsDeletedFalse(userId))
                 .thenReturn(Optional.of(new UserEntity()));
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> {
             try {
-                postService.addNewPost(request, image);
+                postService.addNewPost(userId, request, image);
             } catch (Exception e) {
                 if (e instanceof BusinessException be) {
                     throw be;

@@ -1,6 +1,7 @@
 package com.rizkysiregar.feedzmore.repository;
 
 import com.rizkysiregar.feedzmore.model.entity.NotificationTemplateEntity;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -27,5 +28,5 @@ public interface NotificationTemplateRepository extends JpaRepository<Notificati
                   AND t.isActive = true
                 ORDER BY function('random')
             """)
-    List<NotificationTemplateEntity> findRandomCasual();
+    List<NotificationTemplateEntity> findRandomCasual(Pageable pageable);
 }

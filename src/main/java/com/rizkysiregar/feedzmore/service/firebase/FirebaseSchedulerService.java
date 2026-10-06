@@ -10,6 +10,7 @@ import com.rizkysiregar.feedzmore.repository.JobExecutionLogRepository;
 import com.rizkysiregar.feedzmore.repository.NotificationTemplateRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -53,7 +54,7 @@ public class FirebaseSchedulerService {
         JobExecutionLog jobExecutionLog = logOpt.get();
         if (jobExecutionLog.getLastExecutedAt().plus(INTERVAL_BROADCAST).isBefore(now)) {
 
-            List<NotificationTemplateEntity> casualTemplate = notificationTemplateRepository.findRandomCasual();
+            List<NotificationTemplateEntity> casualTemplate = notificationTemplateRepository.findRandomCasual(PageRequest.of(0, 1));
             if (!casualTemplate.isEmpty()) {
                 NotificationTemplateEntity notificationTemplateEntity = casualTemplate.get(0);
                 Mono<String> responseMono = notificationService.sendNotificationToTopic(

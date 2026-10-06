@@ -1,7 +1,6 @@
 package com.rizkysiregar.feedzmore.service.impl;
 
-import com.rizkysiregar.feedzmore.mapper.CommentMapper;
-import com.rizkysiregar.feedzmore.model.dto.CommentDTO;
+import com.rizkysiregar.feedzmore.model.response.CommentResponse;
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
@@ -57,17 +56,15 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
-    public PaginatedResponse<CommentDTO> getComment(UUID postId, int page, int size) {
+    public PaginatedResponse<CommentResponse> getComment(UUID postId, int page, int size) {
         if (!postCrudRepository.existsByIdAndIsDeletedFalse(postId)) {
             throw new EntityNotFoundException("Post Not Found");
         }
         Pageable pageable = PageRequest.of(page, size);
-        Page<CommentEntity> commentPage = commentRepository.findByPostIdAndParentIsNullOrderByCreatedAtAsc(postId, pageable);
-
-        List<CommentDTO> content = CommentMapper.toDtoList(commentPage.getContent());
+        Page<CommentResponse> commentPage = commentRepository.findTopLevelCommentResponses(postId, pageable);
 
         return new PaginatedResponse<>(
-                content,
+                commentPage.getContent(),
                 commentPage.getNumber(),
                 commentPage.getSize(),
                 commentPage.getTotalElements(),

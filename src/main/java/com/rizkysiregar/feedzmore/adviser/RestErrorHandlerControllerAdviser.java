@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.webmvc.error.ErrorController;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
@@ -34,6 +35,15 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
                 .message(GlobalMessage.INTERNAL_ERROR.getMessage())
                 .build(),
                 HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<?> unreadableRequestBody(HttpMessageNotReadableException e) {
+        log.warn("Unable to read request body: {}", e.getClass().getSimpleName());
+        return new ResponseEntity<>(BaseResponse.builder()
+                .code(GlobalMessage.BAD_REQUEST.getCode())
+                .message(GlobalMessage.BAD_REQUEST.getMessage())
+                .build(), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(BusinessException.class)

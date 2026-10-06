@@ -7,7 +7,7 @@ import com.rizkysiregar.feedzmore.service.auth.GoogleTokenVerifierService;
 import com.rizkysiregar.feedzmore.util.RedisUtil;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
-import com.rizkysiregar.feedzmore.model.dto.UserLoginDTO;
+import com.rizkysiregar.feedzmore.model.response.LoginResponse;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
@@ -94,7 +94,7 @@ public class AuthService {
         return Operation.CREATED;
     }
 
-    public UserLoginDTO login(UserLoginRequest userLoginRequest) {
+    public LoginResponse login(UserLoginRequest userLoginRequest) {
         Authentication authentication =
                 authManager.authenticate(new UsernamePasswordAuthenticationToken(userLoginRequest.getUsername(), userLoginRequest.getPassword()));
 
@@ -115,7 +115,7 @@ public class AuthService {
                 userEntity.get().getRole()
         );
 
-        return UserLoginDTO.builder()
+        return LoginResponse.builder()
                 .token(token)
                 .username(userEntity.get().getUsername())
                 .userId(userEntity.get().getId().toString())
@@ -123,8 +123,8 @@ public class AuthService {
                 .build();
     }
 
-    public UserLoginDTO adminLogin(UserLoginRequest request) {
-        UserLoginDTO loginResult = login(request);
+    public LoginResponse adminLogin(UserLoginRequest request) {
+        LoginResponse loginResult = login(request);
 
         if (!loginResult.getRole().equals(Role.ADMIN)) {
             throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);
@@ -133,7 +133,7 @@ public class AuthService {
         return loginResult;
     }
 
-    public UserLoginDTO googleLogin(GoogleLoginRequest request) {
+    public LoginResponse googleLogin(GoogleLoginRequest request) {
         log.info("GOOGLE.LOGIN");
         // Verify idToken with Google and extract user info from it
         GoogleUserInfo googleUser = googleTokenVerifierService.verifyToken(request.getIdToken());
@@ -154,7 +154,7 @@ public class AuthService {
         userSearchService.indexUser(user);
         // Generate JWT - same as regular login
         String token = jwtService.generateToken(user.getUsername(), user.getId(), user.getRole());
-        return UserLoginDTO.builder()
+        return LoginResponse.builder()
                 .token(token)
                 .username(user.getUsername())
                 .userId(user.getId().toString())

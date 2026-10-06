@@ -4,7 +4,13 @@ import java.util.List;
 
 public class Constants {
     public static final List<String> JWT_WHITELIST = List.of(
-            "/auth/**",
+            "/auth/register",
+            "/auth/admin/login",
+            "/auth/login",
+            "/auth/google",
+            "/auth/forgot-password",
+            "/auth/verify-otp",
+            "/auth/reset-password",
             "/hello",
             "/res/photo",
             "/v3/api-docs/**",
@@ -32,4 +38,3 @@ public class Constants {
     public static final String NOTIFICATION_NEW_FEED_TITLE = "Ada yang baru nih!";
     public static final String NOTIFICATION_NEW_FEED_BODY = "%s baru saja mengungah sesuatu. Yuk!,jadi yang pertama memberikan like!";
 }
-
