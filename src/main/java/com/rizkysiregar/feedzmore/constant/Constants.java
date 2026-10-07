@@ -28,7 +28,8 @@ public class Constants {
             "http://localhost:53375",
             "http://localhost:8083",
             "http://localhost:3000", // web admin react
-            "https://feedzmore-dev.rizkysiregar.my.id"
+            "http://api-dev-feedzmore.rizkysiregar.my.id",
+            "https://api-dev-feedzmore.rizkysiregar.my.id"
     );
 
     public static final String INVALID_USERNAME_PASSWORD = "Invalid Username or Password";
