@@ -14,21 +14,40 @@ import java.util.UUID;
 public interface PostPaginationRepository extends PagingAndSortingRepository<PostEntity, UUID> {
 
     @Query(value = """
-            SELECT p FROM PostEntity p JOIN FETCH p.user
-            WHERE p.isDeleted = false
+            SELECT p FROM PostEntity p JOIN FETCH p.user author
+            WHERE p.isDeleted = false AND author.isDeleted = false
             ORDER BY p.createdAt DESC, p.id DESC
             """, countQuery = """
-            SELECT COUNT(p) FROM PostEntity p WHERE p.isDeleted = false
+            SELECT COUNT(p) FROM PostEntity p JOIN p.user author
+            WHERE p.isDeleted = false AND author.isDeleted = false
             """)
     Page<PostEntity> findAllActivePosts(Pageable pageable);
 
     @Query(value = """
-            SELECT p FROM PostEntity p JOIN FETCH p.user
-            WHERE p.user.id = :userId AND p.isDeleted = false
+            SELECT p FROM PostEntity p JOIN FETCH p.user author
+            WHERE p.isDeleted = false AND author.isDeleted = false
+              AND EXISTS (
+                  SELECT f.id FROM FollowEntity f
+                  WHERE f.follower.id = :viewerId AND f.followed.id = author.id
+              )
             ORDER BY p.createdAt DESC, p.id DESC
             """, countQuery = """
-            SELECT COUNT(p) FROM PostEntity p
-            WHERE p.user.id = :userId AND p.isDeleted = false
+            SELECT COUNT(p) FROM PostEntity p JOIN p.user author
+            WHERE p.isDeleted = false AND author.isDeleted = false
+              AND EXISTS (
+                  SELECT f.id FROM FollowEntity f
+                  WHERE f.follower.id = :viewerId AND f.followed.id = author.id
+              )
+            """)
+    Page<PostEntity> findFollowingPosts(Pageable pageable, @Param("viewerId") UUID viewerId);
+
+    @Query(value = """
+            SELECT p FROM PostEntity p JOIN FETCH p.user author
+            WHERE author.id = :userId AND author.isDeleted = false AND p.isDeleted = false
+            ORDER BY p.createdAt DESC, p.id DESC
+            """, countQuery = """
+            SELECT COUNT(p) FROM PostEntity p JOIN p.user author
+            WHERE author.id = :userId AND author.isDeleted = false AND p.isDeleted = false
             """)
     Page<PostEntity> findAllActivePostsByUserId(Pageable pageable, @Param("userId") UUID userId);
 }

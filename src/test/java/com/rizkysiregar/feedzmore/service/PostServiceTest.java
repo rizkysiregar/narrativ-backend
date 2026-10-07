@@ -3,6 +3,7 @@ package com.rizkysiregar.feedzmore.service;
 
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
+import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
 import com.rizkysiregar.feedzmore.messaging.publisher.PostEventPublisher;
 import com.rizkysiregar.feedzmore.model.response.CreatePostResponse;
 import com.rizkysiregar.feedzmore.model.response.PostFeedResponse;
@@ -15,6 +16,7 @@ import com.rizkysiregar.feedzmore.service.impl.PostServiceImpl;
 import com.rizkysiregar.feedzmore.util.Operation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -55,7 +57,7 @@ public class PostServiceTest {
     private PostServiceImpl postService;
 
     @Test
-    void testGetAllPost_ReturnsPaginatedResponse() {
+    void testExplorePosts_ReturnsPaginatedResponse() {
         // Arrange
         int page = 0;
         int size = 2;
@@ -82,7 +84,7 @@ public class PostServiceTest {
         }
 
         // Act
-        PaginatedResponse<PostFeedResponse> response = postService.getAllPost(page, size, userId);
+        PaginatedResponse<PostFeedResponse> response = postService.getExplorePosts(page, size, userId);
 
         // Assert
         assertNotNull(response);
@@ -97,6 +99,54 @@ public class PostServiceTest {
 
         verify(postPaginationRepository, times(1))
                 .findAllActivePosts(any(Pageable.class));
+        verify(postPaginationRepository, never()).findFollowingPosts(any(Pageable.class), any(UUID.class));
+    }
+
+    @Test
+    void testFollowingPosts_EmptyWhenNoFollowedPosts() {
+        UUID viewerId = UUID.randomUUID();
+        PageRequest pageable = PageRequest.of(0, 10);
+        when(postPaginationRepository.findFollowingPosts(pageable, viewerId))
+                .thenReturn(Page.empty(pageable));
+
+        PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 10, viewerId);
+
+        assertTrue(response.getContent().isEmpty());
+        assertEquals(0, response.getTotalElements());
+        verify(postPaginationRepository, never()).findAllActivePosts(any(Pageable.class));
+        verifyNoInteractions(likeRepository, commentRepository, fileStorageService);
+    }
+
+    @Test
+    void testFollowingPosts_UsesViewerLikeStatus() throws Exception {
+        UUID viewerId = UUID.randomUUID();
+        UserEntity author = new UserEntity();
+        author.setUsername("followed");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(author)
+                .caption("hello").imageUrl("image.jpg").createdAt(LocalDateTime.now()).build();
+        PageRequest pageable = PageRequest.of(0, 10);
+        when(postPaginationRepository.findFollowingPosts(pageable, viewerId))
+                .thenReturn(new PageImpl<>(List.of(post), pageable, 1));
+        when(likeRepository.findLikedPostIds(viewerId, List.of(post.getId())))
+                .thenReturn(List.of(post.getId()));
+        when(fileStorageService.getPresignUrl("image.jpg")).thenReturn("signed-image.jpg");
+
+        PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 10, viewerId);
+
+        assertEquals(1, response.getTotalElements());
+        assertEquals("followed", response.getContent().getFirst().getUsername());
+        assertEquals("signed-image.jpg", response.getContent().getFirst().getImageUrl());
+        assertTrue(response.getContent().getFirst().isLiked());
+        verify(postPaginationRepository).findFollowingPosts(pageable, viewerId);
+    }
+
+    @Test
+    void testFollowingPosts_InvalidPaginationRejected() {
+        UUID viewerId = UUID.randomUUID();
+        assertThrows(BusinessException.class, () -> postService.getFollowingPosts(-1, 10, viewerId));
+        assertThrows(BusinessException.class, () -> postService.getFollowingPosts(0, 0, viewerId));
+        assertThrows(BusinessException.class, () -> postService.getFollowingPosts(0, 101, viewerId));
+        verifyNoInteractions(postPaginationRepository);
     }
 
     @Test
@@ -142,7 +192,9 @@ public class PostServiceTest {
         verify(userRepository).findByIdAndIsDeletedFalse(userId);
         verify(postCrudRepository, times(1))
                 .save(any(PostEntity.class));
-        verify(postEventPublisher, times(1)).publishPostCreatedEvent(any());
+        ArgumentCaptor<PostCreatedEvent> event = ArgumentCaptor.forClass(PostCreatedEvent.class);
+        verify(postEventPublisher).publishPostCreatedEvent(event.capture());
+        assertEquals(userId, event.getValue().getAuthorId());
     }
 
     @Test
@@ -155,23 +207,27 @@ public class PostServiceTest {
         UserEntity user = new UserEntity();
         user.setId(userId);
         user.setUsername(username);
+        UUID viewerId = UUID.randomUUID();
 
         PostEntity p1 = PostEntity.builder().id(UUID.randomUUID()).user(user).caption("hello")
                 .imageUrl("img1.jpg").createdAt(LocalDateTime.now()).build();
         List<PostEntity> posts = List.of(p1);
         Page<PostEntity> postPage = new PageImpl<>(posts, PageRequest.of(page, size), posts.size());
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(userRepository.findByUsernameAndIsDeletedFalse(username)).thenReturn(Optional.of(user));
         when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(userId)))
                 .thenReturn(postPage);
+        when(likeRepository.findLikedPostIds(viewerId, List.of(p1.getId())))
+                .thenReturn(List.of(p1.getId()));
 
         // Act
-        PaginatedResponse<PostFeedResponse> response = postService.getAllPostByUserId(page, size, username);
+        PaginatedResponse<PostFeedResponse> response = postService.getAllPostByUserId(page, size, username, viewerId);
 
         // Assert
         assertNotNull(response);
         assertEquals(username, response.getContent().get(0).getUsername());
-        verify(userRepository).findByUsername(username);
+        assertTrue(response.getContent().get(0).isLiked());
+        verify(userRepository).findByUsernameAndIsDeletedFalse(username);
         verify(postPaginationRepository).findAllActivePostsByUserId(any(Pageable.class), eq(userId));
     }
 
@@ -179,11 +235,11 @@ public class PostServiceTest {
     void testGetAllPostByUserId_UserNotFound_ThrowsBusinessException() {
         // Arrange
         String username = "nouser";
-        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+        when(userRepository.findByUsernameAndIsDeletedFalse(username)).thenReturn(Optional.empty());
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> postService.getAllPostByUserId(0, 10, username));
+                () -> postService.getAllPostByUserId(0, 10, username, UUID.randomUUID()));
         assertEquals(GlobalMessage.USER_NOT_FOUND.getMessage(), ex.getMessage());
     }
 

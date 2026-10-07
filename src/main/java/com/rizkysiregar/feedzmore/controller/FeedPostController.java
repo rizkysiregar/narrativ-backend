@@ -28,15 +28,34 @@ public class FeedPostController {
         this.postService = postService;
     }
 
-    @Operation(summary = "Get all feed post for Home feed page")
+    @Operation(summary = "Get posts from followed users for Home feed")
     @GetMapping
-    public PaginatedResponse<PostFeedResponse> getAllPosts(
+    public PaginatedResponse<PostFeedResponse> getHomePosts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        UUID userId = userPrincipal.getUserId();
-        return postService.getAllPost(page, size, userId);
+        return postService.getFollowingPosts(page, size, userPrincipal.getUserId());
+    }
+
+    @Operation(summary = "Get all public posts for Explore feed")
+    @GetMapping("/explore")
+    public PaginatedResponse<PostFeedResponse> getExplorePosts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return postService.getExplorePosts(page, size, userPrincipal.getUserId());
+    }
+
+    @Operation(summary = "Get posts from followed users")
+    @GetMapping("/following")
+    public PaginatedResponse<PostFeedResponse> getFollowingPosts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return postService.getFollowingPosts(page, size, userPrincipal.getUserId());
     }
 
     @Operation(summary = "Getting feed user specific feed post by username")
@@ -44,8 +63,9 @@ public class FeedPostController {
     public PaginatedResponse<PostFeedResponse> getAllPostByUserId(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @PathVariable String username) {
-        return postService.getAllPostByUserId(page, size, username);
+            @PathVariable String username,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return postService.getAllPostByUserId(page, size, username, userPrincipal.getUserId());
     }
 
     @Operation(summary = "Upload new post feed")
