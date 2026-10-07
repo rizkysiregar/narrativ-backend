@@ -12,8 +12,9 @@ import java.util.UUID;
 
 
 public interface PostService {
-    PaginatedResponse<PostFeedResponse> getAllPost(int page, int size, UUID userId);
-    PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String username);
+    PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, UUID userId);
+    PaginatedResponse<PostFeedResponse> getFollowingPosts(int page, int size, UUID viewerId);
+    PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String username, UUID viewerId);
     CreatePostResponse addNewPost(UUID userId, AddPostRequest addPostRequest, MultipartFile image) throws Exception;
     Operation deletePost(UUID postId, UUID userId);
 }

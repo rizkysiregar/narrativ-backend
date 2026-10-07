@@ -51,23 +51,32 @@ public class PostServiceImpl implements PostService {
     private final PostEventPublisher postEventPublisher;
 
     @Override
-    public PaginatedResponse<PostFeedResponse> getAllPost(int page, int size, UUID userId) {
-        log.info("FETCH.ALL.FEED: {}, size= {} ,userId={}", page, size, userId);
+    public PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, UUID userId) {
+        log.info("FETCH.EXPLORE.FEED: {}, size= {} ,userId={}", page, size, userId);
         Pageable pageable = PageRequest.of(page, size);
         Page<PostEntity> postPage = postPaginationRepository.findAllActivePosts(pageable);
         return buildPaginatedResponse(postPage, userId);
     }
 
     @Override
-    public PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String username) {
+    public PaginatedResponse<PostFeedResponse> getFollowingPosts(int page, int size, UUID viewerId) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        }
+        Page<PostEntity> postPage = postPaginationRepository.findFollowingPosts(PageRequest.of(page, size), viewerId);
+        return buildPaginatedResponse(postPage, viewerId);
+    }
+
+    @Override
+    public PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String username, UUID viewerId) {
         log.info("FETCH.FEED.BY.USERNAME =  {}, size= {} , username= {}", page, size, username);
 
-        UserEntity user = userRepository.findByUsername(username)
+        UserEntity user = userRepository.findByUsernameAndIsDeletedFalse(username)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
 
         Pageable pageable = PageRequest.of(page, size);
         Page<PostEntity> postPage = postPaginationRepository.findAllActivePostsByUserId(pageable, user.getId());
-        return buildPaginatedResponse(postPage, user.getId());
+        return buildPaginatedResponse(postPage, viewerId);
     }
 
     private PaginatedResponse<PostFeedResponse> buildPaginatedResponse(Page<PostEntity> postPage, UUID statusUserId) {
@@ -154,6 +163,7 @@ public class PostServiceImpl implements PostService {
         // event to publish
         PostCreatedEvent event = PostCreatedEvent.builder()
                 .postId(postEntity.getId())
+                .authorId(user.getId())
                 .username(postEntity.getUser().getUsername())
                 .caption(postEntity.getCaption())
                 .imageUrl(postEntity.getImageUrl())

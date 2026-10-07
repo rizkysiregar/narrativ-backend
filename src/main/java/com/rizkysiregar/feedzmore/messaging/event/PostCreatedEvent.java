@@ -15,6 +15,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class PostCreatedEvent {
     private UUID postId;
+    private UUID authorId;
     private String username;
     private String caption;
     private String imageUrl;

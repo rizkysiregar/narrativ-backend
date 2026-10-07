@@ -85,7 +85,7 @@ public class FirebaseNotificationService {
         List<UserDeviceEntity> devices = userDeviceService.getActiveDevice(userId);
         for (UserDeviceEntity device : devices) {
             sendNotificationToToken(device.getPushToken(), title, body)
-                    .doOnError(ex -> log.error("## error sending notification to deviceId {} with token : {}", device.getDeviceId(), device.getPushToken() , ex))
+                    .doOnError(ex -> log.error("## error sending notification to deviceId {}", device.getDeviceId(), ex))
                     .subscribe();
         }
     }
