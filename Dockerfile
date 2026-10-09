@@ -1,11 +1,11 @@
 # Use Amazon Corretto 21 as the base image
-FROM docker.io/library/amazoncorretto:25
+FROM docker.io/library/amazoncorretto:25-alpine
+
+# Install ffmpeg/ffprobe for video validation and thumbnail extraction
+RUN apk add --no-cache ffmpeg
 
 # Set the working directory inside the container
 WORKDIR /app
-
-# Install ffmpeg/ffprobe for video validation and thumbnail extraction
-RUN dnf install -y ffmpeg-free || dnf install -y ffmpeg
 
 # Copy the JAR file into the container
 COPY target/*.jar feedzmore-service.jar
