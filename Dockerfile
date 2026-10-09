@@ -4,6 +4,9 @@ FROM docker.io/library/amazoncorretto:25
 # Set the working directory inside the container
 WORKDIR /app
 
+# Install ffmpeg/ffprobe for video validation and thumbnail extraction
+RUN dnf install -y ffmpeg-free || dnf install -y ffmpeg
+
 # Copy the JAR file into the container
 COPY target/*.jar feedzmore-service.jar
 

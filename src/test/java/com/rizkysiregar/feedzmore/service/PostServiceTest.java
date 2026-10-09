@@ -52,6 +52,8 @@ public class PostServiceTest {
     private FileStorageService fileStorageService;
     @Mock
     private PostEventPublisher postEventPublisher;
+    @Mock
+    private VideoProcessingService videoProcessingService;
 
     @InjectMocks
     private PostServiceImpl postService;
@@ -67,9 +69,9 @@ public class PostServiceTest {
         UserEntity bob = new UserEntity();
         bob.setUsername("bob");
         PostEntity p1 = PostEntity.builder().id(UUID.randomUUID()).user(alice).caption("hello")
-                .imageUrl("img1.jpg").createdAt(LocalDateTime.now()).build();
+                .mediaUrl("img1.jpg").createdAt(LocalDateTime.now()).build();
         PostEntity p2 = PostEntity.builder().id(UUID.randomUUID()).user(bob).caption("world")
-                .imageUrl("img2.jpg").createdAt(LocalDateTime.now().minusMinutes(1)).build();
+                .mediaUrl("img2.jpg").createdAt(LocalDateTime.now().minusMinutes(1)).build();
         List<PostEntity> posts = List.of(p1, p2);
         Page<PostEntity> postPage = new PageImpl<>(posts, PageRequest.of(page, size), posts.size());
 
@@ -94,8 +96,8 @@ public class PostServiceTest {
         assertEquals(posts.size(), response.getTotalElements());
         assertEquals(1, response.getTotalPages());
         // image url should be kept as is
-        assertEquals("img1.jpg", response.getContent().get(0).getImageUrl());
-        assertEquals("img2.jpg", response.getContent().get(1).getImageUrl());
+        assertEquals("img1.jpg", response.getContent().get(0).getMediaUrl());
+        assertEquals("img2.jpg", response.getContent().get(1).getMediaUrl());
 
         verify(postPaginationRepository, times(1))
                 .findAllActivePosts(any(Pageable.class));
@@ -123,7 +125,7 @@ public class PostServiceTest {
         UserEntity author = new UserEntity();
         author.setUsername("followed");
         PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(author)
-                .caption("hello").imageUrl("image.jpg").createdAt(LocalDateTime.now()).build();
+                .caption("hello").mediaUrl("image.jpg").createdAt(LocalDateTime.now()).build();
         PageRequest pageable = PageRequest.of(0, 10);
         when(postPaginationRepository.findFollowingPosts(pageable, viewerId))
                 .thenReturn(new PageImpl<>(List.of(post), pageable, 1));
@@ -135,7 +137,7 @@ public class PostServiceTest {
 
         assertEquals(1, response.getTotalElements());
         assertEquals("followed", response.getContent().getFirst().getUsername());
-        assertEquals("signed-image.jpg", response.getContent().getFirst().getImageUrl());
+        assertEquals("signed-image.jpg", response.getContent().getFirst().getMediaUrl());
         assertTrue(response.getContent().getFirst().isLiked());
         verify(postPaginationRepository).findFollowingPosts(pageable, viewerId);
     }
@@ -160,6 +162,7 @@ public class PostServiceTest {
         MultipartFile image = mock(MultipartFile.class);
         when(image.isEmpty()).thenReturn(false);
         when(image.getSize()).thenReturn(1024L); // 1KB
+        when(image.getContentType()).thenReturn("image/jpeg");
 
         UserEntity user = new UserEntity();
         user.setId(userId);
@@ -174,7 +177,7 @@ public class PostServiceTest {
         PostEntity postEntity = PostEntity.builder()
                 .id(UUID.randomUUID())
                 .caption("My first post")
-                .imageUrl("object/name.jpg")
+                .mediaUrl("object/name.jpg")
                 .user(user)
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -210,7 +213,7 @@ public class PostServiceTest {
         UUID viewerId = UUID.randomUUID();
 
         PostEntity p1 = PostEntity.builder().id(UUID.randomUUID()).user(user).caption("hello")
-                .imageUrl("img1.jpg").createdAt(LocalDateTime.now()).build();
+                .mediaUrl("img1.jpg").createdAt(LocalDateTime.now()).build();
         List<PostEntity> posts = List.of(p1);
         Page<PostEntity> postPage = new PageImpl<>(posts, PageRequest.of(page, size), posts.size());
 
@@ -312,6 +315,7 @@ public class PostServiceTest {
         MultipartFile image = mock(MultipartFile.class);
         when(image.isEmpty()).thenReturn(false);
         when(image.getSize()).thenReturn(6L * 1024 * 1024); // 6MB
+        when(image.getContentType()).thenReturn("image/jpeg");
 
         when(userRepository.findByIdAndIsDeletedFalse(userId))
                 .thenReturn(Optional.of(new UserEntity()));
@@ -341,7 +345,7 @@ public class PostServiceTest {
         PostEntity post = PostEntity.builder()
                 .id(postId)
                 .user(user)
-                .imageUrl("object/name.jpg")
+                .mediaUrl("object/name.jpg")
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -362,7 +366,7 @@ public class PostServiceTest {
         PostEntity post = PostEntity.builder()
                 .id(postId)
                 .user(owner)
-                .imageUrl("object/name.jpg")
+                .mediaUrl("object/name.jpg")
                 .createdAt(LocalDateTime.now())
                 .build();
 

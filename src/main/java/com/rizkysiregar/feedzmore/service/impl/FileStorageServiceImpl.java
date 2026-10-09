@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.awt.*;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
@@ -116,6 +117,34 @@ public class FileStorageServiceImpl implements FileStorageService {
         } catch (Exception e) {
             log.error(":: get object failed, objectName: {}", objectName);
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public String uploadObject(String objectName, InputStream stream, long size, String contentType) throws Exception {
+        minioClient.putObject(
+                PutObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectName)
+                        .stream(stream, size, -1)
+                        .contentType(contentType)
+                        .build()
+        );
+        return objectName;
+    }
+
+    @Override
+    public void deleteObject(String objectName) {
+        try {
+            minioClient.removeObject(
+                    RemoveObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .build()
+            );
+            log.info(":: DELETED.MINIO.OBJECT: {}", objectName);
+        } catch (Exception e) {
+            log.error(":: failed to delete object {} because of {}", objectName, e.getMessage());
         }
     }
 }

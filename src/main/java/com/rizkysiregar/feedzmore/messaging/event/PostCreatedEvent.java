@@ -9,6 +9,8 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 
+import com.rizkysiregar.feedzmore.model.enums.MediaType;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -18,7 +20,8 @@ public class PostCreatedEvent {
     private UUID authorId;
     private String username;
     private String caption;
-    private String imageUrl;
+    private MediaType mediaType;
+    private String mediaUrl;
     private LocalDateTime createdAt;
     private String email;
     private Map<String, Object> emailProps;

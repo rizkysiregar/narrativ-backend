@@ -7,6 +7,6 @@ import lombok.Data;
 @AllArgsConstructor
 public class CommentResponse {
     String username;
-    String imageUrl;
+    String profileImageUrl;
     String commentContent;
 }

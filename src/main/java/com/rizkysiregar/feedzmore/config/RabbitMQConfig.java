@@ -16,6 +16,7 @@ public class RabbitMQConfig {
     public static final String POST_EXCHANGE = "post.exchange";
     public static final String NOTIFICATION_QUEUE = "notification.queue";
     public static final String EMAIL_QUEUE = "email.queue";
+    public static final String VIDEO_THUMBNAIL_QUEUE = "video.thumbnail.queue";
     public static final String POST_CREATED_ROUTING_KEY = "POST.CREATED";
 
     @Bean
@@ -70,6 +71,36 @@ public class RabbitMQConfig {
                 .with(POST_CREATED_ROUTING_KEY);
     }
 
+
+    // --- Video Thumbnail ---
+    @Bean
+    public Queue videoThumbnailQueue() {
+        return QueueBuilder.durable(VIDEO_THUMBNAIL_QUEUE)
+                .withArgument("x-dead-letter-exchange", "dlx.exchange")
+                .withArgument("x-dead-letter-routing-key", "video.thumbnail.dlq")
+                .build();
+    }
+
+    @Bean
+    public Binding videoThumbnailBinding() {
+        return BindingBuilder
+                .bind(videoThumbnailQueue())
+                .to(exchange())
+                .with(POST_CREATED_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue videoThumbnailDlq() {
+        return new Queue("video.thumbnail.dlq");
+    }
+
+    @Bean
+    public Binding videoThumbnailDlqBinding() {
+        return BindingBuilder
+                .bind(videoThumbnailDlq())
+                .to(deadLetterExchange())
+                .with("video.thumbnail.dlq");
+    }
 
     // --- Dead Letter ---
     @Bean

@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import com.rizkysiregar.feedzmore.model.enums.MediaType;
+
 @Entity
 @Table(name = "posts")
 @Data
@@ -27,8 +29,15 @@ public class PostEntity {
     @Column(name = "caption", columnDefinition = "TEXT")
     private String caption;
 
-    @Column(name = "image_url", nullable = false)
-    private String imageUrl;
+    @Column(name = "media_url", nullable = false)
+    private String mediaUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "media_type", nullable = false)
+    private MediaType mediaType;
+
+    @Column(name = "thumbnail_url")
+    private String thumbnailUrl;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
