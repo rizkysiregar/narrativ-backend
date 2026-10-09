@@ -13,9 +13,11 @@ import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
+import com.rizkysiregar.feedzmore.model.enums.MediaType;
 import com.rizkysiregar.feedzmore.repository.*;
 import com.rizkysiregar.feedzmore.service.FileStorageService;
 import com.rizkysiregar.feedzmore.service.PostService;
+import com.rizkysiregar.feedzmore.service.VideoProcessingService;
 import com.rizkysiregar.feedzmore.util.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +51,12 @@ public class PostServiceImpl implements PostService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final PostEventPublisher postEventPublisher;
+    private final VideoProcessingService videoProcessingService;
+
+    private static final long MAX_IMAGE_SIZE = 5L * 1024 * 1024;
+    private static final long MAX_VIDEO_SIZE = 50L * 1024 * 1024;
+    private static final long MAX_VIDEO_DURATION_SECONDS = 60;
+    private static final List<String> ALLOWED_VIDEO_TYPES = List.of("video/mp4", "video/quicktime", "video/webm");
 
     @Override
     public PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, UUID userId) {
@@ -96,16 +104,21 @@ public class PostServiceImpl implements PostService {
                         post.getId(),
                         post.getUser().getUsername(),
                         post.getCaption(),
-                        post.getImageUrl(),
+                        post.getMediaUrl(),
+                        post.getMediaType(),
+                        post.getThumbnailUrl(),
                         post.getCreatedAt(),
                         likeCounts.getOrDefault(post.getId(), 0L),
                         commentCounts.getOrDefault(post.getId(), 0L),
                         likedPostIds.contains(post.getId())
                 );
                 try {
-                    response.setImageUrl(fileStorageService.getPresignUrl(response.getImageUrl()));
+                    response.setMediaUrl(fileStorageService.getPresignUrl(response.getMediaUrl()));
+                    if (response.getThumbnailUrl() != null) {
+                        response.setThumbnailUrl(fileStorageService.getPresignUrl(response.getThumbnailUrl()));
+                    }
                 } catch (Exception e) {
-                    log.error("## cannot get presign url for objectName= {}, because of= {}", response.getImageUrl(), e.getMessage());
+                    log.error("## cannot get presign url for objectName= {}, because of= {}", response.getMediaUrl(), e.getMessage());
                 }
                 return response;
             }).toList();
@@ -121,7 +134,7 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public CreatePostResponse addNewPost(UUID userId, AddPostRequest request, MultipartFile image) throws Exception {
+    public CreatePostResponse addNewPost(UUID userId, AddPostRequest request, MultipartFile media) throws Exception {
         log.info("NEW.FEED.POST: {}", userId);
 
         UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
@@ -130,14 +143,29 @@ public class PostServiceImpl implements PostService {
                     return new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
                 });
 
-        if (image.isEmpty()) {
-            log.error("Image is empty");
+        if (media == null || media.isEmpty()) {
+            log.error("Media is empty");
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
-        if (image.getSize() > 5 * 1024 * 1024) {
-            log.error("Image too large");
-            throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
+        String contentType = media.getContentType();
+        MediaType mediaType;
+        if (contentType != null && contentType.startsWith("image/")) {
+            mediaType = MediaType.IMAGE;
+            if (media.getSize() > MAX_IMAGE_SIZE) {
+                log.error("Image too large");
+                throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
+            }
+        } else if (contentType != null && ALLOWED_VIDEO_TYPES.contains(contentType)) {
+            mediaType = MediaType.VIDEO;
+            if (media.getSize() > MAX_VIDEO_SIZE) {
+                log.error("Video too large");
+                throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
+            }
+            validateVideoDuration(media);
+        } else {
+            log.error("Unsupported media type: {}", contentType);
+            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
         Map<String, Object> emailProps = new HashMap<>();
@@ -146,7 +174,7 @@ public class PostServiceImpl implements PostService {
         emailProps.put("postTitle", request.getCaption());
 
         String objectName = fileStorageService.uploadFile(
-                image,
+                media,
                 user.getUsername(),
                 ObjectStorageTypeGroup.POST_FEED
         );
@@ -155,7 +183,8 @@ public class PostServiceImpl implements PostService {
                 PostEntity.builder()
                         .caption(request.getCaption())
                         .createdAt(LocalDateTime.now())
-                        .imageUrl(objectName)
+                        .mediaUrl(objectName)
+                        .mediaType(mediaType)
                         .user(user)
                         .build()
         );
@@ -166,7 +195,8 @@ public class PostServiceImpl implements PostService {
                 .authorId(user.getId())
                 .username(postEntity.getUser().getUsername())
                 .caption(postEntity.getCaption())
-                .imageUrl(postEntity.getImageUrl())
+                .mediaType(postEntity.getMediaType())
+                .mediaUrl(postEntity.getMediaUrl())
                 .createdAt(postEntity.getCreatedAt())
                 .email(user.getEmail())
                 .emailProps(emailProps)
@@ -196,6 +226,27 @@ public class PostServiceImpl implements PostService {
         post.setDeleted(true);
         postCrudRepository.save(post);
 
+        fileStorageService.deleteObject(post.getMediaUrl());
+        if (post.getThumbnailUrl() != null) {
+            fileStorageService.deleteObject(post.getThumbnailUrl());
+        }
+
         return Operation.DELETED;
+    }
+
+    private void validateVideoDuration(MultipartFile media) throws Exception {
+        java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("feedzmore-video-", ".mp4");
+        try {
+            try (java.io.InputStream in = media.getInputStream()) {
+                java.nio.file.Files.copy(in, tempFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            double duration = videoProcessingService.getDurationSeconds(tempFile);
+            if (duration > MAX_VIDEO_DURATION_SECONDS) {
+                log.error("Video duration too long: {}s", duration);
+                throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+            }
+        } finally {
+            java.nio.file.Files.deleteIfExists(tempFile);
+        }
     }
 }

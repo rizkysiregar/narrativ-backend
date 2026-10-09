@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.model.response;
 
+import com.rizkysiregar.feedzmore.model.enums.MediaType;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -12,18 +13,23 @@ public class PostFeedResponse {
     private UUID id;
     private String username;
     private String caption;
-    private String imageUrl;
+    private String mediaUrl;
+    private MediaType mediaType;
+    private String thumbnailUrl;
     private LocalDateTime createdAt;
-    private long likeCount;  // Use long instead of String
-    private long commentCount; // Use long instead of String
+    private long likeCount;
+    private long commentCount;
     private boolean isLiked;
 
-    public PostFeedResponse(UUID id, String username, String caption, String imageUrl, LocalDateTime createdAt,
-                   long likeCount, long commentCount, boolean isLiked) {
+    public PostFeedResponse(UUID id, String username, String caption, String mediaUrl, MediaType mediaType,
+                            String thumbnailUrl, LocalDateTime createdAt,
+                            long likeCount, long commentCount, boolean isLiked) {
         this.id = id;
         this.username = username;
         this.caption = caption;
-        this.imageUrl = imageUrl;
+        this.mediaUrl = mediaUrl;
+        this.mediaType = mediaType;
+        this.thumbnailUrl = thumbnailUrl;
         this.createdAt = createdAt;
         this.likeCount = likeCount;
         this.commentCount = commentCount;
