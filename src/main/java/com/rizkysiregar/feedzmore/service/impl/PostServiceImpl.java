@@ -7,17 +7,19 @@ import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
 import com.rizkysiregar.feedzmore.messaging.publisher.PostEventPublisher;
 import com.rizkysiregar.feedzmore.model.dto.PostCountDTO;
+import com.rizkysiregar.feedzmore.model.dto.ObjectStat;
 import com.rizkysiregar.feedzmore.model.response.CreatePostResponse;
+import com.rizkysiregar.feedzmore.model.response.CreatePostUploadUrlResponse;
 import com.rizkysiregar.feedzmore.model.response.PostFeedResponse;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
+import com.rizkysiregar.feedzmore.model.request.CreatePostUploadUrlRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.model.enums.MediaType;
 import com.rizkysiregar.feedzmore.repository.*;
 import com.rizkysiregar.feedzmore.service.FileStorageService;
 import com.rizkysiregar.feedzmore.service.PostService;
-import com.rizkysiregar.feedzmore.service.VideoProcessingService;
 import com.rizkysiregar.feedzmore.util.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +29,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -51,12 +52,20 @@ public class PostServiceImpl implements PostService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final PostEventPublisher postEventPublisher;
-    private final VideoProcessingService videoProcessingService;
 
     private static final long MAX_IMAGE_SIZE = 5L * 1024 * 1024;
     private static final long MAX_VIDEO_SIZE = 50L * 1024 * 1024;
-    private static final long MAX_VIDEO_DURATION_SECONDS = 60;
     private static final List<String> ALLOWED_VIDEO_TYPES = List.of("video/mp4", "video/quicktime", "video/webm");
+    private static final Map<String, String> CONTENT_TYPE_EXTENSIONS = Map.of(
+            "image/jpeg", ".jpg",
+            "image/png", ".png",
+            "image/webp", ".webp",
+            "image/gif", ".gif",
+            "video/mp4", ".mp4",
+            "video/quicktime", ".mov",
+            "video/webm", ".webm"
+    );
+    private static final long PRESIGN_UPLOAD_EXPIRY_SECONDS = 15L * 60;
 
     @Override
     public PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, UUID userId) {
@@ -134,7 +143,49 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public CreatePostResponse addNewPost(UUID userId, AddPostRequest request, MultipartFile media) throws Exception {
+    public CreatePostUploadUrlResponse createUploadUrl(UUID userId, CreatePostUploadUrlRequest request) {
+        log.info("NEW.POST.UPLOAD.URL: {}", userId);
+
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+                .orElseThrow(() -> {
+                    log.error("Active user not found {}", userId);
+                    return new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+                });
+
+        String contentType = request.getContentType();
+        if (contentType == null || !isAllowedContentType(contentType)) {
+            log.error("Unsupported media type: {}", contentType);
+            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        }
+
+        String extension = CONTENT_TYPE_EXTENSIONS.get(contentType);
+        if (extension == null) {
+            // derive from image sub type, e.g. image/avif -> .avif
+            extension = "." + contentType.substring(contentType.indexOf('/') + 1);
+        }
+
+        // format it: username/POST_FEED/{uuid}{ext}
+        String objectKey = String.format("%s/%s/%s%s",
+                user.getUsername(),
+                ObjectStorageTypeGroup.POST_FEED,
+                UUID.randomUUID(),
+                extension);
+
+        try {
+            String presignedUrl = fileStorageService.getPresignUploadUrl(objectKey, contentType);
+            return CreatePostUploadUrlResponse.builder()
+                    .presignedUrl(presignedUrl)
+                    .objectKey(objectKey)
+                    .expiresInSeconds(PRESIGN_UPLOAD_EXPIRY_SECONDS)
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to create presign upload url for user {}: {}", userId, e.getMessage());
+            throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public CreatePostResponse addNewPost(UUID userId, AddPostRequest request) {
         log.info("NEW.FEED.POST: {}", userId);
 
         UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
@@ -143,29 +194,45 @@ public class PostServiceImpl implements PostService {
                     return new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
                 });
 
-        if (media == null || media.isEmpty()) {
-            log.error("Media is empty");
+        String objectKey = request.getObjectKey();
+        if (objectKey == null || objectKey.isBlank()) {
+            log.error("Object key is empty");
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
-        String contentType = media.getContentType();
-        MediaType mediaType;
-        if (contentType != null && contentType.startsWith("image/")) {
-            mediaType = MediaType.IMAGE;
-            if (media.getSize() > MAX_IMAGE_SIZE) {
-                log.error("Image too large");
-                throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
-            }
-        } else if (contentType != null && ALLOWED_VIDEO_TYPES.contains(contentType)) {
-            mediaType = MediaType.VIDEO;
-            if (media.getSize() > MAX_VIDEO_SIZE) {
-                log.error("Video too large");
-                throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
-            }
-            validateVideoDuration(media);
-        } else {
-            log.error("Unsupported media type: {}", contentType);
+        // object must belong to this user and to POST_FEED group
+        String expectedPrefix = user.getUsername() + "/" + ObjectStorageTypeGroup.POST_FEED + "/";
+        if (!objectKey.startsWith(expectedPrefix)) {
+            log.error("Object key does not belong to user: objectKey={}, userId={}", objectKey, userId);
+            throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);
+        }
+
+        // validate the uploaded object. The media type is derived from the object
+        // key extension (the backend generated it from the requested content type),
+        // while statObject is best-effort for the size check: a transient storage
+        // failure (e.g. proxy/HEAD hiccup) must not fail the whole post creation.
+        MediaType mediaType = resolveMediaTypeFromKey(objectKey);
+        if (mediaType == null) {
+            log.error("Unsupported media extension: objectKey={}", objectKey);
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            ObjectStat objectStat = fileStorageService.statObject(objectKey);
+            long size = objectStat.getSize();
+            if (mediaType == MediaType.IMAGE && size > MAX_IMAGE_SIZE) {
+                log.error("Image too large: {} bytes", size);
+                throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
+            }
+            if (mediaType == MediaType.VIDEO && size > MAX_VIDEO_SIZE) {
+                log.error("Video too large: {} bytes", size);
+                throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
+            }
+        } catch (BusinessException e) {
+            if (HttpStatus.NOT_FOUND.equals(e.getHttpStatus())) {
+                throw e;
+            }
+            log.warn(":: POST.STAT.SKIPPED: objectKey={} reason={}", objectKey, e.getMessage());
         }
 
         Map<String, Object> emailProps = new HashMap<>();
@@ -173,17 +240,11 @@ public class PostServiceImpl implements PostService {
         emailProps.put("isSuccess", true);
         emailProps.put("postTitle", request.getCaption());
 
-        String objectName = fileStorageService.uploadFile(
-                media,
-                user.getUsername(),
-                ObjectStorageTypeGroup.POST_FEED
-        );
-
         PostEntity postEntity = postCrudRepository.save(
                 PostEntity.builder()
                         .caption(request.getCaption())
                         .createdAt(LocalDateTime.now())
-                        .mediaUrl(objectName)
+                        .mediaUrl(objectKey)
                         .mediaType(mediaType)
                         .user(user)
                         .build()
@@ -234,19 +295,19 @@ public class PostServiceImpl implements PostService {
         return Operation.DELETED;
     }
 
-    private void validateVideoDuration(MultipartFile media) throws Exception {
-        java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("feedzmore-video-", ".mp4");
-        try {
-            try (java.io.InputStream in = media.getInputStream()) {
-                java.nio.file.Files.copy(in, tempFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            }
-            double duration = videoProcessingService.getDurationSeconds(tempFile);
-            if (duration > MAX_VIDEO_DURATION_SECONDS) {
-                log.error("Video duration too long: {}s", duration);
-                throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-            }
-        } finally {
-            java.nio.file.Files.deleteIfExists(tempFile);
+    private boolean isAllowedContentType(String contentType) {
+        return contentType.startsWith("image/") || ALLOWED_VIDEO_TYPES.contains(contentType);
+    }
+
+    private MediaType resolveMediaTypeFromKey(String objectKey) {
+        String lower = objectKey.toLowerCase();
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png")
+                || lower.endsWith(".webp") || lower.endsWith(".gif")) {
+            return MediaType.IMAGE;
         }
+        if (lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.endsWith(".webm")) {
+            return MediaType.VIDEO;
+        }
+        return null;
     }
 }

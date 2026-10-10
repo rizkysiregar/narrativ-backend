@@ -5,11 +5,14 @@ import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
 import com.rizkysiregar.feedzmore.messaging.publisher.PostEventPublisher;
+import com.rizkysiregar.feedzmore.model.dto.ObjectStat;
 import com.rizkysiregar.feedzmore.model.response.CreatePostResponse;
+import com.rizkysiregar.feedzmore.model.response.CreatePostUploadUrlResponse;
 import com.rizkysiregar.feedzmore.model.response.PostFeedResponse;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
+import com.rizkysiregar.feedzmore.model.request.CreatePostUploadUrlRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.*;
 import com.rizkysiregar.feedzmore.service.impl.PostServiceImpl;
@@ -24,7 +27,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -52,8 +55,6 @@ public class PostServiceTest {
     private FileStorageService fileStorageService;
     @Mock
     private PostEventPublisher postEventPublisher;
-    @Mock
-    private VideoProcessingService videoProcessingService;
 
     @InjectMocks
     private PostServiceImpl postService;
@@ -152,17 +153,59 @@ public class PostServiceTest {
     }
 
     @Test
+    void testCreateUploadUrl_Success() throws Exception {
+        // Arrange
+        UUID userId = UUID.randomUUID();
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setUsername("testuser");
+
+        when(userRepository.findByIdAndIsDeletedFalse(userId))
+                .thenReturn(Optional.of(user));
+        when(fileStorageService.getPresignUploadUrl(anyString(), eq("video/mp4")))
+                .thenReturn("http://minio/presigned-url");
+
+        // Act
+        CreatePostUploadUrlResponse response = postService.createUploadUrl(
+                userId, CreatePostUploadUrlRequest.builder().contentType("video/mp4").build());
+
+        // Assert
+        assertNotNull(response);
+        assertEquals("http://minio/presigned-url", response.getPresignedUrl());
+        assertTrue(response.getObjectKey().startsWith("testuser/POST_FEED/"));
+        assertTrue(response.getObjectKey().endsWith(".mp4"));
+        assertEquals(900L, response.getExpiresInSeconds());
+        verify(fileStorageService).getPresignUploadUrl(eq(response.getObjectKey()), eq("video/mp4"));
+    }
+
+    @Test
+    void testCreateUploadUrl_UnsupportedContentType_ThrowsBadRequest() throws Exception {
+        // Arrange
+        UUID userId = UUID.randomUUID();
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setUsername("testuser");
+
+        when(userRepository.findByIdAndIsDeletedFalse(userId))
+                .thenReturn(Optional.of(user));
+
+        // Act & Assert
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> postService.createUploadUrl(
+                        userId, CreatePostUploadUrlRequest.builder().contentType("application/pdf").build()));
+        assertEquals(GlobalMessage.BAD_REQUEST.getMessage(), ex.getMessage());
+        verify(fileStorageService, never()).getPresignUploadUrl(anyString(), anyString());
+    }
+
+    @Test
     void testAddNewPost_Success() throws Exception {
         // Arrange
         UUID userId = UUID.randomUUID();
+        String objectKey = "testuser/POST_FEED/" + UUID.randomUUID() + ".jpg";
         AddPostRequest request = AddPostRequest.builder()
                 .caption("My first post")
+                .objectKey(objectKey)
                 .build();
-
-        MultipartFile image = mock(MultipartFile.class);
-        when(image.isEmpty()).thenReturn(false);
-        when(image.getSize()).thenReturn(1024L); // 1KB
-        when(image.getContentType()).thenReturn("image/jpeg");
 
         UserEntity user = new UserEntity();
         user.setId(userId);
@@ -171,13 +214,13 @@ public class PostServiceTest {
 
         when(userRepository.findByIdAndIsDeletedFalse(userId))
                 .thenReturn(Optional.of(user));
-        when(fileStorageService.uploadFile(eq(image), eq("testuser"), anyString()))
-                .thenReturn("object/name.jpg");
+        when(fileStorageService.statObject(objectKey))
+                .thenReturn(ObjectStat.builder().size(1024L).contentType("image/jpeg").build());
 
         PostEntity postEntity = PostEntity.builder()
                 .id(UUID.randomUUID())
                 .caption("My first post")
-                .mediaUrl("object/name.jpg")
+                .mediaUrl(objectKey)
                 .user(user)
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -185,13 +228,12 @@ public class PostServiceTest {
         when(postCrudRepository.save(any(PostEntity.class))).thenReturn(postEntity);
 
         // Act
-        CreatePostResponse result = postService.addNewPost(userId, request, image);
+        CreatePostResponse result = postService.addNewPost(userId, request);
 
         // Assert
         assertNotNull(result);
         assertEquals(GlobalMessage.CREATED.getMessage(), result.getStatus());
-        verify(fileStorageService, times(1))
-                .uploadFile(eq(image), eq("testuser"), anyString());
+        verify(fileStorageService, times(1)).statObject(objectKey);
         verify(userRepository).findByIdAndIsDeletedFalse(userId);
         verify(postCrudRepository, times(1))
                 .save(any(PostEntity.class));
@@ -247,92 +289,153 @@ public class PostServiceTest {
     }
 
     @Test
-    void testAddNewPost_UserNotFound_ThrowsBadRequest() throws Exception {
+    void testAddNewPost_UserNotFound_ThrowsBadRequest() {
         // Arrange
         UUID userId = UUID.randomUUID();
         AddPostRequest request = AddPostRequest.builder()
                 .caption("caption")
+                .objectKey("testuser/POST_FEED/x.jpg")
                 .build();
-        MultipartFile image = mock(MultipartFile.class);
 
         when(userRepository.findByIdAndIsDeletedFalse(userId))
                 .thenReturn(Optional.empty());
 
         // Act & Assert
-        BusinessException ex = assertThrows(BusinessException.class, () -> {
-            try {
-                postService.addNewPost(userId, request, image);
-            } catch (Exception e) {
-                if (e instanceof BusinessException be) {
-                    throw be;
-                }
-                fail("Unexpected exception type: " + e);
-            }
-        });
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                postService.addNewPost(userId, request));
         assertEquals(GlobalMessage.BAD_REQUEST.getMessage(), ex.getMessage());
-        verify(fileStorageService, never()).uploadFile(any(), anyString(), anyString());
+        verify(fileStorageService, never()).statObject(anyString());
         verify(postCrudRepository, never()).save(any());
     }
 
     @Test
-    void testAddNewPost_EmptyImage_ThrowsBadRequest() throws Exception {
+    void testAddNewPost_BlankObjectKey_ThrowsBadRequest() {
         // Arrange
         UUID userId = UUID.randomUUID();
         AddPostRequest request = AddPostRequest.builder()
                 .caption("caption")
+                .objectKey(" ")
                 .build();
-
-        MultipartFile image = mock(MultipartFile.class);
-        when(image.isEmpty()).thenReturn(true);
 
         when(userRepository.findByIdAndIsDeletedFalse(userId))
                 .thenReturn(Optional.of(new UserEntity()));
 
         // Act & Assert
-        BusinessException ex = assertThrows(BusinessException.class, () -> {
-            try {
-                postService.addNewPost(userId, request, image);
-            } catch (Exception e) {
-                if (e instanceof BusinessException be) {
-                    throw be;
-                }
-                fail("Unexpected exception type: " + e);
-            }
-        });
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                postService.addNewPost(userId, request));
         assertEquals(GlobalMessage.BAD_REQUEST.getMessage(), ex.getMessage());
-        verify(fileStorageService, never()).uploadFile(any(), anyString(), anyString());
+        verify(fileStorageService, never()).statObject(anyString());
         verify(postCrudRepository, never()).save(any());
     }
 
     @Test
-    void testAddNewPost_ImageTooLarge_ThrowsBadRequestFileTooLarge() throws Exception {
+    void testAddNewPost_ObjectKeyOwnedByOtherUser_ThrowsAccessDenied() {
         // Arrange
         UUID userId = UUID.randomUUID();
         AddPostRequest request = AddPostRequest.builder()
                 .caption("caption")
+                .objectKey("otheruser/POST_FEED/" + UUID.randomUUID() + ".jpg")
                 .build();
 
-        MultipartFile image = mock(MultipartFile.class);
-        when(image.isEmpty()).thenReturn(false);
-        when(image.getSize()).thenReturn(6L * 1024 * 1024); // 6MB
-        when(image.getContentType()).thenReturn("image/jpeg");
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setUsername("testuser");
 
         when(userRepository.findByIdAndIsDeletedFalse(userId))
-                .thenReturn(Optional.of(new UserEntity()));
+                .thenReturn(Optional.of(user));
 
         // Act & Assert
-        BusinessException ex = assertThrows(BusinessException.class, () -> {
-            try {
-                postService.addNewPost(userId, request, image);
-            } catch (Exception e) {
-                if (e instanceof BusinessException be) {
-                    throw be;
-                }
-                fail("Unexpected exception type: " + e);
-            }
-        });
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                postService.addNewPost(userId, request));
+        assertEquals(GlobalMessage.ACCESS_DENIED.getMessage(), ex.getMessage());
+        verify(fileStorageService, never()).statObject(anyString());
+        verify(postCrudRepository, never()).save(any());
+    }
+
+    @Test
+    void testAddNewPost_ImageTooLarge_ThrowsBadRequestFileTooLarge() {
+        // Arrange
+        UUID userId = UUID.randomUUID();
+        String objectKey = "testuser/POST_FEED/" + UUID.randomUUID() + ".jpg";
+        AddPostRequest request = AddPostRequest.builder()
+                .caption("caption")
+                .objectKey(objectKey)
+                .build();
+
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setUsername("testuser");
+
+        when(userRepository.findByIdAndIsDeletedFalse(userId))
+                .thenReturn(Optional.of(user));
+        when(fileStorageService.statObject(objectKey))
+                .thenReturn(ObjectStat.builder()
+                        .size(6L * 1024 * 1024) // 6MB
+                        .contentType("image/jpeg")
+                        .build());
+
+        // Act & Assert
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                postService.addNewPost(userId, request));
         assertEquals(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE.getMessage(), ex.getMessage());
-        verify(fileStorageService, never()).uploadFile(any(), anyString(), anyString());
+        verify(postCrudRepository, never()).save(any());
+    }
+
+    @Test
+    void testAddNewPost_VideoTooLarge_ThrowsBadRequestFileTooLarge() {
+        // Arrange
+        UUID userId = UUID.randomUUID();
+        String objectKey = "testuser/POST_FEED/" + UUID.randomUUID() + ".mp4";
+        AddPostRequest request = AddPostRequest.builder()
+                .caption("caption")
+                .objectKey(objectKey)
+                .build();
+
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setUsername("testuser");
+
+        when(userRepository.findByIdAndIsDeletedFalse(userId))
+                .thenReturn(Optional.of(user));
+        when(fileStorageService.statObject(objectKey))
+                .thenReturn(ObjectStat.builder()
+                        .size(51L * 1024 * 1024) // 51MB
+                        .contentType("video/mp4")
+                        .build());
+
+        // Act & Assert
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                postService.addNewPost(userId, request));
+        assertEquals(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE.getMessage(), ex.getMessage());
+        verify(postCrudRepository, never()).save(any());
+    }
+
+    @Test
+    void testAddNewPost_UnsupportedObjectType_ThrowsBadRequest() {
+        // Arrange
+        UUID userId = UUID.randomUUID();
+        String objectKey = "testuser/POST_FEED/" + UUID.randomUUID() + ".bin";
+        AddPostRequest request = AddPostRequest.builder()
+                .caption("caption")
+                .objectKey(objectKey)
+                .build();
+
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setUsername("testuser");
+
+        when(userRepository.findByIdAndIsDeletedFalse(userId))
+                .thenReturn(Optional.of(user));
+        when(fileStorageService.statObject(objectKey))
+                .thenReturn(ObjectStat.builder()
+                        .size(1024L)
+                        .contentType("application/octet-stream")
+                        .build());
+
+        // Act & Assert
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                postService.addNewPost(userId, request));
+        assertEquals(GlobalMessage.BAD_REQUEST.getMessage(), ex.getMessage());
         verify(postCrudRepository, never()).save(any());
     }
 

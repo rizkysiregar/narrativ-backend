@@ -1,6 +1,7 @@
 package com.rizkysiregar.feedzmore.service;
 
 import com.rizkysiregar.feedzmore.model.dto.ImageObject;
+import com.rizkysiregar.feedzmore.model.dto.ObjectStat;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
@@ -16,6 +17,8 @@ public interface FileStorageService {
     String uploadFile(MultipartFile file, String userId, String featureName) throws Exception;
 
     String getPresignUrl(String objectName) throws Exception;
+    String getPresignUploadUrl(String objectName, String contentType) throws Exception;
+    ObjectStat statObject(String objectName);
     ImageObject getObject(String objectName, String bucketName);
 
     String uploadObject(String objectName, InputStream stream, long size, String contentType) throws Exception;

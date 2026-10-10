@@ -3,8 +3,10 @@ package com.rizkysiregar.feedzmore.service.impl;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.dto.ImageObject;
+import com.rizkysiregar.feedzmore.model.dto.ObjectStat;
 import com.rizkysiregar.feedzmore.service.FileStorageService;
 import io.minio.*;
+import io.minio.errors.ErrorResponseException;
 import io.minio.http.Method;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +19,7 @@ import java.awt.*;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -28,6 +31,8 @@ import java.util.concurrent.TimeUnit;
 @Service
 @Slf4j
 public class FileStorageServiceImpl implements FileStorageService {
+
+    private static final int PRESIGN_UPLOAD_EXPIRY_MINUTES = 15;
 
     private final MinioClient minioClient;
     private final String bucketName;
@@ -84,6 +89,47 @@ public class FileStorageServiceImpl implements FileStorageService {
                         .expiry(1, TimeUnit.HOURS)
                         .build()
         );
+    }
+
+    @Override
+    public String getPresignUploadUrl(String objectName, String contentType) throws Exception {
+        log.info(":: PRESIGN.UPLOAD.MINIO: {}", objectName);
+        return minioClient.getPresignedObjectUrl(
+                GetPresignedObjectUrlArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectName)
+                        .method(Method.PUT)
+                        .expiry(PRESIGN_UPLOAD_EXPIRY_MINUTES, TimeUnit.MINUTES)
+                        .extraHeaders(Map.of("Content-Type", contentType))
+                        .build()
+        );
+    }
+
+    @Override
+    public ObjectStat statObject(String objectName) {
+        try {
+            StatObjectResponse stat = minioClient.statObject(
+                    StatObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .build()
+            );
+            return ObjectStat.builder()
+                    .size(stat.size())
+                    .contentType(stat.contentType())
+                    .build();
+        } catch (ErrorResponseException e) {
+            String code = e.errorResponse() != null ? e.errorResponse().code() : null;
+            if ("NoSuchKey".equals(code) || "NoSuchBucket".equals(code) || "NoSuchObject".equals(code)) {
+                log.warn(":: STAT.MINIO.OBJECT.NOT.FOUND: {} code={}", objectName, code);
+                throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
+            }
+            log.error(":: STAT.MINIO.FAILED: {} code={} message={}", objectName, code, e.getMessage());
+            throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch (Exception e) {
+            log.error(":: STAT.MINIO.OBJECT.FAILED: {}, because of {}", objectName, e.getMessage());
+            throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @Override
