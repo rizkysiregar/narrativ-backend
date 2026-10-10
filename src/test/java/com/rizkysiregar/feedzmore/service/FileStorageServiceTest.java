@@ -1,13 +1,19 @@
 package com.rizkysiregar.feedzmore.service;
 
+import com.rizkysiregar.feedzmore.constant.GlobalMessage;
+import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.dto.ImageObject;
+import com.rizkysiregar.feedzmore.model.dto.ObjectStat;
 import com.rizkysiregar.feedzmore.service.impl.FileStorageServiceImpl;
 import io.minio.*;
+import io.minio.errors.ErrorResponseException;
+import io.minio.messages.ErrorResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
@@ -99,6 +105,53 @@ public class FileStorageServiceTest {
         // Assert
         assertEquals("http://localhost:9000/test-bucket/u1/POST/x.png", url);
         verify(minioClient, times(1)).getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class));
+    }
+
+    @Test
+    void getPresignUploadUrl_Success() throws Exception {
+        // Arrange
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenReturn("http://localhost:9000/test-bucket/u1/POST_FEED/x.mp4");
+
+        // Act
+        String url = fileStorageService.getPresignUploadUrl("u1/POST_FEED/x.mp4", "video/mp4");
+
+        // Assert
+        assertEquals("http://localhost:9000/test-bucket/u1/POST_FEED/x.mp4", url);
+        verify(minioClient, times(1)).getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class));
+    }
+
+    @Test
+    void statObject_Success() throws Exception {
+        // Arrange
+        String objectName = "u1/POST_FEED/x.mp4";
+        StatObjectResponse stat = mock(StatObjectResponse.class);
+        when(stat.size()).thenReturn(1024L);
+        when(stat.contentType()).thenReturn("video/mp4");
+        when(minioClient.statObject(any(StatObjectArgs.class))).thenReturn(stat);
+
+        // Act
+        ObjectStat result = fileStorageService.statObject(objectName);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1024L, result.getSize());
+        assertEquals("video/mp4", result.getContentType());
+        verify(minioClient, times(1)).statObject(any(StatObjectArgs.class));
+    }
+
+    @Test
+    void statObject_NotFound_ThrowsBusinessException() throws Exception {
+        // Arrange
+        ErrorResponse errorResponse = new ErrorResponse("NoSuchKey", "The specified key does not exist.",
+                TEST_BUCKET, "u1/POST_FEED/x.mp4", "/" + TEST_BUCKET + "/u1/POST_FEED/x.mp4", "req", "host");
+        when(minioClient.statObject(any(StatObjectArgs.class)))
+                .thenThrow(new ErrorResponseException(errorResponse, null, null));
+
+        // Act & Assert
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileStorageService.statObject("u1/POST_FEED/x.mp4"));
+        assertEquals(GlobalMessage.NOT_FOUND.getMessage(), ex.getMessage());
     }
 
     @Test

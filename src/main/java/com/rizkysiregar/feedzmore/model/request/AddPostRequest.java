@@ -10,5 +10,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class AddPostRequest {
-    String caption;
+    private String caption;
+    private String objectKey;
 }

@@ -2,19 +2,17 @@ package com.rizkysiregar.feedzmore.controller;
 
 import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.response.CreatePostResponse;
+import com.rizkysiregar.feedzmore.model.response.CreatePostUploadUrlResponse;
 import com.rizkysiregar.feedzmore.model.response.PostFeedResponse;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
+import com.rizkysiregar.feedzmore.model.request.CreatePostUploadUrlRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.service.PostService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
 
@@ -68,25 +66,24 @@ public class FeedPostController {
         return postService.getAllPostByUserId(page, size, username, userPrincipal.getUserId());
     }
 
-    @Operation(summary = "Upload new post feed")
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Get presigned upload URL for post media. Client uploads the file directly to object storage using this URL.")
+    @PostMapping(value = "/upload-url", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("hasRole('USER')")
+    public CreatePostUploadUrlResponse createUploadUrl(
+            @RequestBody CreatePostUploadUrlRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return postService.createUploadUrl(userPrincipal.getUserId(), request);
+    }
+
+    @Operation(summary = "Create new post feed with media that has been uploaded via presigned URL")
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasRole('USER')")
     public CreatePostResponse upload(
-            @Parameter(
-                    description = "Other payloads that related to the post",
-                    required = true,
-                    content = @Content(
-                            mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = AddPostRequest.class)
-                    )
-            )
-            @RequestPart(value = "addPostRequest") AddPostRequest addPostRequest,
-
-            @Parameter(description = "An image or video that want to post", required = true)
-            @RequestPart(value = "media") MultipartFile media,
+            @RequestBody AddPostRequest addPostRequest,
             @AuthenticationPrincipal UserPrincipal userPrincipal
-    ) throws Exception {
-        return postService.addNewPost(userPrincipal.getUserId(), addPostRequest, media);
+    ) {
+        return postService.addNewPost(userPrincipal.getUserId(), addPostRequest);
     }
 
     @Operation(summary = "Soft delete own feed post")
