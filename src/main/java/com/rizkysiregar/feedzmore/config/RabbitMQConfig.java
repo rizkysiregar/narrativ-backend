@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
@@ -12,16 +13,42 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@Slf4j
 public class RabbitMQConfig {
+
+    // --- Exchanges ---
     public static final String POST_EXCHANGE = "post.exchange";
+    public static final String DEAD_LETTER_EXCHANGE = "dlx.exchange";
+
+    // --- Queues ---
     public static final String NOTIFICATION_QUEUE = "notification.queue";
     public static final String EMAIL_QUEUE = "email.queue";
     public static final String VIDEO_THUMBNAIL_QUEUE = "video.thumbnail.queue";
-    public static final String POST_CREATED_ROUTING_KEY = "POST.CREATED";
+
+    // --- Dead letter queues ---
+    public static final String NOTIFICATION_DLQ = "notification.dlq";
+    public static final String EMAIL_DLQ = "email.dlq";
+    public static final String VIDEO_THUMBNAIL_DLQ = "video.thumbnail.dlq";
+
+    // --- Routing keys ---
+    public static final String POST_CREATED_ROUTING_KEY = "post.created";
+
+    // --- Consumer identities (used to build idempotency keys) ---
+    public static final String NOTIFICATION_CONSUMER = "notification";
+    public static final String EMAIL_CONSUMER = "email";
+    public static final String VIDEO_THUMBNAIL_CONSUMER = "video-thumbnail";
+
+    public static final int LISTENER_PREFETCH_COUNT = 10;
+    public static final int LISTENER_MAX_RETRIES = 3;
 
     @Bean
-    public TopicExchange exchange() {
+    public TopicExchange postExchange() {
         return new TopicExchange(POST_EXCHANGE);
+    }
+
+    @Bean
+    public DirectExchange deadLetterExchange() {
+        return new DirectExchange(DEAD_LETTER_EXCHANGE);
     }
 
     @Bean
@@ -36,30 +63,61 @@ public class RabbitMQConfig {
     ) {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(messageConverter);
+        // Return unroutable messages to the publisher instead of silently dropping them.
+        template.setMandatory(true);
+        template.setObservationEnabled(true);
+        template.setConfirmCallback((correlation, ack, cause) -> {
+            if (ack) {
+                log.debug("RABBITMQ PUBLISH CONFIRMED id={}",
+                        correlation != null ? correlation.getId() : null);
+            } else {
+                log.error("RABBITMQ PUBLISH NACKED id={} cause={}",
+                        correlation != null ? correlation.getId() : null, cause);
+            }
+        });
+        template.setReturnsCallback(returned -> log.error(
+                "RABBITMQ MESSAGE RETURNED exchange={} routingKey={} replyCode={} replyText={}",
+                returned.getExchange(), returned.getRoutingKey(),
+                returned.getReplyCode(), returned.getReplyText()));
         return template;
     }
 
     // --- Notification ---
     @Bean
     public Queue notificationQueue() {
-        return new Queue(NOTIFICATION_QUEUE);
+        return QueueBuilder.durable(NOTIFICATION_QUEUE)
+                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", NOTIFICATION_DLQ)
+                .build();
     }
 
     @Bean
     public Binding notificationBinding() {
         return BindingBuilder
                 .bind(notificationQueue())
-                .to(exchange())
+                .to(postExchange())
                 .with(POST_CREATED_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue notificationDlq() {
+        return QueueBuilder.durable(NOTIFICATION_DLQ).build();
+    }
+
+    @Bean
+    public Binding notificationDlqBinding() {
+        return BindingBuilder
+                .bind(notificationDlq())
+                .to(deadLetterExchange())
+                .with(NOTIFICATION_DLQ);
     }
 
     // --- Email ---
     @Bean
     public Queue emailQueue() {
-//        return new Queue(EMAIL_QUEUE);
         return QueueBuilder.durable(EMAIL_QUEUE)
-                .withArgument("x-dead-letter-exchange", "dlx.exchange")
-                .withArgument("x-dead-letter-routing-key", "email.dlq")
+                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", EMAIL_DLQ)
                 .build();
     }
 
@@ -67,17 +125,29 @@ public class RabbitMQConfig {
     public Binding emailBinding() {
         return BindingBuilder
                 .bind(emailQueue())
-                .to(exchange())
+                .to(postExchange())
                 .with(POST_CREATED_ROUTING_KEY);
     }
 
+    @Bean
+    public Queue emailDlq() {
+        return QueueBuilder.durable(EMAIL_DLQ).build();
+    }
+
+    @Bean
+    public Binding emailDlqBinding() {
+        return BindingBuilder
+                .bind(emailDlq())
+                .to(deadLetterExchange())
+                .with(EMAIL_DLQ);
+    }
 
     // --- Video Thumbnail ---
     @Bean
     public Queue videoThumbnailQueue() {
         return QueueBuilder.durable(VIDEO_THUMBNAIL_QUEUE)
-                .withArgument("x-dead-letter-exchange", "dlx.exchange")
-                .withArgument("x-dead-letter-routing-key", "video.thumbnail.dlq")
+                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", VIDEO_THUMBNAIL_DLQ)
                 .build();
     }
 
@@ -85,13 +155,13 @@ public class RabbitMQConfig {
     public Binding videoThumbnailBinding() {
         return BindingBuilder
                 .bind(videoThumbnailQueue())
-                .to(exchange())
+                .to(postExchange())
                 .with(POST_CREATED_ROUTING_KEY);
     }
 
     @Bean
     public Queue videoThumbnailDlq() {
-        return new Queue("video.thumbnail.dlq");
+        return QueueBuilder.durable(VIDEO_THUMBNAIL_DLQ).build();
     }
 
     @Bean
@@ -99,26 +169,7 @@ public class RabbitMQConfig {
         return BindingBuilder
                 .bind(videoThumbnailDlq())
                 .to(deadLetterExchange())
-                .with("video.thumbnail.dlq");
-    }
-
-    // --- Dead Letter ---
-    @Bean
-    public DirectExchange deadLetterExchange() {
-        return new DirectExchange("dlx.exchange");
-    }
-
-    @Bean
-    public Queue emailDlq() {
-        return new Queue("email.dlq");
-    }
-
-    @Bean
-    public Binding dlqBinding() {
-        return BindingBuilder
-                .bind(emailDlq())
-                .to(deadLetterExchange())
-                .with("email.dlq");
+                .with(VIDEO_THUMBNAIL_DLQ);
     }
 
     @Bean
@@ -128,9 +179,12 @@ public class RabbitMQConfig {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(messageConverter());
+        factory.setPrefetchCount(LISTENER_PREFETCH_COUNT);
+        // Propagate the trace context from the publisher into the consumer span.
+        factory.setObservationEnabled(true);
         factory.setAdviceChain(
                 RetryInterceptorBuilder.stateless()
-                        .maxRetries(3)
+                        .maxRetries(LISTENER_MAX_RETRIES)
                         .backOffOptions(1000, 2.0, 5000)
                         .recoverer(new RejectAndDontRequeueRecoverer())
                         .build()

@@ -2,8 +2,10 @@ package com.rizkysiregar.feedzmore.messaging.consumer;
 
 import com.rizkysiregar.feedzmore.constant.Constants;
 import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
+import com.rizkysiregar.feedzmore.messaging.idempotency.EventDeduplicator;
 import com.rizkysiregar.feedzmore.repository.FollowRepository;
 import com.rizkysiregar.feedzmore.service.firebase.FirebaseNotificationService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -18,8 +20,10 @@ import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -32,9 +36,16 @@ class NotificationConsumerTest {
     private FirebaseNotificationService notificationService;
     @Mock
     private FollowRepository followRepository;
+    @Mock
+    private EventDeduplicator deduplicator;
 
     @InjectMocks
     private NotificationConsumer consumer;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(deduplicator.tryReserve(anyString(), anyString())).thenReturn(true);
+    }
 
     @Test
     void sendsOnlyToActiveFollowersAcrossKeysetPages() {
@@ -121,5 +132,28 @@ class NotificationConsumerTest {
         consumer.handlePostCreated(PostCreatedEvent.builder().postId(UUID.randomUUID()).build());
 
         verifyNoInteractions(followRepository, notificationService);
+    }
+
+    @Test
+    void skipsFollowerThatWasAlreadyNotifiedOnRedelivery() {
+        UUID authorId = UUID.randomUUID();
+        UUID alreadyNotified = UUID.randomUUID();
+        UUID pending = UUID.randomUUID();
+        PostCreatedEvent event = PostCreatedEvent.builder()
+                .postId(UUID.randomUUID())
+                .authorId(authorId)
+                .username("author")
+                .build();
+        when(followRepository.findActiveFollowerIdsByFollowedId(authorId, PageRequest.of(0, 500)))
+                .thenReturn(List.of(alreadyNotified, pending));
+        when(deduplicator.tryReserve(anyString(), anyString())).thenReturn(false, true);
+
+        consumer.handlePostCreated(event);
+
+        String body = String.format(Constants.NOTIFICATION_NEW_FEED_BODY, "author");
+        verify(notificationService, org.mockito.Mockito.never())
+                .sendNotificationWithUserId(alreadyNotified, Constants.NOTIFICATION_NEW_FEED_TITLE, body);
+        verify(notificationService)
+                .sendNotificationWithUserId(pending, Constants.NOTIFICATION_NEW_FEED_TITLE, body);
     }
 }

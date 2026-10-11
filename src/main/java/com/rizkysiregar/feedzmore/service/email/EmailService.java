@@ -52,6 +52,7 @@ public class EmailService implements IEmailService {
             mailSender.send(message);
         } catch (Exception e) {
             log.error("FAILED SEND EMAIL: {} ", e.getMessage());
+            throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

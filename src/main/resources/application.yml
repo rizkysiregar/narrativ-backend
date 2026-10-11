@@ -32,6 +32,8 @@ app:
     post-create: ${APP_RATE_LIMIT_POST_CREATE}
     interaction: ${APP_RATE_LIMIT_INTERACTION}
     default: ${APP_RATE_LIMIT_DEFAULT}
+  messaging:
+    idempotency-ttl-seconds: ${APP_MESSAGING_IDEMPOTENCY_TTL_SECONDS:86400}
 
 
 logging:

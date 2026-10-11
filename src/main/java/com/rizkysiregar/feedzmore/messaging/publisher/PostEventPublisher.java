@@ -4,9 +4,12 @@ import com.rizkysiregar.feedzmore.config.RabbitMQConfig;
 import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -16,20 +19,32 @@ public class PostEventPublisher {
 
     /**
      * Published asynchronously so a slow/unreachable broker never blocks the
-     * HTTP request that creates the post. Publish failures are logged instead of
-     * propagating to the caller.
+     * HTTP request that creates the post. The correlation id lets the global
+     * publisher-confirm callback report whether the broker accepted the message;
+     * unroutable messages are reported by the returns callback. Publish failures
+     * are logged instead of propagating to the caller.
      */
     @Async("postEventExecutor")
     public void publishPostCreatedEvent(PostCreatedEvent event) {
-        log.info("PUBLISHING EVENT {} ", event);
+        String eventId = resolveEventId(event);
+        CorrelationData correlationData = new CorrelationData(eventId);
+        log.info("PUBLISHING EVENT id={} {}", eventId, event);
         try {
             rabbitTemplate.convertAndSend(
                     RabbitMQConfig.POST_EXCHANGE,
                     RabbitMQConfig.POST_CREATED_ROUTING_KEY,
-                    event
+                    event,
+                    correlationData
             );
         } catch (Exception e) {
-            log.error("Failed to publish PostCreatedEvent for post {}: {}", event.getPostId(), e.getMessage());
+            log.error("Failed to publish PostCreatedEvent id={} postId={}: {}",
+                    eventId, event.getPostId(), e.getMessage());
         }
+    }
+
+    private String resolveEventId(PostCreatedEvent event) {
+        return event.getPostId() != null
+                ? event.getPostId().toString()
+                : UUID.randomUUID().toString();
     }
 }

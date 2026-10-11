@@ -2,6 +2,7 @@ package com.rizkysiregar.feedzmore.messaging.consumer;
 
 import com.rizkysiregar.feedzmore.config.RabbitMQConfig;
 import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
+import com.rizkysiregar.feedzmore.messaging.idempotency.EventDeduplicator;
 import com.rizkysiregar.feedzmore.model.dto.ImageObject;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.enums.MediaType;
@@ -28,6 +29,7 @@ public class VideoThumbnailConsumer {
     private final FileStorageService fileStorageService;
     private final VideoProcessingService videoProcessingService;
     private final PostCrudRepository postCrudRepository;
+    private final EventDeduplicator deduplicator;
 
     @Value("${minio.bucket}")
     private String bucketName;
@@ -35,6 +37,12 @@ public class VideoThumbnailConsumer {
     @RabbitListener(queues = RabbitMQConfig.VIDEO_THUMBNAIL_QUEUE)
     public void handlePostCreated(PostCreatedEvent event) {
         if (event.getMediaType() != MediaType.VIDEO) {
+            return;
+        }
+        String eventKey = event.getPostId() != null ? event.getPostId().toString() : null;
+        if (eventKey != null
+                && !deduplicator.tryReserve(RabbitMQConfig.VIDEO_THUMBNAIL_CONSUMER, eventKey)) {
+            log.info("THUMBNAIL SKIPPED (already processed) postId={}", event.getPostId());
             return;
         }
         log.info("GENERATING THUMBNAIL for postId={}", event.getPostId());
@@ -63,6 +71,9 @@ public class VideoThumbnailConsumer {
             }
         } catch (Exception e) {
             log.error("THUMBNAIL FAILED for postId={}: {}", event.getPostId(), e.getMessage());
+            if (eventKey != null) {
+                deduplicator.release(RabbitMQConfig.VIDEO_THUMBNAIL_CONSUMER, eventKey);
+            }
             throw new RuntimeException(e);
         } finally {
             try {

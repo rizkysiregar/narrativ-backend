@@ -41,6 +41,14 @@ public class RedisUtil implements CommandLineRunner {
         return redisTemplate.opsForValue().get(key);
     }
 
+    // Set value only if the key does not exist yet (atomic SETNX + TTL).
+    // Returns true when this caller created the key.
+    public boolean setIfAbsent(String key, Object value, long timeoutSeconds) {
+        Boolean created = redisTemplate.opsForValue()
+                .setIfAbsent(key, value, Duration.ofSeconds(timeoutSeconds));
+        return Boolean.TRUE.equals(created);
+    }
+
     // Delete key
     public void delete(String key) {
         redisTemplate.delete(key);

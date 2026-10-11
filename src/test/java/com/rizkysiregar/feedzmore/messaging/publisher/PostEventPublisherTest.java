@@ -1,0 +1,63 @@
+package com.rizkysiregar.feedzmore.messaging.publisher;
+
+import com.rizkysiregar.feedzmore.config.RabbitMQConfig;
+import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+
+@ExtendWith(MockitoExtension.class)
+class PostEventPublisherTest {
+
+    @Mock
+    private RabbitTemplate rabbitTemplate;
+
+    @InjectMocks
+    private PostEventPublisher publisher;
+
+    @Test
+    void publishesWithRoutingKeyAndCorrelationId() {
+        UUID postId = UUID.randomUUID();
+        PostCreatedEvent event = PostCreatedEvent.builder().postId(postId).build();
+
+        publisher.publishPostCreatedEvent(event);
+
+        ArgumentCaptor<CorrelationData> correlation = ArgumentCaptor.forClass(CorrelationData.class);
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.POST_EXCHANGE),
+                eq(RabbitMQConfig.POST_CREATED_ROUTING_KEY),
+                eq(event),
+                correlation.capture());
+        assertEquals(postId.toString(), correlation.getValue().getId());
+    }
+
+    @Test
+    void doesNotPropagatePublishFailure() {
+        UUID postId = UUID.randomUUID();
+        PostCreatedEvent event = PostCreatedEvent.builder().postId(postId).build();
+        org.mockito.Mockito.doThrow(new RuntimeException("broker down"))
+                .when(rabbitTemplate).convertAndSend(anyString(), anyString(), any(Object.class),
+                        any(CorrelationData.class));
+
+        publisher.publishPostCreatedEvent(event);
+
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.POST_EXCHANGE),
+                eq(RabbitMQConfig.POST_CREATED_ROUTING_KEY),
+                eq(event),
+                any(CorrelationData.class));
+    }
+}

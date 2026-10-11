@@ -34,6 +34,12 @@ spring:
     username: ${RABBITMQ_USERNAME}
     password: ${RABBITMQ_FEEDZMORE_PASSWORD}
     virtual-host: ${RABBITMQ_VIRTUAL_HOST}
+    connection-timeout: 5s
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      retry:
+        enabled: false
   mail:
     host: ${MAIL_HOST}
     port: ${MAIL_PORT}
