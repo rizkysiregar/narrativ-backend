@@ -426,11 +426,6 @@ public class PostServiceTest {
 
         when(userRepository.findByIdAndIsDeletedFalse(userId))
                 .thenReturn(Optional.of(user));
-        when(fileStorageService.statObject(objectKey))
-                .thenReturn(ObjectStat.builder()
-                        .size(1024L)
-                        .contentType("application/octet-stream")
-                        .build());
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () ->

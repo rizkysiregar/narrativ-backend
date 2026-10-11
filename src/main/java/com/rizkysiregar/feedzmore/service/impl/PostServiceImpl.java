@@ -217,8 +217,21 @@ public class PostServiceImpl implements PostService {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
+        ObjectStat objectStat = null;
         try {
-            ObjectStat objectStat = fileStorageService.statObject(objectKey);
+            objectStat = fileStorageService.statObject(objectKey);
+        } catch (BusinessException e) {
+            if (HttpStatus.NOT_FOUND.equals(e.getHttpStatus())) {
+                throw e;
+            }
+            log.warn(":: POST.STAT.SKIPPED: objectKey={} reason={}", objectKey, e.getMessage());
+        } catch (Exception e) {
+            log.warn(":: POST.STAT.SKIPPED: objectKey={} reason={}", objectKey, e.getMessage());
+        }
+
+        // Size validation is a hard business rule and must never be swallowed by
+        // the best-effort stat handling above.
+        if (objectStat != null) {
             long size = objectStat.getSize();
             if (mediaType == MediaType.IMAGE && size > MAX_IMAGE_SIZE) {
                 log.error("Image too large: {} bytes", size);
@@ -228,11 +241,6 @@ public class PostServiceImpl implements PostService {
                 log.error("Video too large: {} bytes", size);
                 throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
             }
-        } catch (BusinessException e) {
-            if (HttpStatus.NOT_FOUND.equals(e.getHttpStatus())) {
-                throw e;
-            }
-            log.warn(":: POST.STAT.SKIPPED: objectKey={} reason={}", objectKey, e.getMessage());
         }
 
         Map<String, Object> emailProps = new HashMap<>();
