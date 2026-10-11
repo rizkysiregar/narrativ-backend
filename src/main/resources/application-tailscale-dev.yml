@@ -66,9 +66,10 @@ otp:
   retry-time-in-seconds: ${OTP_RETRY_TIME_IN_SECONDS}
 
 management:
-  zipkin:
-    tracing:
-      endpoint: http://${TAILSCALE_DEV_HOST}:${ZIPKIN_PORT}/api/v2/spans
+  tracing:
+    export:
+      zipkin:
+        endpoint: http://${TAILSCALE_DEV_HOST}:${ZIPKIN_PORT}/api/v2/spans
 
 minio:
   endpoint: ${MINIO_ENDPOINT}

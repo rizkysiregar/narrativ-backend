@@ -4,6 +4,7 @@ import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -26,7 +27,7 @@ public class RateLimiterService {
 
     private final ProxyManager<String> proxyManager;
 
-    public RateLimiterService(ProxyManager<String> proxyManager) {
+    public RateLimiterService(@Lazy ProxyManager<String> proxyManager) {
         this.proxyManager = proxyManager;
     }
 
