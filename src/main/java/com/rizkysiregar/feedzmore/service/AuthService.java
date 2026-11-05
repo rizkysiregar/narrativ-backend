@@ -36,6 +36,9 @@ import java.util.UUID;
 @Slf4j
 public class AuthService {
 
+    private static final String REFRESH_TOKEN_PREFIX = "refresh_token:";
+    private static final long REFRESH_TOKEN_TTL_SECONDS = 60L * 60 * 24 * 30; // 30 days
+
     final UserRepository userRepository;
     final AuthenticationManager authManager;
     final JWTService jwtService;
@@ -117,6 +120,7 @@ public class AuthService {
 
         return LoginResponse.builder()
                 .token(token)
+                .refreshToken(issueRefreshToken(userEntity.get().getId()))
                 .username(userEntity.get().getUsername())
                 .userId(userEntity.get().getId().toString())
                 .role(userEntity.get().getRole())
@@ -156,9 +160,45 @@ public class AuthService {
         String token = jwtService.generateToken(user.getUsername(), user.getId(), user.getRole());
         return LoginResponse.builder()
                 .token(token)
+                .refreshToken(issueRefreshToken(user.getId()))
                 .username(user.getUsername())
                 .userId(user.getId().toString())
+                .role(user.getRole())
                 .build();
+    }
+
+    public LoginResponse refreshToken(String refreshToken) {
+        String key = REFRESH_TOKEN_PREFIX.concat(refreshToken);
+        Object storedUserId = redisUtil.get(key);
+
+        if (storedUserId == null) {
+            throw new BusinessException(GlobalMessage.UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
+        }
+
+        // rotation: a refresh token can only be used once
+        redisUtil.delete(key);
+
+        UserEntity user;
+        try {
+            user = userRepository.findByIdAndIsDeletedFalse(UUID.fromString(storedUserId.toString()))
+                    .orElseThrow(() -> new BusinessException(GlobalMessage.UNAUTHORIZED, HttpStatus.UNAUTHORIZED));
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(GlobalMessage.UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
+        }
+
+        return LoginResponse.builder()
+                .token(jwtService.generateToken(user.getUsername(), user.getId(), user.getRole()))
+                .refreshToken(issueRefreshToken(user.getId()))
+                .username(user.getUsername())
+                .userId(user.getId().toString())
+                .role(user.getRole())
+                .build();
+    }
+
+    private String issueRefreshToken(UUID userId) {
+        String refreshToken = UUID.randomUUID().toString();
+        redisUtil.set(REFRESH_TOKEN_PREFIX.concat(refreshToken), userId.toString(), REFRESH_TOKEN_TTL_SECONDS);
+        return refreshToken;
     }
 
     private UserEntity createGoogleUser(GoogleUserInfo googleUser) {
