@@ -8,6 +8,7 @@ public class Constants {
             "/auth/admin/login",
             "/auth/login",
             "/auth/google",
+            "/auth/refresh",
             "/auth/forgot-password",
             "/auth/verify-otp",
             "/auth/reset-password",

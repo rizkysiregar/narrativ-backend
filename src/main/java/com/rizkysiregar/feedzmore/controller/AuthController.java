@@ -65,6 +65,12 @@ public class AuthController {
         return authService.googleLogin(request);
     }
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "Refresh access token", description = "Exchange a valid refresh token for a new access token and a new (rotated) refresh token")
+    @PostMapping("auth/refresh")
+    public LoginResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return authService.refreshToken(request.getRefreshToken());
+    }
+
     @io.swagger.v3.oas.annotations.Operation(summary = "User validation and OTP Request", description = "Use this for sending otp into user registered email")
     @PostMapping("auth/forgot-password")
     public SentOtpDTO forgotPassword(@RequestBody @Valid ForgotPasswordRequest request) {

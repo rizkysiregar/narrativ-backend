@@ -19,6 +19,8 @@ import java.util.function.Function;
 @Service
 @Slf4j
 public class JWTService {
+    public static final long ACCESS_TOKEN_TTL_MS = 1000L * 60 * 15;
+
     @Value("${secret.key}")
     private String secretKey;
 
@@ -44,7 +46,7 @@ public class JWTService {
                 .add(claims)
                 .subject(username)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24)) // 24 Hours expiry
+                .expiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_TTL_MS)) // 15 minutes expiry
                 .and()
                 .signWith(getKey())
                 .compact();
@@ -81,8 +83,7 @@ public class JWTService {
 
     public boolean validateToken(String token, UserDetails userDetails) {
         final String userName = extractUsername(token);
-        //return (userName.equals(userDetails.getUsername()) && !isTokenExpired(token));
-        return (userName.equals(userDetails.getUsername())); // exclude the token expiration validation
+        return userName.equals(userDetails.getUsername()) && !isTokenExpired(token);
     }
 
     private boolean isTokenExpired(String token) {

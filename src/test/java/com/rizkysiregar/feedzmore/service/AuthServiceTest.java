@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.junit.jupiter.api.Assertions.*;
@@ -374,6 +375,46 @@ public class AuthServiceTest {
         assertEquals("newuser", result.getUsername());
         verify(userRepository).save(any(UserEntity.class));
         verify(userSearchService).indexUser(any(UserEntity.class));
+    }
+
+    @Test
+    void testRefreshToken_Success_RotatesToken() {
+        UUID userId = UUID.randomUUID();
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setUsername("testuser");
+        user.setRole(Role.USER);
+
+        when(redisUtil.get("refresh_token:old-token")).thenReturn(userId.toString());
+        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.of(user));
+        when(jwtService.generateToken("testuser", userId, Role.USER)).thenReturn("newAccess");
+
+        LoginResponse result = authService.refreshToken("old-token");
+
+        assertEquals("newAccess", result.getToken());
+        assertNotNull(result.getRefreshToken());
+        assertNotEquals("old-token", result.getRefreshToken());
+        assertEquals(userId.toString(), result.getUserId());
+        verify(redisUtil).delete("refresh_token:old-token");
+        verify(redisUtil).set(eq("refresh_token:" + result.getRefreshToken()), eq(userId.toString()), anyLong());
+    }
+
+    @Test
+    void testRefreshToken_InvalidToken() {
+        when(redisUtil.get("refresh_token:bad")).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> authService.refreshToken("bad"));
+        verify(jwtService, never()).generateToken(any(), any(), any());
+    }
+
+    @Test
+    void testRefreshToken_UserDeleted() {
+        UUID userId = UUID.randomUUID();
+        when(redisUtil.get("refresh_token:tok")).thenReturn(userId.toString());
+        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.empty());
+
+        assertThrows(BusinessException.class, () -> authService.refreshToken("tok"));
+        verify(redisUtil).delete("refresh_token:tok");
     }
 
 }
