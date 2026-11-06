@@ -28,8 +28,7 @@ Create the following credentials in **Manage Jenkins → Credentials → System 
 
 | Credential ID | Type | Value and required access |
 | --- | --- | --- |
-| `dockerhub` | Username with password | Docker Hub username and a Docker Hub access token with permission to push `rizkysiregar/feedzmore-service`. |
-| `github-all-repo-pat` | Username with password | GitHub username and PAT. It needs repository contents read/write for `homelabs-gitops`; it also needs read access to `feedzmore-backend` if Jenkins checks out the source through HTTPS. |
+| `github-all-repo-pat` | Username with password | GitHub username and PAT. It needs repository contents read/write for `homelabs-gitops`, and (classic PAT) the `write:packages` scope to push `ghcr.io/rizkysiregar/feedzmore-service`; it also needs read access to `feedzmore-backend` if Jenkins checks out the source through HTTPS. |
 
 Do not place either token in a Jenkinsfile, `.env`, GitOps manifest, or shell command history. The existing SonarQube token that was previously present in the README should be revoked and regenerated before it is used again.
 
@@ -60,7 +59,7 @@ For a commit on `master`, the Jenkinsfile performs this sequence:
 1. Checks out the exact backend commit and derives a 12-character Git SHA, for example `a1b2c3d4e5f6`.
 2. Runs `mvn clean test` in a Java 25 Maven container. A failed test stops the release.
 3. Packages `target/*.jar`.
-4. Builds and pushes `rizkysiregar/feedzmore-service:a1b2c3d4e5f6` to Docker Hub.
+4. Builds and pushes `ghcr.io/rizkysiregar/feedzmore-service:a1b2c3d4e5f6` to GitHub Container Registry.
 5. Clones `homelabs-gitops/main`.
 6. Updates only the matching `images[].newTag` value in `apps/feedzmore/kustomization.yaml` using `yq`.
 7. Commits `deploy(feedzmore): a1b2c3d4e5f6` and pushes it to `main`.

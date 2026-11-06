@@ -138,7 +138,7 @@ Complete these before creating the Argo CD application:
    A `404` response before the Feedzmore Ingress exists is acceptable; it proves the controller is reachable.
 
 3. Confirm the worker node can reach `192.168.1.50` on all dependency ports: PostgreSQL `5433`, Redis `6379`, RabbitMQ `5672`, Elasticsearch `9200`, and Zipkin `9411`.
-4. Ensure the Docker Hub repository `rizkysiregar/feedzmore-service` is available to the cluster. If it becomes private, create an `imagePullSecret` and reference it in the Deployment.
+4. Ensure the GHCR package `ghcr.io/rizkysiregar/feedzmore-service` is available to the cluster. If it becomes private, create an `imagePullSecret` and reference it in the Deployment.
 5. Store Docker Hub and GitHub PAT credentials in Jenkins, following the existing portfolio convention.
 6. Revoke any token that has been committed in documentation or source history, and store replacement credentials only in Jenkins or the private environment file.
 
@@ -270,7 +270,7 @@ metadata:
 The Deployment must:
 
 - Have one replica.
-- Use image `rizkysiregar/feedzmore-service:<immutable-git-sha>`.
+- Use image `ghcr.io/rizkysiregar/feedzmore-service:<immutable-git-sha>`.
 - Use `containerPort: 9091`.
 - Load `feedzmore-config` and `feedzmore-secrets` with `envFrom`.
 - Define startup, readiness, and liveness probes at `/api/v1/actuator/health/...` on port `9091`.
@@ -315,7 +315,7 @@ resources:
   - service.yaml
   - ingress.yaml
 images:
-  - name: rizkysiregar/feedzmore-service
+  - name: ghcr.io/rizkysiregar/feedzmore-service
     newTag: initial-placeholder
 ```
 
@@ -388,7 +388,7 @@ Required stages:
 1. Checkout `feedzmore-backend` branch `master`.
 2. Run `mvn clean test` using the Java version declared by `pom.xml`.
 3. Run `mvn package` to produce `target/*.jar`.
-4. Build image `rizkysiregar/feedzmore-service:<short-git-sha>`.
+4. Build image `ghcr.io/rizkysiregar/feedzmore-service:<short-git-sha>`.
 5. Push the immutable SHA image tag to Docker Hub. Updating `latest` is optional and must not be used by GitOps.
 6. Clone `homelabs-gitops` branch `main` using the existing GitHub PAT credential.
 7. Update only the matching `images[].newTag` value in `apps/feedzmore/kustomization.yaml` with `yq`.
@@ -743,7 +743,7 @@ The public health endpoint must return HTTP `200`. A response from portfolio ins
 Configure the Feedzmore Jenkins job to run the included Jenkinsfile. It will:
 
 1. Build and test Java code.
-2. Build and push `rizkysiregar/feedzmore-service:<commit-sha>`.
+2. Build and push `ghcr.io/rizkysiregar/feedzmore-service:<commit-sha>`.
 3. Clone `homelabs-gitops` branch `main`.
 4. Change only `apps/feedzmore/kustomization.yaml` image `newTag`.
 5. Commit and push the GitOps change.
