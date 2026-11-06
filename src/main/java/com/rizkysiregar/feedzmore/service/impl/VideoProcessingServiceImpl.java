@@ -7,8 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
@@ -16,27 +14,6 @@ import java.util.concurrent.TimeUnit;
 @Service
 @Slf4j
 public class VideoProcessingServiceImpl implements VideoProcessingService {
-
-    @Override
-    public double getDurationSeconds(Path videoPath) {
-        try {
-            Process process = new ProcessBuilder(
-                    "ffprobe", "-v", "error",
-                    "-show_entries", "format=duration",
-                    "-of", "default=noprint_wrappers=1:nokey=1",
-                    videoPath.toAbsolutePath().toString()
-            ).redirectErrorStream(true).start();
-
-            String output = new BufferedReader(new InputStreamReader(process.getInputStream()))
-                    .lines().reduce("", (a, b) -> a + b);
-            process.waitFor(30, TimeUnit.SECONDS);
-
-            return Double.parseDouble(output.trim());
-        } catch (Exception e) {
-            log.error(":: FFPROBE FAILED for {}: {}", videoPath, e.getMessage());
-            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-        }
-    }
 
     @Override
     public Path extractThumbnail(Path videoPath, Path outputPath) {

@@ -5,6 +5,7 @@ import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.constant.ObjectStorageTypeGroup;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
+import com.rizkysiregar.feedzmore.messaging.event.VideoThumbnailRequestedEvent;
 import com.rizkysiregar.feedzmore.messaging.publisher.PostEventPublisher;
 import com.rizkysiregar.feedzmore.model.dto.PostCountDTO;
 import com.rizkysiregar.feedzmore.model.dto.ObjectStat;
@@ -23,6 +24,7 @@ import com.rizkysiregar.feedzmore.service.PostService;
 import com.rizkysiregar.feedzmore.util.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -52,6 +54,9 @@ public class PostServiceImpl implements PostService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final PostEventPublisher postEventPublisher;
+
+    @Value("${app.thumbnail.worker-enabled:false}")
+    private boolean thumbnailWorkerEnabled;
 
     private static final long MAX_IMAGE_SIZE = 5L * 1024 * 1024;
     private static final long MAX_VIDEO_SIZE = 50L * 1024 * 1024;
@@ -274,6 +279,12 @@ public class PostServiceImpl implements PostService {
         // broadcast post created event, currently the consumer are: notification and email
         postEventPublisher.publishPostCreatedEvent(event);
 
+        // The post is saved with a null thumbnail. When the media worker is enabled it
+        // generates one asynchronously and reports back via VideoThumbnailResultConsumer.
+        if (thumbnailWorkerEnabled && postEntity.getMediaType() == MediaType.VIDEO) {
+            postEventPublisher.publishVideoThumbnailRequested(
+                    VideoThumbnailRequestedEvent.of(postEntity.getId(), postEntity.getMediaUrl()));
+        }
 
         return CreatePostResponse.builder()
                 .status(GlobalMessage.CREATED.getMessage())
