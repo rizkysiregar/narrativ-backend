@@ -2,6 +2,7 @@ package com.rizkysiregar.feedzmore.messaging.publisher;
 
 import com.rizkysiregar.feedzmore.config.RabbitMQConfig;
 import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
+import com.rizkysiregar.feedzmore.messaging.event.VideoThumbnailRequestedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -59,5 +60,21 @@ class PostEventPublisherTest {
                 eq(RabbitMQConfig.POST_CREATED_ROUTING_KEY),
                 eq(event),
                 any(CorrelationData.class));
+    }
+
+    @Test
+    void publishesThumbnailRequestWithItsOwnRoutingKey() {
+        UUID postId = UUID.randomUUID();
+        VideoThumbnailRequestedEvent event =
+                VideoThumbnailRequestedEvent.of(postId, "user/POST_FEED/video.mp4");
+
+        publisher.publishVideoThumbnailRequested(event);
+
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.POST_EXCHANGE),
+                eq(RabbitMQConfig.VIDEO_THUMBNAIL_REQUESTED_ROUTING_KEY),
+                eq(event),
+                any(CorrelationData.class));
+        assertEquals("user/POST_FEED/video_thumb.jpg", event.getThumbnailObjectKey());
     }
 }

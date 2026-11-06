@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.FileInputStream;
@@ -21,7 +22,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
+/**
+ * Legacy in-process thumbnail generation (needs ffmpeg in this image). Disabled once
+ * {@code app.thumbnail.worker-enabled=true}, when the media worker takes over.
+ */
 @Component
+@ConditionalOnProperty(name = "app.thumbnail.worker-enabled", havingValue = "false", matchIfMissing = true)
 @Slf4j
 @RequiredArgsConstructor
 public class VideoThumbnailConsumer {

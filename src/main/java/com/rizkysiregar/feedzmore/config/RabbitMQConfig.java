@@ -24,14 +24,20 @@ public class RabbitMQConfig {
     public static final String NOTIFICATION_QUEUE = "notification.queue";
     public static final String EMAIL_QUEUE = "email.queue";
     public static final String VIDEO_THUMBNAIL_QUEUE = "video.thumbnail.queue";
+    public static final String VIDEO_THUMBNAIL_REQUEST_QUEUE = "video.thumbnail.request.queue";
+    public static final String VIDEO_THUMBNAIL_RESULT_QUEUE = "video.thumbnail.result.queue";
 
     // --- Dead letter queues ---
     public static final String NOTIFICATION_DLQ = "notification.dlq";
     public static final String EMAIL_DLQ = "email.dlq";
     public static final String VIDEO_THUMBNAIL_DLQ = "video.thumbnail.dlq";
+    public static final String VIDEO_THUMBNAIL_REQUEST_DLQ = "video.thumbnail.request.dlq";
+    public static final String VIDEO_THUMBNAIL_RESULT_DLQ = "video.thumbnail.result.dlq";
 
     // --- Routing keys ---
     public static final String POST_CREATED_ROUTING_KEY = "post.created";
+    public static final String VIDEO_THUMBNAIL_REQUESTED_ROUTING_KEY = "video.thumbnail.requested";
+    public static final String VIDEO_THUMBNAIL_GENERATED_ROUTING_KEY = "video.thumbnail.generated";
 
     // --- Consumer identities (used to build idempotency keys) ---
     public static final String NOTIFICATION_CONSUMER = "notification";
@@ -170,6 +176,67 @@ public class RabbitMQConfig {
                 .bind(videoThumbnailDlq())
                 .to(deadLetterExchange())
                 .with(VIDEO_THUMBNAIL_DLQ);
+    }
+
+    // --- Video Thumbnail (media worker) ---
+    // The worker consumes the request queue and publishes to POST_EXCHANGE with the
+    // generated routing key. Topology is declared here only; the worker never declares it.
+    @Bean
+    public Queue videoThumbnailRequestQueue() {
+        return QueueBuilder.durable(VIDEO_THUMBNAIL_REQUEST_QUEUE)
+                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", VIDEO_THUMBNAIL_REQUEST_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Binding videoThumbnailRequestBinding() {
+        return BindingBuilder
+                .bind(videoThumbnailRequestQueue())
+                .to(postExchange())
+                .with(VIDEO_THUMBNAIL_REQUESTED_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue videoThumbnailRequestDlq() {
+        return QueueBuilder.durable(VIDEO_THUMBNAIL_REQUEST_DLQ).build();
+    }
+
+    @Bean
+    public Binding videoThumbnailRequestDlqBinding() {
+        return BindingBuilder
+                .bind(videoThumbnailRequestDlq())
+                .to(deadLetterExchange())
+                .with(VIDEO_THUMBNAIL_REQUEST_DLQ);
+    }
+
+    @Bean
+    public Queue videoThumbnailResultQueue() {
+        return QueueBuilder.durable(VIDEO_THUMBNAIL_RESULT_QUEUE)
+                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", VIDEO_THUMBNAIL_RESULT_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Binding videoThumbnailResultBinding() {
+        return BindingBuilder
+                .bind(videoThumbnailResultQueue())
+                .to(postExchange())
+                .with(VIDEO_THUMBNAIL_GENERATED_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue videoThumbnailResultDlq() {
+        return QueueBuilder.durable(VIDEO_THUMBNAIL_RESULT_DLQ).build();
+    }
+
+    @Bean
+    public Binding videoThumbnailResultDlqBinding() {
+        return BindingBuilder
+                .bind(videoThumbnailResultDlq())
+                .to(deadLetterExchange())
+                .with(VIDEO_THUMBNAIL_RESULT_DLQ);
     }
 
     @Bean

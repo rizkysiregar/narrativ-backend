@@ -4,6 +4,8 @@ package com.rizkysiregar.feedzmore.service;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
+import com.rizkysiregar.feedzmore.messaging.event.VideoThumbnailRequestedEvent;
+import com.rizkysiregar.feedzmore.model.enums.MediaType;
 import com.rizkysiregar.feedzmore.messaging.publisher.PostEventPublisher;
 import com.rizkysiregar.feedzmore.model.dto.ObjectStat;
 import com.rizkysiregar.feedzmore.model.response.CreatePostResponse;
@@ -240,6 +242,54 @@ public class PostServiceTest {
         ArgumentCaptor<PostCreatedEvent> event = ArgumentCaptor.forClass(PostCreatedEvent.class);
         verify(postEventPublisher).publishPostCreatedEvent(event.capture());
         assertEquals(userId, event.getValue().getAuthorId());
+    }
+
+    @Test
+    void addNewPost_requestsThumbnailFromWorkerForVideo() {
+        org.springframework.test.util.ReflectionTestUtils.setField(postService, "thumbnailWorkerEnabled", true);
+        UUID userId = UUID.randomUUID();
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setUsername("testuser");
+        String objectKey = "testuser/POST_FEED/clip.mp4";
+        AddPostRequest request = new AddPostRequest();
+        request.setObjectKey(objectKey);
+        request.setCaption("clip");
+        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.of(user));
+        when(fileStorageService.statObject(objectKey))
+                .thenReturn(ObjectStat.builder().size(1024L).contentType("video/mp4").build());
+        PostEntity saved = PostEntity.builder().id(UUID.randomUUID()).caption("clip").mediaUrl(objectKey)
+                .mediaType(MediaType.VIDEO).user(user).createdAt(LocalDateTime.now()).build();
+        when(postCrudRepository.save(any(PostEntity.class))).thenReturn(saved);
+
+        postService.addNewPost(userId, request);
+
+        ArgumentCaptor<VideoThumbnailRequestedEvent> requested =
+                ArgumentCaptor.forClass(VideoThumbnailRequestedEvent.class);
+        verify(postEventPublisher).publishVideoThumbnailRequested(requested.capture());
+        assertEquals(saved.getId(), requested.getValue().getPostId());
+        assertEquals("testuser/POST_FEED/clip_thumb.jpg", requested.getValue().getThumbnailObjectKey());
+    }
+
+    @Test
+    void addNewPost_doesNotRequestThumbnailWhenWorkerDisabled() {
+        UUID userId = UUID.randomUUID();
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setUsername("testuser");
+        String objectKey = "testuser/POST_FEED/clip.mp4";
+        AddPostRequest request = new AddPostRequest();
+        request.setObjectKey(objectKey);
+        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.of(user));
+        when(fileStorageService.statObject(objectKey))
+                .thenReturn(ObjectStat.builder().size(1024L).contentType("video/mp4").build());
+        when(postCrudRepository.save(any(PostEntity.class))).thenReturn(PostEntity.builder()
+                .id(UUID.randomUUID()).mediaUrl(objectKey).mediaType(MediaType.VIDEO)
+                .user(user).createdAt(LocalDateTime.now()).build());
+
+        postService.addNewPost(userId, request);
+
+        verify(postEventPublisher, never()).publishVideoThumbnailRequested(any());
     }
 
     @Test

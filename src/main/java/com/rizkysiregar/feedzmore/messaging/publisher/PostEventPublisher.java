@@ -2,6 +2,7 @@ package com.rizkysiregar.feedzmore.messaging.publisher;
 
 import com.rizkysiregar.feedzmore.config.RabbitMQConfig;
 import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
+import com.rizkysiregar.feedzmore.messaging.event.VideoThumbnailRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
@@ -38,6 +39,31 @@ public class PostEventPublisher {
             );
         } catch (Exception e) {
             log.error("Failed to publish PostCreatedEvent id={} postId={}: {}",
+                    eventId, event.getPostId(), e.getMessage());
+        }
+    }
+
+    /**
+     * Asks the media worker to generate a video thumbnail. Same fire-and-forget
+     * semantics as {@link #publishPostCreatedEvent}: the post already exists with a
+     * null thumbnail and is updated when the worker's result event arrives.
+     */
+    @Async("postEventExecutor")
+    public void publishVideoThumbnailRequested(VideoThumbnailRequestedEvent event) {
+        String eventId = event.getPostId() != null
+                ? event.getPostId().toString()
+                : UUID.randomUUID().toString();
+        CorrelationData correlationData = new CorrelationData(eventId);
+        log.info("PUBLISHING EVENT id={} {}", eventId, event);
+        try {
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.POST_EXCHANGE,
+                    RabbitMQConfig.VIDEO_THUMBNAIL_REQUESTED_ROUTING_KEY,
+                    event,
+                    correlationData
+            );
+        } catch (Exception e) {
+            log.error("Failed to publish VideoThumbnailRequestedEvent id={} postId={}: {}",
                     eventId, event.getPostId(), e.getMessage());
         }
     }
