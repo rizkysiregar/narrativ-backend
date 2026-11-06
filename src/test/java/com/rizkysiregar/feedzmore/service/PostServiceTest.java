@@ -245,8 +245,7 @@ public class PostServiceTest {
     }
 
     @Test
-    void addNewPost_requestsThumbnailFromWorkerForVideo() {
-        org.springframework.test.util.ReflectionTestUtils.setField(postService, "thumbnailWorkerEnabled", true);
+    void addNewPost_requestsThumbnailForVideo() {
         UUID userId = UUID.randomUUID();
         UserEntity user = new UserEntity();
         user.setId(userId);
@@ -272,19 +271,19 @@ public class PostServiceTest {
     }
 
     @Test
-    void addNewPost_doesNotRequestThumbnailWhenWorkerDisabled() {
+    void addNewPost_doesNotRequestThumbnailForImage() {
         UUID userId = UUID.randomUUID();
         UserEntity user = new UserEntity();
         user.setId(userId);
         user.setUsername("testuser");
-        String objectKey = "testuser/POST_FEED/clip.mp4";
+        String objectKey = "testuser/POST_FEED/photo.jpg";
         AddPostRequest request = new AddPostRequest();
         request.setObjectKey(objectKey);
         when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
-                .thenReturn(ObjectStat.builder().size(1024L).contentType("video/mp4").build());
+                .thenReturn(ObjectStat.builder().size(1024L).contentType("image/jpeg").build());
         when(postCrudRepository.save(any(PostEntity.class))).thenReturn(PostEntity.builder()
-                .id(UUID.randomUUID()).mediaUrl(objectKey).mediaType(MediaType.VIDEO)
+                .id(UUID.randomUUID()).mediaUrl(objectKey).mediaType(MediaType.IMAGE)
                 .user(user).createdAt(LocalDateTime.now()).build());
 
         postService.addNewPost(userId, request);

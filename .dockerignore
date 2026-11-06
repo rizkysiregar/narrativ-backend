@@ -1,0 +1,16 @@
+.git
+.idea
+.env
+.env.*
+!.env.example
+.mvn
+log
+docs
+deploy
+*.md
+.DS_Store
+# Only the built jar and the yml configs are needed in the image
+target/*
+!target/*.jar
+src/main/java
+src/test

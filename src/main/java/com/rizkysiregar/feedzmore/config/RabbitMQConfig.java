@@ -23,14 +23,12 @@ public class RabbitMQConfig {
     // --- Queues ---
     public static final String NOTIFICATION_QUEUE = "notification.queue";
     public static final String EMAIL_QUEUE = "email.queue";
-    public static final String VIDEO_THUMBNAIL_QUEUE = "video.thumbnail.queue";
     public static final String VIDEO_THUMBNAIL_REQUEST_QUEUE = "video.thumbnail.request.queue";
     public static final String VIDEO_THUMBNAIL_RESULT_QUEUE = "video.thumbnail.result.queue";
 
     // --- Dead letter queues ---
     public static final String NOTIFICATION_DLQ = "notification.dlq";
     public static final String EMAIL_DLQ = "email.dlq";
-    public static final String VIDEO_THUMBNAIL_DLQ = "video.thumbnail.dlq";
     public static final String VIDEO_THUMBNAIL_REQUEST_DLQ = "video.thumbnail.request.dlq";
     public static final String VIDEO_THUMBNAIL_RESULT_DLQ = "video.thumbnail.result.dlq";
 
@@ -42,7 +40,6 @@ public class RabbitMQConfig {
     // --- Consumer identities (used to build idempotency keys) ---
     public static final String NOTIFICATION_CONSUMER = "notification";
     public static final String EMAIL_CONSUMER = "email";
-    public static final String VIDEO_THUMBNAIL_CONSUMER = "video-thumbnail";
 
     public static final int LISTENER_PREFETCH_COUNT = 10;
     public static final int LISTENER_MAX_RETRIES = 3;
@@ -146,36 +143,6 @@ public class RabbitMQConfig {
                 .bind(emailDlq())
                 .to(deadLetterExchange())
                 .with(EMAIL_DLQ);
-    }
-
-    // --- Video Thumbnail ---
-    @Bean
-    public Queue videoThumbnailQueue() {
-        return QueueBuilder.durable(VIDEO_THUMBNAIL_QUEUE)
-                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
-                .withArgument("x-dead-letter-routing-key", VIDEO_THUMBNAIL_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Binding videoThumbnailBinding() {
-        return BindingBuilder
-                .bind(videoThumbnailQueue())
-                .to(postExchange())
-                .with(POST_CREATED_ROUTING_KEY);
-    }
-
-    @Bean
-    public Queue videoThumbnailDlq() {
-        return QueueBuilder.durable(VIDEO_THUMBNAIL_DLQ).build();
-    }
-
-    @Bean
-    public Binding videoThumbnailDlqBinding() {
-        return BindingBuilder
-                .bind(videoThumbnailDlq())
-                .to(deadLetterExchange())
-                .with(VIDEO_THUMBNAIL_DLQ);
     }
 
     // --- Video Thumbnail (media worker) ---
