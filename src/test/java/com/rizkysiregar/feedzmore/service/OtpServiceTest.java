@@ -10,6 +10,7 @@ import com.rizkysiregar.feedzmore.repository.OtpCodeRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.email.IEmailService;
 import com.rizkysiregar.feedzmore.service.otp.OtpService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +27,7 @@ import com.rizkysiregar.feedzmore.model.OtpCode;
 import com.rizkysiregar.feedzmore.model.dto.SentOtpDTO;
 import org.springframework.http.HttpStatus;
 
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.*;
 
 
@@ -45,6 +47,11 @@ public class OtpServiceTest {
 
     @InjectMocks
     private OtpService otpService;
+
+    @BeforeEach
+    void noLockByDefault() {
+        lenient().when(redisUtil.hasKey(startsWith("otp_lock:"))).thenReturn(false);
+    }
 
 
     @Test
@@ -227,5 +234,115 @@ public class OtpServiceTest {
         verify(redisUtil, times(1)).get("otp:" + email);
     }
 
+    @Test
+    void verifyOtp_Success_ClearsAttemptCounter() {
+        String email = "test@mail.com";
+        when(redisUtil.get("otp:" + email)).thenReturn("123456");
+        when(redisUtil.increment("otp_attempts:" + email)).thenReturn(3L);
+
+        otpService.verifyOtp(email, "123456");
+
+        verify(redisUtil).delete("otp_attempts:" + email);
+    }
+
+    @Test
+    void verifyOtp_Success_DeletesOtpSoItCannotBeReused() {
+        String email = "test@mail.com";
+        when(redisUtil.get("otp:" + email)).thenReturn("123456");
+        when(redisUtil.increment("otp_attempts:" + email)).thenReturn(1L);
+
+        otpService.verifyOtp(email, "123456");
+
+        verify(redisUtil).delete("otp:" + email);
+    }
+
+    @Test
+    void verifyOtp_WrongOtp_DoesNotDeleteOtpBeforeLimit() {
+        String email = "test@mail.com";
+        when(redisUtil.get("otp:" + email)).thenReturn("123456");
+        when(redisUtil.increment("otp_attempts:" + email)).thenReturn(2L);
+
+        Assertions.assertThrows(BusinessException.class, () -> otpService.verifyOtp(email, "000000"));
+
+        verify(redisUtil, never()).delete("otp:" + email);
+    }
+
+    @Test
+    void verifyOtp_WrongOtp_FirstAttempt_StartsCounterWithTtl() {
+        String email = "test@mail.com";
+        when(redisUtil.get("otp:" + email)).thenReturn("123456");
+        when(redisUtil.increment("otp_attempts:" + email)).thenReturn(1L);
+
+        BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.verifyOtp(email, "000000"));
+
+        Assertions.assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        verify(redisUtil).expire("otp_attempts:" + email, 60);
+        verify(redisUtil, never()).delete("otp:" + email);
+    }
+
+    @Test
+    void verifyOtp_WrongOtp_FourthAttempt_StillInvalidOtp() {
+        String email = "test@mail.com";
+        when(redisUtil.get("otp:" + email)).thenReturn("123456");
+        when(redisUtil.increment("otp_attempts:" + email)).thenReturn(4L);
+
+        BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.verifyOtp(email, "000000"));
+
+        Assertions.assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        Assertions.assertEquals(GlobalMessage.INVALID_OTP.getMessage(), ex.getMessage());
+        verify(redisUtil, never()).set(eq("otp_lock:" + email), any(), anyLong());
+    }
+
+    @Test
+    void verifyOtp_WrongOtp_FifthAttempt_BurnsOtpAndLocksEmail() {
+        String email = "test@mail.com";
+        when(redisUtil.get("otp:" + email)).thenReturn("123456");
+        when(redisUtil.increment("otp_attempts:" + email)).thenReturn(5L);
+
+        BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.verifyOtp(email, "000000"));
+
+        Assertions.assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getHttpStatus());
+        Assertions.assertEquals(GlobalMessage.TOO_MANY_REQUEST_OTP.getMessage(), ex.getMessage());
+        verify(redisUtil).delete("otp:" + email);
+        verify(redisUtil).delete("otp_attempts:" + email);
+        verify(redisUtil).set("otp_lock:" + email, "1", 300L);
+    }
+
+    @Test
+    void verifyOtp_SixthAttempt_RejectedEvenWithCorrectOtp() {
+        // e.g. parallel requests that all passed the lock check before it was written
+        String email = "test@mail.com";
+        when(redisUtil.get("otp:" + email)).thenReturn("123456");
+        when(redisUtil.increment("otp_attempts:" + email)).thenReturn(6L);
+
+        BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.verifyOtp(email, "123456"));
+
+        Assertions.assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getHttpStatus());
+        verify(redisUtil, never()).set(eq("reset_token:" + email), any(), anyLong());
+    }
+
+    @Test
+    void verifyOtp_WhenLocked_RejectedWithoutTouchingOtp() {
+        String email = "test@mail.com";
+        when(redisUtil.hasKey("otp_lock:" + email)).thenReturn(true);
+
+        BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.verifyOtp(email, "123456"));
+
+        Assertions.assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getHttpStatus());
+        verify(redisUtil, never()).get(anyString());
+        verify(redisUtil, never()).increment(anyString());
+    }
+
+    @Test
+    void sendOtp_WhenLocked_RejectedBeforeSendingEmail() {
+        String email = "test@mail.com";
+        when(redisUtil.hasKey("otp_lock:" + email)).thenReturn(true);
+
+        BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.sendOtp(email));
+
+        Assertions.assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getHttpStatus());
+        verify(emailService, never()).sendOtpEmail(anyString(), anyString());
+        verify(otpCodeRepository, never()).save(any());
+    }
 
 }
