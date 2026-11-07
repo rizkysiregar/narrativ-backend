@@ -64,6 +64,10 @@ public class UserPrincipal implements UserDetails {
         return !this.userEntity.isDeleted();
     }
 
+    public String getBanReason() {
+        return this.userEntity.getBanReason();
+    }
+
     public boolean isBanned() {
         return this.userEntity.getStatus() == UserStatus.BANNED;
     }

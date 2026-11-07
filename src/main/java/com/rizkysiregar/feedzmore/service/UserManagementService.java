@@ -230,8 +230,8 @@ public class UserManagementService {
         auditLogService.record(AdminAuditAction.USER_BAN, AuditTargetType.USER, savedUser.getId().toString(),
                 reason, null);
 
-        // external systems last: if one of them fails the whole ban rolls back and can simply be retried
-        authService.revokeRefreshTokens(savedUser.getId());
+        // refresh tokens are kept: refresh and every JWT request reject a banned user and tell them why.
+        // They are revoked on unban, so a session from before the ban never silently comes back.
         userSearchService.deleteUser(savedUser.getId().toString());
 
         return AdminUserDetailDTO.from(savedUser);
@@ -256,6 +256,7 @@ public class UserManagementService {
         auditLogService.record(AdminAuditAction.USER_UNBAN, AuditTargetType.USER, savedUser.getId().toString(),
                 reason, null);
 
+        authService.revokeRefreshTokens(savedUser.getId());
         // a user that deleted the account while banned must not come back into search
         if (!savedUser.isDeleted()) {
             userSearchService.indexUser(savedUser);

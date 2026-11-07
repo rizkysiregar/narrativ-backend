@@ -57,6 +57,7 @@ class JwtFilterTest {
         user.setRole(Role.USER);
         user.setStatus(status);
         user.setDeleted(deleted);
+        user.setBanReason(status == UserStatus.BANNED ? "posting spam" : null);
         return new UserPrincipal(user);
     }
 
@@ -76,7 +77,7 @@ class JwtFilterTest {
         filter().doFilter(authorizedRequest(), response, filterChain);
 
         assertEquals(401, response.getStatus());
-        assertTrue(response.getContentAsString().contains(GlobalMessage.USER_BANNED.getMessage()));
+        assertTrue(response.getContentAsString().contains("Akun Anda telah diblokir oleh admin. Alasan: posting spam"));
         assertNull(SecurityContextHolder.getContext().getAuthentication());
         verifyNoInteractions(filterChain);
     }

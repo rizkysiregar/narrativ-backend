@@ -5,6 +5,7 @@ import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.response.BaseResponse;
 import com.rizkysiregar.feedzmore.service.JWTService;
+import com.rizkysiregar.feedzmore.util.BanMessages;
 import com.rizkysiregar.feedzmore.service.impl.UserDetailsServiceImpl;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -57,7 +58,8 @@ public class JwtFilter extends OncePerRequestFilter {
 
                 if (userDetails instanceof UserPrincipal principal && principal.isBanned()) {
                     log.warn("Rejected JWT request because user is banned: {}", username);
-                    writeUnauthorizedResponse(response, GlobalMessage.USER_BANNED);
+                    writeUnauthorizedResponse(response, GlobalMessage.USER_BANNED.getCode(),
+                            BanMessages.bannedMessage(principal.getBanReason()));
                     return;
                 }
 
@@ -100,6 +102,10 @@ public class JwtFilter extends OncePerRequestFilter {
     }
 
     private void writeUnauthorizedResponse(HttpServletResponse response, GlobalMessage message) throws IOException {
+        writeUnauthorizedResponse(response, message.getCode(), message.getMessage());
+    }
+
+    private void writeUnauthorizedResponse(HttpServletResponse response, String code, String message) throws IOException {
         if (response.isCommitted()) {
             return;
         }
@@ -109,8 +115,8 @@ public class JwtFilter extends OncePerRequestFilter {
         response.setCharacterEncoding("UTF-8");
 
         BaseResponse<?> body = BaseResponse.builder()
-                .code(message.getCode())
-                .message(message.getMessage())
+                .code(code)
+                .message(message)
                 .build();
 
         objectMapper.writeValue(response.getWriter(), body);

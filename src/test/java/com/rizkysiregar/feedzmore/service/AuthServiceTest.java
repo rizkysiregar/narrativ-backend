@@ -421,7 +421,7 @@ public class AuthServiceTest {
         user.setRole(Role.USER);
 
         when(redisUtil.get("refresh_token:old-token")).thenReturn(userId.toString());
-        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(jwtService.generateToken("testuser", userId, Role.USER)).thenReturn("newAccess");
 
         LoginResponse result = authService.refreshToken("old-token");
@@ -448,12 +448,47 @@ public class AuthServiceTest {
     void testRefreshToken_UserDeleted() {
         UUID userId = UUID.randomUUID();
         when(redisUtil.get("refresh_token:tok")).thenReturn(userId.toString());
-        when(userRepository.findActiveById(userId)).thenReturn(Optional.empty());
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         assertThrows(BusinessException.class, () -> authService.refreshToken("tok"));
         verify(redisUtil).delete("refresh_token:tok");
     }
 
+
+    @Test
+    void testRefreshToken_DeletedUser_DropsTheTokenAndIsUnauthorized() {
+        UUID userId = UUID.randomUUID();
+        UserEntity deleted = new UserEntity();
+        deleted.setId(userId);
+        deleted.setDeleted(true);
+        when(redisUtil.get("refresh_token:tok")).thenReturn(userId.toString());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(deleted));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> authService.refreshToken("tok"));
+
+        assertEquals(GlobalMessage.UNAUTHORIZED.getMessage(), exception.getMessage());
+        verify(redisUtil).delete("refresh_token:tok");
+    }
+
+    @Test
+    void testRefreshToken_BannedUser_GetsTheBanReasonAndKeepsTheTokenSoEveryRetryExplainsIt() {
+        UUID userId = UUID.randomUUID();
+        UserEntity banned = new UserEntity();
+        banned.setId(userId);
+        banned.setStatus(UserStatus.BANNED);
+        banned.setBanReason("posting spam");
+        when(redisUtil.get("refresh_token:tok")).thenReturn(userId.toString());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(banned));
+
+        for (int attempt = 0; attempt < 2; attempt++) {
+            BusinessException exception = assertThrows(BusinessException.class, () -> authService.refreshToken("tok"));
+            assertEquals(org.springframework.http.HttpStatus.UNAUTHORIZED, exception.getHttpStatus());
+            assertEquals("Akun Anda telah diblokir oleh admin. Alasan: posting spam", exception.getMessage());
+        }
+
+        verify(redisUtil, never()).delete(anyString());
+        verifyNoInteractions(jwtService);
+    }
 
     @Test
     void testRevokeRefreshTokens_DeletesEveryIndexedTokenAndTheIndex() {
@@ -480,12 +515,13 @@ public class AuthServiceTest {
         banned.setId(UUID.randomUUID());
         banned.setUsername("banned");
         banned.setStatus(UserStatus.BANNED);
+        banned.setBanReason("posting spam");
         when(userRepository.findByUsername("banned")).thenReturn(Optional.of(banned));
 
         BusinessException exception = assertThrows(BusinessException.class, () -> authService.login(loginRequest));
 
         assertEquals(org.springframework.http.HttpStatus.UNAUTHORIZED, exception.getHttpStatus());
-        assertEquals(GlobalMessage.USER_BANNED.getMessage(), exception.getMessage());
+        assertEquals("Akun Anda telah diblokir oleh admin. Alasan: posting spam", exception.getMessage());
         verifyNoInteractions(jwtService, redisUtil);
     }
 

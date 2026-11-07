@@ -165,7 +165,7 @@ class UserManagementServiceTest {
     // ------------------------------------------------------------------- ban
 
     @Test
-    void banUser_marksBannedAuditsAndRevokesSessionsBeforeTouchingTheSearchIndex() {
+    void banUser_marksBannedAuditsAndRemovesTheUserFromSearchButKeepsTheSessionsSoTheAppCanShowTheReason() {
         UUID id = UUID.randomUUID();
         UserEntity target = user(id, Role.USER);
         when(userRepository.findById(id)).thenReturn(Optional.of(target));
@@ -182,12 +182,12 @@ class UserManagementServiceTest {
         assertEquals("spam account", result.banReason());
         assertEquals(adminId.toString(), result.bannedBy());
 
-        InOrder order = inOrder(userRepository, auditLogService, authService, userSearchService);
+        InOrder order = inOrder(userRepository, auditLogService, userSearchService);
         order.verify(userRepository).save(target);
         order.verify(auditLogService).record(AdminAuditAction.USER_BAN, AuditTargetType.USER, id.toString(),
                 "spam account", null);
-        order.verify(authService).revokeRefreshTokens(id);
         order.verify(userSearchService).deleteUser(id.toString());
+        verifyNoInteractions(authService);
     }
 
     @Test
@@ -258,6 +258,8 @@ class UserManagementServiceTest {
         verify(auditLogService).record(AdminAuditAction.USER_UNBAN, AuditTargetType.USER, id.toString(),
                 "appeal accepted", null);
         verify(userSearchService).indexUser(target);
+        // sessions from before the ban must not silently come back
+        verify(authService).revokeRefreshTokens(id);
     }
 
     @Test

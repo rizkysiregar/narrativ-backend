@@ -27,7 +27,7 @@ public enum GlobalMessage {
     INVALID_RESET_TOKEN("400", "Tautan perubahan kata sandi sudah tidak valid atau pernah digunakan."),
     USERNAME_ALREADY_TAKEN("400", "Nama pengguna ini sudah digunakan. Coba nama lain yang unik, ya!"),
     USER_NOT_FOUND("404", "User yang kamu cari tidak terdaftar"),
-    USER_BANNED("401", "Akun Anda telah diblokir oleh admin. Silakan hubungi admin untuk informasi lebih lanjut."),
+    USER_BANNED("401", "Akun Anda telah diblokir oleh admin."),
     USER_ALREADY_BANNED("409", "User ini sudah dalam status diblokir."),
     USER_NOT_BANNED("409", "User ini tidak sedang diblokir."),
     USER_ALREADY_DELETED("409", "User ini sudah menghapus akunnya sendiri sehingga tidak dapat dimoderasi."),

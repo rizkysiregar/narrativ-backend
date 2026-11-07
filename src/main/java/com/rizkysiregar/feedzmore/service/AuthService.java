@@ -15,6 +15,7 @@ import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
+import com.rizkysiregar.feedzmore.util.BanMessages;
 import com.rizkysiregar.feedzmore.util.Operation;
 import com.rizkysiregar.feedzmore.util.UsernameGenerator;
 import jakarta.persistence.criteria.Predicate;
@@ -194,17 +195,28 @@ public class AuthService {
             throw new BusinessException(GlobalMessage.UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
         }
 
+        UserEntity user;
+        try {
+            user = userRepository.findById(UUID.fromString(storedUserId.toString()))
+                    .filter(found -> !found.isDeleted())
+                    .orElse(null);
+        } catch (IllegalArgumentException e) {
+            user = null;
+        }
+
+        if (user == null) {
+            // the token belongs to nobody (anymore): it is useless, drop it
+            redisUtil.delete(key);
+            throw new BusinessException(GlobalMessage.UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
+        }
+
+        // a banned user keeps the token on purpose: every retry must tell the app the account is banned, and why.
+        // The tokens are revoked on unban, so a session from before the ban never silently comes back.
+        assertNotBanned(user);
+
         // rotation: a refresh token can only be used once
         redisUtil.delete(key);
         redisUtil.removeFromSet(USER_REFRESH_TOKENS_PREFIX.concat(storedUserId.toString()), refreshToken);
-
-        UserEntity user;
-        try {
-            user = userRepository.findActiveById(UUID.fromString(storedUserId.toString()))
-                    .orElseThrow(() -> new BusinessException(GlobalMessage.UNAUTHORIZED, HttpStatus.UNAUTHORIZED));
-        } catch (IllegalArgumentException e) {
-            throw new BusinessException(GlobalMessage.UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
-        }
 
         return LoginResponse.builder()
                 .token(jwtService.generateToken(user.getUsername(), user.getId(), user.getRole()))
@@ -223,8 +235,9 @@ public class AuthService {
     }
 
     /**
-     * Revokes every refresh token the user holds. Access tokens stay valid until they expire (15 minutes),
-     * tokens issued before the per-user index existed are not covered and die on their own TTL or on use.
+     * Revokes every refresh token the user holds (force logout, unban). Access tokens stay valid until they
+     * expire (15 minutes), tokens issued before the per-user index existed are not covered and die on their
+     * own TTL or on use.
      */
     public void revokeRefreshTokens(UUID userId) {
         String indexKey = USER_REFRESH_TOKENS_PREFIX.concat(userId.toString());
@@ -236,7 +249,7 @@ public class AuthService {
 
     private void assertNotBanned(UserEntity user) {
         if (user.getStatus() == UserStatus.BANNED) {
-            throw new BusinessException(GlobalMessage.USER_BANNED, HttpStatus.UNAUTHORIZED);
+            throw BanMessages.bannedException(user.getBanReason());
         }
     }
 
