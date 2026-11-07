@@ -25,6 +25,9 @@ public class RateLimiterService {
     @Value("${app.rate-limit.default}")
     private int defaultLimit;
 
+    @Value("${app.rate-limit.auth}")
+    private int authLimit;
+
     private final ProxyManager<String> proxyManager;
 
     public RateLimiterService(@Lazy ProxyManager<String> proxyManager) {
@@ -32,7 +35,16 @@ public class RateLimiterService {
     }
 
     public Bucket resolveBucket(String userId, String endpointType) {
-        String key = "rate-limit:" + userId + ":" + endpointType;
+        return bucketFor("rate-limit:" + userId + ":" + endpointType, endpointType);
+    }
+
+    // anonymous callers (login, register, otp, ...) are limited per client IP. Separate key prefix so an IP
+    // can never share a bucket with a username.
+    public Bucket resolveIpBucket(String ip, String endpointType) {
+        return bucketFor("rate-limit-ip:" + ip + ":" + endpointType, endpointType);
+    }
+
+    private Bucket bucketFor(String key, String endpointType) {
         Supplier<BucketConfiguration> configSupplier = () -> buildConfig(endpointType);
         return proxyManager.builder().build(key, configSupplier);
     }
@@ -42,6 +54,7 @@ public class RateLimiterService {
             case "feed" -> feedLimit;
             case "post-create" -> postCreateLimit;
             case "interaction" -> interactionLimit;
+            case "auth" -> authLimit;
             default -> defaultLimit;
         };
 
