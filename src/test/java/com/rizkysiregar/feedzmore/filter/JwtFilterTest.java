@@ -110,4 +110,51 @@ class JwtFilterTest {
         assertNotNull(SecurityContextHolder.getContext().getAuthentication());
         verify(filterChain).doFilter(request, response);
     }
+
+    private MockHttpServletRequest requestTo(String path) {
+        MockHttpServletRequest request = authorizedRequest();
+        request.setContextPath("/api/v1");
+        request.setRequestURI("/api/v1" + path);
+        return request;
+    }
+
+    @Test
+    void publicAuthEndpoints_ignoreAStaleAuthorizationHeader() throws Exception {
+        for (String path : new String[]{"/auth/login", "/auth/admin/login", "/auth/google", "/auth/refresh", "/auth/register"}) {
+            MockHttpServletRequest request = requestTo(path);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            filter().doFilter(request, response, filterChain);
+
+            assertEquals(200, response.getStatus(), path);
+            verify(filterChain).doFilter(request, response);
+            org.mockito.Mockito.clearInvocations(filterChain);
+        }
+        verifyNoInteractions(jwtService, userDetailsService);
+    }
+
+    @Test
+    void registerAdmin_stillNeedsAValidToken() throws Exception {
+        when(jwtService.extractUsername("some.jwt.token"))
+                .thenThrow(new io.jsonwebtoken.ExpiredJwtException(null, null, "expired"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter().doFilter(requestTo("/auth/register-admin"), response, filterChain);
+
+        assertEquals(401, response.getStatus());
+        assertTrue(response.getContentAsString().contains(GlobalMessage.UNAUTHORIZED.getMessage()));
+        verifyNoInteractions(filterChain);
+    }
+
+    @Test
+    void otherEndpoints_stillRejectAnInvalidToken() throws Exception {
+        when(jwtService.extractUsername("some.jwt.token"))
+                .thenThrow(new io.jsonwebtoken.ExpiredJwtException(null, null, "expired"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter().doFilter(requestTo("/users/me"), response, filterChain);
+
+        assertEquals(401, response.getStatus());
+        verifyNoInteractions(filterChain);
+    }
 }

@@ -35,6 +35,20 @@ public class JwtFilter extends OncePerRequestFilter {
     private final UserDetailsServiceImpl userDetailsService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * The public auth endpoints (login, refresh, google, register, otp, ...) decide for themselves, so an
+     * Authorization header that a client still holds (an expired token from an earlier session, one pasted
+     * into Swagger) must not answer for them: it would hide the real result, e.g. that the account is banned.
+     * Only register-admin needs the caller to be authenticated.
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        String path = contextPath != null && uri.startsWith(contextPath) ? uri.substring(contextPath.length()) : uri;
+        return path.startsWith("/auth/") && !path.startsWith("/auth/register-admin");
+    }
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
