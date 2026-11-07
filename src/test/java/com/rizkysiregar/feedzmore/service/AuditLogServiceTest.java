@@ -103,7 +103,7 @@ class AuditLogServiceTest {
     void record_withoutRequestContext_leavesIpEmpty() {
         authenticateAsAdmin();
 
-        auditLogService.record(AdminAuditAction.USER_RESTORE, AuditTargetType.USER, "target-1", null, null);
+        auditLogService.record(AdminAuditAction.USER_UNBAN, AuditTargetType.USER, "target-1", null, null);
 
         ArgumentCaptor<AdminAuditLogEntity> captor = ArgumentCaptor.forClass(AdminAuditLogEntity.class);
         verify(auditLogRepository).save(captor.capture());
@@ -114,7 +114,7 @@ class AuditLogServiceTest {
     @Test
     void record_withoutAuthenticatedAdmin_failsAndWritesNothing() {
         assertThrows(IllegalStateException.class, () -> auditLogService.record(
-                AdminAuditAction.USER_RESTORE, AuditTargetType.USER, "target-1", null, null));
+                AdminAuditAction.USER_UNBAN, AuditTargetType.USER, "target-1", null, null));
 
         verify(auditLogRepository, never()).save(any());
     }
@@ -126,7 +126,7 @@ class AuditLogServiceTest {
         AdminAuditLogEntity row = AdminAuditLogEntity.builder()
                 .id(UUID.randomUUID())
                 .adminId(adminId)
-                .action(AdminAuditAction.USER_SOFT_DELETE)
+                .action(AdminAuditAction.USER_BAN)
                 .targetType(AuditTargetType.USER)
                 .targetId("target-1")
                 .createdAt(Instant.parse("2026-11-07T01:00:00Z"))
@@ -144,7 +144,7 @@ class AuditLogServiceTest {
 
         assertEquals(1, result.getContent().size());
         assertEquals("admin", result.getContent().get(0).adminUsername());
-        assertEquals(AdminAuditAction.USER_SOFT_DELETE, result.getContent().get(0).action());
+        assertEquals(AdminAuditAction.USER_BAN, result.getContent().get(0).action());
         assertEquals(1, result.getTotalElements());
     }
 

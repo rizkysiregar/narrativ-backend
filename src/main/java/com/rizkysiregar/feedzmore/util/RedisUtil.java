@@ -8,6 +8,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -53,6 +55,24 @@ public class RedisUtil implements CommandLineRunner {
     public long increment(String key) {
         Long value = redisTemplate.opsForValue().increment(key);
         return value == null ? 0L : value;
+    }
+
+    // Add a member to a set and (re)start the TTL of the whole set
+    public void addToSet(String key, String member, long timeoutSeconds) {
+        redisTemplate.opsForSet().add(key, member);
+        redisTemplate.expire(key, Duration.ofSeconds(timeoutSeconds));
+    }
+
+    public void removeFromSet(String key, String member) {
+        redisTemplate.opsForSet().remove(key, member);
+    }
+
+    public Set<String> membersOfSet(String key) {
+        Set<Object> members = redisTemplate.opsForSet().members(key);
+        if (members == null) {
+            return Set.of();
+        }
+        return members.stream().map(String::valueOf).collect(Collectors.toSet());
     }
 
     // Delete key

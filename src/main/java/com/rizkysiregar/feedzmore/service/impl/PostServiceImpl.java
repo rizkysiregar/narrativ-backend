@@ -89,7 +89,7 @@ public class PostServiceImpl implements PostService {
     public PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String username, UUID viewerId) {
         log.info("FETCH.FEED.BY.USERNAME =  {}, size= {} , username= {}", page, size, username);
 
-        UserEntity user = userRepository.findByUsernameAndIsDeletedFalse(username)
+        UserEntity user = userRepository.findActiveByUsername(username)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
 
         Pageable pageable = PageRequest.of(page, size);
@@ -147,7 +147,7 @@ public class PostServiceImpl implements PostService {
     public CreatePostUploadUrlResponse createUploadUrl(UUID userId, CreatePostUploadUrlRequest request) {
         log.info("NEW.POST.UPLOAD.URL: {}", userId);
 
-        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+        UserEntity user = userRepository.findActiveById(userId)
                 .orElseThrow(() -> {
                     log.error("Active user not found {}", userId);
                     return new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
@@ -189,7 +189,7 @@ public class PostServiceImpl implements PostService {
     public CreatePostResponse addNewPost(UUID userId, AddPostRequest request) {
         log.info("NEW.FEED.POST: {}", userId);
 
-        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+        UserEntity user = userRepository.findActiveById(userId)
                 .orElseThrow(() -> {
                     log.error("Active user not found {}", userId);
                     return new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);

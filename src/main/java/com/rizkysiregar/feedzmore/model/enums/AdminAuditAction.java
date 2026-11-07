@@ -3,6 +3,7 @@ package com.rizkysiregar.feedzmore.model.enums;
 public enum AdminAuditAction {
     ADMIN_REGISTER,
     USER_UPDATE,
-    USER_SOFT_DELETE,
-    USER_RESTORE
+    USER_BAN,
+    USER_UNBAN,
+    USER_FORCE_LOGOUT
 }

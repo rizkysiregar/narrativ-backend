@@ -2,6 +2,7 @@ package com.rizkysiregar.feedzmore.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
+import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.response.BaseResponse;
 import com.rizkysiregar.feedzmore.service.JWTService;
 import com.rizkysiregar.feedzmore.service.impl.UserDetailsServiceImpl;
@@ -53,6 +54,12 @@ public class JwtFilter extends OncePerRequestFilter {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
                 validateUserIsEnabled(userDetails);
+
+                if (userDetails instanceof UserPrincipal principal && principal.isBanned()) {
+                    log.warn("Rejected JWT request because user is banned: {}", username);
+                    writeUnauthorizedResponse(response, GlobalMessage.USER_BANNED);
+                    return;
+                }
 
                 if (jwtService.validateToken(token, userDetails)) {
                     UsernamePasswordAuthenticationToken authToken =

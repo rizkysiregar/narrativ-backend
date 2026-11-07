@@ -27,6 +27,14 @@ public enum GlobalMessage {
     INVALID_RESET_TOKEN("400", "Tautan perubahan kata sandi sudah tidak valid atau pernah digunakan."),
     USERNAME_ALREADY_TAKEN("400", "Nama pengguna ini sudah digunakan. Coba nama lain yang unik, ya!"),
     USER_NOT_FOUND("404", "User yang kamu cari tidak terdaftar"),
+    USER_BANNED("401", "Akun Anda telah diblokir oleh admin. Silakan hubungi admin untuk informasi lebih lanjut."),
+    USER_ALREADY_BANNED("409", "User ini sudah dalam status diblokir."),
+    USER_NOT_BANNED("409", "User ini tidak sedang diblokir."),
+    USER_ALREADY_DELETED("409", "User ini sudah menghapus akunnya sendiri sehingga tidak dapat dimoderasi."),
+    CANNOT_BAN_SELF("403", "Anda tidak dapat memblokir akun Anda sendiri."),
+    CANNOT_BAN_ADMIN("403", "Admin tidak dapat diblokir. Turunkan role admin tersebut terlebih dahulu."),
+    CANNOT_CHANGE_OWN_ROLE("403", "Anda tidak dapat mengubah role akun Anda sendiri."),
+    LAST_ADMIN("409", "Tidak dapat menurunkan role admin terakhir."),
     EMAIL_ALREADY_TAKEN("400", "Email ini sudah terdaftar. Silakan gunakan email lain atau masuk ke akun Anda."),
     ;
 

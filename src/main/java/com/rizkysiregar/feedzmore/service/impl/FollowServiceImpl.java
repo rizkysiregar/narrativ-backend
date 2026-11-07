@@ -68,9 +68,9 @@ public class FollowServiceImpl implements FollowService {
     }
 
     private void requireActiveUsers(UUID userId, UUID requesterId) {
-        userRepository.findByIdAndIsDeletedFalse(requesterId)
+        userRepository.findActiveById(requesterId)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
-        userRepository.findByIdAndIsDeletedFalse(userId)
+        userRepository.findActiveById(userId)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
     }
 

@@ -9,6 +9,8 @@ import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.enums.AdminAuditAction;
 import com.rizkysiregar.feedzmore.model.enums.AuditTargetType;
 import com.rizkysiregar.feedzmore.model.enums.Role;
+import com.rizkysiregar.feedzmore.model.enums.UserStatus;
+import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.model.request.*;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
@@ -264,7 +266,7 @@ public class AuthServiceTest {
         user.setPhoneNumber("123");
         user.setProfileImage("img.png");
 
-        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+        when(userRepository.findActiveById(id)).thenReturn(Optional.of(user));
 
         // Act
         UserDetailDTO dto = authService.getUserById(id.toString());
@@ -281,7 +283,7 @@ public class AuthServiceTest {
     void testGetUserById_NotFound() {
         // Arrange
         UUID id = UUID.randomUUID();
-        when(userRepository.findById(id)).thenReturn(Optional.empty());
+        when(userRepository.findActiveById(id)).thenReturn(Optional.empty());
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.getUserById(id.toString()));
@@ -419,7 +421,7 @@ public class AuthServiceTest {
         user.setRole(Role.USER);
 
         when(redisUtil.get("refresh_token:old-token")).thenReturn(userId.toString());
-        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.of(user));
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
         when(jwtService.generateToken("testuser", userId, Role.USER)).thenReturn("newAccess");
 
         LoginResponse result = authService.refreshToken("old-token");
@@ -429,7 +431,9 @@ public class AuthServiceTest {
         assertNotEquals("old-token", result.getRefreshToken());
         assertEquals(userId.toString(), result.getUserId());
         verify(redisUtil).delete("refresh_token:old-token");
+        verify(redisUtil).removeFromSet("user_refresh_tokens:" + userId, "old-token");
         verify(redisUtil).set(eq("refresh_token:" + result.getRefreshToken()), eq(userId.toString()), anyLong());
+        verify(redisUtil).addToSet(eq("user_refresh_tokens:" + userId), eq(result.getRefreshToken()), anyLong());
     }
 
     @Test
@@ -444,10 +448,63 @@ public class AuthServiceTest {
     void testRefreshToken_UserDeleted() {
         UUID userId = UUID.randomUUID();
         when(redisUtil.get("refresh_token:tok")).thenReturn(userId.toString());
-        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.empty());
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.empty());
 
         assertThrows(BusinessException.class, () -> authService.refreshToken("tok"));
         verify(redisUtil).delete("refresh_token:tok");
     }
 
+
+    @Test
+    void testRevokeRefreshTokens_DeletesEveryIndexedTokenAndTheIndex() {
+        UUID userId = UUID.randomUUID();
+        when(redisUtil.membersOfSet("user_refresh_tokens:" + userId)).thenReturn(java.util.Set.of("t1", "t2"));
+
+        authService.revokeRefreshTokens(userId);
+
+        verify(redisUtil).delete("refresh_token:t1");
+        verify(redisUtil).delete("refresh_token:t2");
+        verify(redisUtil).delete("user_refresh_tokens:" + userId);
+    }
+
+    @Test
+    void testLogin_BannedUser_IsRejectedAfterPasswordCheckAndIssuesNothing() {
+        UserLoginRequest loginRequest = new UserLoginRequest();
+        loginRequest.setUsername("banned");
+        loginRequest.setPassword("password");
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+
+        UserEntity banned = new UserEntity();
+        banned.setId(UUID.randomUUID());
+        banned.setUsername("banned");
+        banned.setStatus(UserStatus.BANNED);
+        when(userRepository.findByUsername("banned")).thenReturn(Optional.of(banned));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> authService.login(loginRequest));
+
+        assertEquals(org.springframework.http.HttpStatus.UNAUTHORIZED, exception.getHttpStatus());
+        assertEquals(GlobalMessage.USER_BANNED.getMessage(), exception.getMessage());
+        verifyNoInteractions(jwtService, redisUtil);
+    }
+
+    @Test
+    void testGoogleLogin_BannedUser_IsRejectedBeforeAnythingIsSavedOrIndexed() {
+        GoogleLoginRequest request = new GoogleLoginRequest();
+        request.setIdToken("id-token");
+        GoogleUserInfo info = GoogleUserInfo.builder().email("banned@mail.com").googleId("g-1").build();
+        when(googleTokenVerifierService.verifyToken("id-token")).thenReturn(info);
+
+        UserEntity banned = new UserEntity();
+        banned.setId(UUID.randomUUID());
+        banned.setGoogleId("g-1");
+        banned.setStatus(UserStatus.BANNED);
+        when(userRepository.findByEmail("banned@mail.com")).thenReturn(Optional.of(banned));
+
+        assertThrows(BusinessException.class, () -> authService.googleLogin(request));
+
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(userSearchService, jwtService);
+    }
 }

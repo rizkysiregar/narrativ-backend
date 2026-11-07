@@ -162,7 +162,7 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
         when(fileStorageService.getPresignUploadUrl(anyString(), eq("video/mp4")))
                 .thenReturn("http://minio/presigned-url");
@@ -188,7 +188,7 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
 
         // Act & Assert
@@ -214,7 +214,7 @@ public class PostServiceTest {
         user.setUsername("testuser");
         user.setEmail("test@mail.com");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
                 .thenReturn(ObjectStat.builder().size(1024L).contentType("image/jpeg").build());
@@ -236,7 +236,7 @@ public class PostServiceTest {
         assertNotNull(result);
         assertEquals(GlobalMessage.CREATED.getMessage(), result.getStatus());
         verify(fileStorageService, times(1)).statObject(objectKey);
-        verify(userRepository).findByIdAndIsDeletedFalse(userId);
+        verify(userRepository).findActiveById(userId);
         verify(postCrudRepository, times(1))
                 .save(any(PostEntity.class));
         ArgumentCaptor<PostCreatedEvent> event = ArgumentCaptor.forClass(PostCreatedEvent.class);
@@ -254,7 +254,7 @@ public class PostServiceTest {
         AddPostRequest request = new AddPostRequest();
         request.setObjectKey(objectKey);
         request.setCaption("clip");
-        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.of(user));
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
                 .thenReturn(ObjectStat.builder().size(1024L).contentType("video/mp4").build());
         PostEntity saved = PostEntity.builder().id(UUID.randomUUID()).caption("clip").mediaUrl(objectKey)
@@ -279,7 +279,7 @@ public class PostServiceTest {
         String objectKey = "testuser/POST_FEED/photo.jpg";
         AddPostRequest request = new AddPostRequest();
         request.setObjectKey(objectKey);
-        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.of(user));
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
                 .thenReturn(ObjectStat.builder().size(1024L).contentType("image/jpeg").build());
         when(postCrudRepository.save(any(PostEntity.class))).thenReturn(PostEntity.builder()
@@ -308,7 +308,7 @@ public class PostServiceTest {
         List<PostEntity> posts = List.of(p1);
         Page<PostEntity> postPage = new PageImpl<>(posts, PageRequest.of(page, size), posts.size());
 
-        when(userRepository.findByUsernameAndIsDeletedFalse(username)).thenReturn(Optional.of(user));
+        when(userRepository.findActiveByUsername(username)).thenReturn(Optional.of(user));
         when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(userId)))
                 .thenReturn(postPage);
         when(likeRepository.findLikedPostIds(viewerId, List.of(p1.getId())))
@@ -321,7 +321,7 @@ public class PostServiceTest {
         assertNotNull(response);
         assertEquals(username, response.getContent().get(0).getUsername());
         assertTrue(response.getContent().get(0).isLiked());
-        verify(userRepository).findByUsernameAndIsDeletedFalse(username);
+        verify(userRepository).findActiveByUsername(username);
         verify(postPaginationRepository).findAllActivePostsByUserId(any(Pageable.class), eq(userId));
     }
 
@@ -329,7 +329,7 @@ public class PostServiceTest {
     void testGetAllPostByUserId_UserNotFound_ThrowsBusinessException() {
         // Arrange
         String username = "nouser";
-        when(userRepository.findByUsernameAndIsDeletedFalse(username)).thenReturn(Optional.empty());
+        when(userRepository.findActiveByUsername(username)).thenReturn(Optional.empty());
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class,
@@ -346,7 +346,7 @@ public class PostServiceTest {
                 .objectKey("testuser/POST_FEED/x.jpg")
                 .build();
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.empty());
 
         // Act & Assert
@@ -366,7 +366,7 @@ public class PostServiceTest {
                 .objectKey(" ")
                 .build();
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(new UserEntity()));
 
         // Act & Assert
@@ -390,7 +390,7 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
 
         // Act & Assert
@@ -415,7 +415,7 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
                 .thenReturn(ObjectStat.builder()
@@ -444,7 +444,7 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
                 .thenReturn(ObjectStat.builder()
@@ -473,7 +473,7 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
 
         // Act & Assert
