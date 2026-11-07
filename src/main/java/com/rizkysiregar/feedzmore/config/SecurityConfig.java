@@ -55,6 +55,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(request -> request
                         .requestMatchers(Constants.JWT_WHITELIST.toArray(String[]::new)).permitAll()
+                        // only health and info are public (kubernetes probes); metrics/prometheus/etc. need an admin
+                        .requestMatchers("/actuator/**", "/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
                 .sessionManagement(session ->

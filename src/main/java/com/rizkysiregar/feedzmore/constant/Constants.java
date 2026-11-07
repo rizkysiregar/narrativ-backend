@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.constant;
 
+import java.time.ZoneId;
 import java.util.List;
 
 public class Constants {
@@ -18,11 +19,12 @@ public class Constants {
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/forgot-password",
-            "/actuator/**"
+            "/actuator/health/**",
+            "/actuator/info"
     );
 
     public static final List<String> METHOD_LIST = List.of(
-            "GET", "POST", "PUT", "DELETE", "OPTIONS"
+            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
     );
 
     public static final List<String> CORS_WHITELIST_ORIGIN = List.of(
@@ -32,6 +34,9 @@ public class Constants {
             "http://api-dev-feedzmore.rizkysiregar.my.id",
             "https://api-dev-feedzmore.rizkysiregar.my.id"
     );
+
+    // time zone used for admin calendar boundaries (audit log date filters, dashboard statistics)
+    public static final ZoneId ADMIN_ZONE = ZoneId.of("Asia/Jakarta");
 
     public static final String INVALID_USERNAME_PASSWORD = "Invalid Username or Password";
 

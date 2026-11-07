@@ -5,6 +5,9 @@ import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.dto.AdminUserDetailDTO;
 import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
+import com.rizkysiregar.feedzmore.model.enums.AdminAuditAction;
+import com.rizkysiregar.feedzmore.model.enums.AuditTargetType;
+import com.rizkysiregar.feedzmore.model.enums.Role;
 import com.rizkysiregar.feedzmore.model.request.AdminUpdateUserRequest;
 import com.rizkysiregar.feedzmore.model.request.UpdateMyUserRequest;
 import com.rizkysiregar.feedzmore.model.request.UserSearchRequest;
@@ -31,6 +34,7 @@ public class UserManagementService {
 
     private final UserRepository userRepository;
     private final UserSearchService userSearchService;
+    private final AuditLogService auditLogService;
 
     public UserDetailDTO getMyProfile(UUID currentUserId) {
         UserEntity user = findActiveUserOrThrow(currentUserId);
@@ -118,11 +122,17 @@ public class UserManagementService {
         applyCommonUserUpdates(user, request.username(), request.email(), request.firstName(),
                 request.lastName(), request.phoneNumber(), request.profileImage());
 
+        Role previousRole = user.getRole();
         if (request.role() != null) {
             user.setRole(request.role());
         }
 
         UserEntity savedUser = userRepository.save(user);
+        auditLogService.record(AdminAuditAction.USER_UPDATE, AuditTargetType.USER, savedUser.getId().toString(),
+                null, AuditLogService.metadata(
+                        "fields", changedFields(request),
+                        "previousRole", previousRole == savedUser.getRole() ? null : previousRole,
+                        "newRole", previousRole == savedUser.getRole() ? null : savedUser.getRole()));
 
         if (savedUser.isDeleted()) {
             userSearchService.deleteUser(savedUser.getId().toString());
@@ -147,6 +157,8 @@ public class UserManagementService {
         user.setDeleted(true);
         userRepository.save(user);
         userSearchService.deleteUser(user.getId().toString());
+        auditLogService.record(AdminAuditAction.USER_SOFT_DELETE, AuditTargetType.USER, user.getId().toString(),
+                null, null);
 
         return Operation.DELETED;
     }
@@ -166,8 +178,23 @@ public class UserManagementService {
         user.setDeleted(false);
         UserEntity savedUser = userRepository.save(user);
         userSearchService.indexUser(savedUser);
+        auditLogService.record(AdminAuditAction.USER_RESTORE, AuditTargetType.USER, savedUser.getId().toString(),
+                null, null);
 
         return Operation.UPDATED;
+    }
+
+    // names only, never values: the audit log must not become a second copy of user PII
+    private List<String> changedFields(AdminUpdateUserRequest request) {
+        List<String> fields = new ArrayList<>();
+        if (request.username() != null && !request.username().isBlank()) fields.add("username");
+        if (request.email() != null && !request.email().isBlank()) fields.add("email");
+        if (request.firstName() != null) fields.add("firstName");
+        if (request.lastName() != null) fields.add("lastName");
+        if (request.phoneNumber() != null) fields.add("phoneNumber");
+        if (request.profileImage() != null) fields.add("profileImage");
+        if (request.role() != null) fields.add("role");
+        return fields;
     }
 
     private UserEntity findActiveUserOrThrow(UUID currentUserId) {

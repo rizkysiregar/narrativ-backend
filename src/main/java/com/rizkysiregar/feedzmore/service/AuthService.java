@@ -1,6 +1,8 @@
 package com.rizkysiregar.feedzmore.service;
 
 import com.rizkysiregar.feedzmore.model.dto.GoogleUserInfo;
+import com.rizkysiregar.feedzmore.model.enums.AdminAuditAction;
+import com.rizkysiregar.feedzmore.model.enums.AuditTargetType;
 import com.rizkysiregar.feedzmore.model.enums.Role;
 import com.rizkysiregar.feedzmore.model.request.*;
 import com.rizkysiregar.feedzmore.service.auth.GoogleTokenVerifierService;
@@ -47,6 +49,7 @@ public class AuthService {
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
     private final GoogleTokenVerifierService googleTokenVerifierService;
     private final UsernameGenerator usernameGenerator;
+    private final AuditLogService auditLogService;
 
     public AuthService(UserRepository userRepository,
                        AuthenticationManager authManager,
@@ -54,7 +57,8 @@ public class AuthService {
                        RedisUtil redisUtil,
                        GoogleTokenVerifierService googleTokenVerifierService,
                        UsernameGenerator usernameGenerator,
-                       UserSearchService userSearchService
+                       UserSearchService userSearchService,
+                       AuditLogService auditLogService
     ) {
         this.userRepository = userRepository;
         this.authManager = authManager;
@@ -63,8 +67,10 @@ public class AuthService {
         this.googleTokenVerifierService = googleTokenVerifierService;
         this.usernameGenerator = usernameGenerator;
         this.userSearchService = userSearchService;
+        this.auditLogService = auditLogService;
     }
 
+    @Transactional
     public Operation register(RegisterUserRequest registerUserRequest, Boolean isAdmin) {
 
         if (userRepository.findByUsername(registerUserRequest.getUsername()).isPresent()) {
@@ -92,8 +98,14 @@ public class AuthService {
         entity.setProfileImage(registerUserRequest.getProfileImage());
         entity.setRole(role);
 
-        userRepository.save(entity);
+        UserEntity saved = userRepository.save(entity);
         userSearchService.indexUser(entity); // dual write into ES
+
+        if (isAdmin) {
+            auditLogService.record(AdminAuditAction.ADMIN_REGISTER, AuditTargetType.USER,
+                    saved.getId().toString(), null,
+                    AuditLogService.metadata("username", entity.getUsername()));
+        }
         return Operation.CREATED;
     }
 

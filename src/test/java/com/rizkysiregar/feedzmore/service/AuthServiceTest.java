@@ -6,6 +6,8 @@ import com.rizkysiregar.feedzmore.model.dto.GoogleUserInfo;
 import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
 import com.rizkysiregar.feedzmore.model.response.LoginResponse;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
+import com.rizkysiregar.feedzmore.model.enums.AdminAuditAction;
+import com.rizkysiregar.feedzmore.model.enums.AuditTargetType;
 import com.rizkysiregar.feedzmore.model.enums.Role;
 import com.rizkysiregar.feedzmore.model.request.*;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
@@ -61,6 +63,9 @@ public class AuthServiceTest {
     @Mock
     private UsernameGenerator usernameGenerator;
 
+    @Mock
+    private AuditLogService auditLogService;
+
     @InjectMocks
     private AuthService authService;
 
@@ -98,6 +103,34 @@ public class AuthServiceTest {
         assertEquals(Operation.CREATED, result);
         verify(userRepository, times(1))
                 .save(any(UserEntity.class));
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void testRegisterAdmin_RecordsAuditLog() {
+        UUID newAdminId = UUID.randomUUID();
+        UserEntity saved = new UserEntity();
+        saved.setId(newAdminId);
+        saved.setUsername("newadmin");
+        when(userRepository.save(any(UserEntity.class))).thenReturn(saved);
+
+        RegisterUserRequest request = new RegisterUserRequest();
+        request.setUsername("newadmin");
+        request.setPassword("password");
+        request.setEmail("admin@mail.com");
+        request.setFirstName("New");
+        request.setLastName("Admin");
+        request.setPhoneNumber("1234567890");
+
+        Operation result = authService.register(request, true);
+
+        assertEquals(Operation.CREATED, result);
+        verify(auditLogService).record(
+                eq(AdminAuditAction.ADMIN_REGISTER),
+                eq(AuditTargetType.USER),
+                eq(newAdminId.toString()),
+                isNull(),
+                any());
     }
 
     @Test

@@ -59,3 +59,4 @@ management:
       probes:
         enabled: ${MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED}
       show-details: ${MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS}
+      roles: ADMIN
