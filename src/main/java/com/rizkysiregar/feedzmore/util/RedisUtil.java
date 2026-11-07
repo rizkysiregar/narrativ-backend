@@ -49,6 +49,12 @@ public class RedisUtil implements CommandLineRunner {
         return Boolean.TRUE.equals(created);
     }
 
+    // Atomically increment a counter (INCR). A missing key starts from 0, so the first call returns 1.
+    public long increment(String key) {
+        Long value = redisTemplate.opsForValue().increment(key);
+        return value == null ? 0L : value;
+    }
+
     // Delete key
     public void delete(String key) {
         redisTemplate.delete(key);

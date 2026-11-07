@@ -32,6 +32,14 @@ public class OtpService implements IOtpService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
+    private static final String OTP_KEY_PREFIX = "otp:";
+    private static final String OTP_ATTEMPTS_KEY_PREFIX = "otp_attempts:";
+    private static final String OTP_LOCK_KEY_PREFIX = "otp_lock:";
+    private static final long OTP_TTL_SECONDS = 60;
+    // a 6 digit OTP has only 1M combinations, so the number of guesses per OTP must stay tiny
+    private static final long MAX_VERIFY_ATTEMPTS = 5;
+    private static final long LOCK_SECONDS = 5 * 60;
+
     @Value("${otp.retry-time-in-seconds}")
     String otpRetryTimeInSeconds;
 
@@ -44,13 +52,17 @@ public class OtpService implements IOtpService {
 
     @Override
     public SentOtpDTO sendOtp(String email) {
+        if (redisUtil.hasKey(OTP_LOCK_KEY_PREFIX + email)) {
+            throw new BusinessException(GlobalMessage.TOO_MANY_REQUEST_OTP, HttpStatus.TOO_MANY_REQUESTS);
+        }
+
         Optional<UserEntity> user = userRepository.findByEmail(email);
 
         if (user.isEmpty()) {
             throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
         }
 
-        if (redisUtil.hasKey("otp:" + email)) {
+        if (redisUtil.hasKey(OTP_KEY_PREFIX + email)) {
             throw new BusinessException(GlobalMessage.TOO_MANY_REQUEST_OTP, HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
         }
 
@@ -70,7 +82,8 @@ public class OtpService implements IOtpService {
                 .expirationTime(expirationTime)
                 .build();
         otpCodeRepository.save(otpCode);
-        redisUtil.set("otp:" + email, otp, 60);
+        redisUtil.set(OTP_KEY_PREFIX + email, otp, OTP_TTL_SECONDS);
+        redisUtil.delete(OTP_ATTEMPTS_KEY_PREFIX + email); // a fresh OTP starts with a fresh attempt budget
 
         return SentOtpDTO.builder()
                 .otpSendToEmailAddress(EmailMasking.maskEmail(email))
@@ -85,13 +98,30 @@ public class OtpService implements IOtpService {
 
     @Override
     public ResetTokenDTO verifyOtp(String email, String otp) {
-        Object actualOtp = redisUtil.get("otp:" + email);
+        if (redisUtil.hasKey(OTP_LOCK_KEY_PREFIX + email)) {
+            throw new BusinessException(GlobalMessage.TOO_MANY_REQUEST_OTP, HttpStatus.TOO_MANY_REQUESTS);
+        }
+
+        Object actualOtp = redisUtil.get(OTP_KEY_PREFIX + email);
 
         if (actualOtp == null) {
             throw new BusinessException(GlobalMessage.OTP_EXPIRED, HttpStatus.BAD_REQUEST);
         }
 
+        // every guess is counted before it is compared, INCR is atomic so parallel requests cannot dodge the limit
+        String attemptsKey = OTP_ATTEMPTS_KEY_PREFIX + email;
+        long attempts = redisUtil.increment(attemptsKey);
+        if (attempts == 1) {
+            redisUtil.expire(attemptsKey, OTP_TTL_SECONDS);
+        }
+        if (attempts > MAX_VERIFY_ATTEMPTS) {
+            throw new BusinessException(GlobalMessage.TOO_MANY_REQUEST_OTP, HttpStatus.TOO_MANY_REQUESTS);
+        }
+
         if (actualOtp.equals(otp)) {
+            // one time use: burn the OTP right away so it cannot be replayed
+            redisUtil.delete(OTP_KEY_PREFIX + email);
+            redisUtil.delete(attemptsKey);
             String resetToken = UUID.randomUUID().toString();
             String resetTokenKey = "reset_token:".concat(email);
             redisUtil.set(resetTokenKey, resetToken, 600);
@@ -99,11 +129,18 @@ public class OtpService implements IOtpService {
             return ResetTokenDTO.builder()
                     .resetToken(resetToken)
                     .build();
-        } else {
-            log.info("## OTP not matched");
-            throw new BusinessException(GlobalMessage.INVALID_OTP, HttpStatus.BAD_REQUEST);
         }
-    }
 
+        log.info("## OTP not matched, attempt {}/{}", attempts, MAX_VERIFY_ATTEMPTS);
+        if (attempts == MAX_VERIFY_ATTEMPTS) {
+            // budget spent: burn the OTP and block both verify and re-send for a while
+            log.warn("## OTP verify limit reached for email: {}", EmailMasking.maskEmail(email));
+            redisUtil.delete(OTP_KEY_PREFIX + email);
+            redisUtil.delete(attemptsKey);
+            redisUtil.set(OTP_LOCK_KEY_PREFIX + email, "1", LOCK_SECONDS);
+            throw new BusinessException(GlobalMessage.TOO_MANY_REQUEST_OTP, HttpStatus.TOO_MANY_REQUESTS);
+        }
+        throw new BusinessException(GlobalMessage.INVALID_OTP, HttpStatus.BAD_REQUEST);
+    }
 
 }
