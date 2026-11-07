@@ -32,6 +32,10 @@ app:
     post-create: ${APP_RATE_LIMIT_POST_CREATE}
     interaction: ${APP_RATE_LIMIT_INTERACTION}
     default: ${APP_RATE_LIMIT_DEFAULT}
+    # anonymous /auth/** calls (login, register, otp, ...), per client IP per minute
+    auth: ${APP_RATE_LIMIT_AUTH:10}
+    # header the edge sets with the real client IP (Cloudflare: CF-Connecting-IP). Empty = use socket address
+    client-ip-header: ${APP_RATE_LIMIT_CLIENT_IP_HEADER:CF-Connecting-IP}
   messaging:
     idempotency-ttl-seconds: ${APP_MESSAGING_IDEMPOTENCY_TTL_SECONDS:86400}
 
