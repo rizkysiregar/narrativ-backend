@@ -44,6 +44,10 @@ public enum GlobalMessage {
     REPORT_ALREADY_CLOSED("409", "Laporan ini sudah ditutup."),
     REPORT_ACTION_NOT_APPLICABLE("400", "Aksi ini tidak berlaku untuk jenis target laporan tersebut."),
     REPORT_NOTE_REQUIRED("400", "Catatan sepanjang 5 sampai 500 karakter wajib diisi untuk aksi ini."),
+    PARAMETER_KEY_EXISTS("409", "Parameter dengan key ini sudah ada."),
+    TEMPLATE_CODE_EXISTS("409", "Template dengan code ini sudah ada."),
+    NOTHING_TO_UPDATE("400", "Tidak ada data yang diubah. Isi minimal satu field."),
+    BROADCAST_FAILED("502", "Notifikasi gagal dikirim ke Firebase. Coba lagi nanti."),
     EMAIL_ALREADY_TAKEN("400", "Email ini sudah terdaftar. Silakan gunakan email lain atau masuk ke akun Anda."),
     ;
 

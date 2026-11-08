@@ -6,5 +6,6 @@ public enum AuditTargetType {
     COMMENT,
     REPORT,
     PARAMETER,
-    NOTIFICATION_TEMPLATE
+    NOTIFICATION_TEMPLATE,
+    BROADCAST
 }
