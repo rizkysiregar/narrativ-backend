@@ -35,6 +35,9 @@ public enum GlobalMessage {
     CANNOT_BAN_ADMIN("403", "Admin tidak dapat diblokir. Turunkan role admin tersebut terlebih dahulu."),
     CANNOT_CHANGE_OWN_ROLE("403", "Anda tidak dapat mengubah role akun Anda sendiri."),
     LAST_ADMIN("409", "Tidak dapat menurunkan role admin terakhir."),
+    CONTENT_ALREADY_TAKEN_DOWN("409", "Konten ini sudah di-takedown."),
+    CONTENT_NOT_TAKEN_DOWN("409", "Konten ini tidak sedang di-takedown."),
+    POST_ALREADY_DELETED("409", "Post ini sudah dihapus oleh pemiliknya sehingga tidak dapat dimoderasi."),
     EMAIL_ALREADY_TAKEN("400", "Email ini sudah terdaftar. Silakan gunakan email lain atau masuk ke akun Anda."),
     ;
 

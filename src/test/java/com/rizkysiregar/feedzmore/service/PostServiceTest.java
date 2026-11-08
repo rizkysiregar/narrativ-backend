@@ -34,6 +34,8 @@ import org.springframework.http.HttpStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -524,5 +526,79 @@ public class PostServiceTest {
 
         assertEquals(GlobalMessage.ACCESS_DENIED.getMessage(), exception.getMessage());
         verify(postCrudRepository, never()).save(any());
+    }
+
+    // ------------------------------------------------------------ takedown in the feed
+
+    private PostEntity takenDownPost(UserEntity author) {
+        return PostEntity.builder().id(UUID.randomUUID()).user(author).caption("secret caption")
+                .mediaUrl("media.jpg").thumbnailUrl("thumb.jpg").mediaType(MediaType.VIDEO)
+                .createdAt(LocalDateTime.now())
+                .moderationStatus(ModerationStatus.TAKEN_DOWN)
+                .moderatedAt(Instant.parse("2026-11-08T01:00:00Z"))
+                .moderationReason("melanggar aturan komunitas")
+                .build();
+    }
+
+    @Test
+    void feed_takenDownPost_isListedWithStatusButWithoutContentForOtherUsers() throws Exception {
+        UUID viewerId = UUID.randomUUID();
+        UserEntity author = new UserEntity();
+        author.setId(UUID.randomUUID());
+        author.setUsername("author");
+        PostEntity post = takenDownPost(author);
+        when(postPaginationRepository.findAllActivePosts(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
+
+        PostFeedResponse item = postService.getExplorePosts(0, 10, viewerId).getContent().get(0);
+
+        assertEquals(ModerationStatus.TAKEN_DOWN, item.getModerationStatus());
+        assertEquals(Instant.parse("2026-11-08T01:00:00Z"), item.getTakenDownAt());
+        assertNull(item.getTakedownReason());
+        assertNull(item.getCaption());
+        assertNull(item.getMediaUrl());
+        assertNull(item.getThumbnailUrl());
+        verify(fileStorageService, never()).getPresignUrl(any());
+    }
+
+    @Test
+    void feed_takenDownPost_authorStillSeesHisContentAndTheReason() throws Exception {
+        UserEntity author = new UserEntity();
+        author.setId(UUID.randomUUID());
+        author.setUsername("author");
+        PostEntity post = takenDownPost(author);
+        when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(author.getId())))
+                .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
+        when(userRepository.findActiveByUsername("author")).thenReturn(Optional.of(author));
+        when(fileStorageService.getPresignUrl("media.jpg")).thenReturn("signed-media");
+        when(fileStorageService.getPresignUrl("thumb.jpg")).thenReturn("signed-thumb");
+
+        PostFeedResponse item = postService.getAllPostByUserId(0, 10, "author", author.getId()).getContent().get(0);
+
+        assertEquals(ModerationStatus.TAKEN_DOWN, item.getModerationStatus());
+        assertEquals("melanggar aturan komunitas", item.getTakedownReason());
+        assertEquals("secret caption", item.getCaption());
+        assertEquals("signed-media", item.getMediaUrl());
+        assertEquals("signed-thumb", item.getThumbnailUrl());
+    }
+
+    @Test
+    void feed_activePost_hasActiveStatusAndNoTakedownFields() throws Exception {
+        UserEntity author = new UserEntity();
+        author.setId(UUID.randomUUID());
+        author.setUsername("author");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("hello")
+                .mediaUrl("img.jpg").mediaType(MediaType.IMAGE).createdAt(LocalDateTime.now()).build();
+        when(postPaginationRepository.findAllActivePosts(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
+        when(fileStorageService.getPresignUrl("img.jpg")).thenReturn("signed-img");
+
+        PostFeedResponse item = postService.getExplorePosts(0, 10, UUID.randomUUID()).getContent().get(0);
+
+        assertEquals(ModerationStatus.ACTIVE, item.getModerationStatus());
+        assertNull(item.getTakedownReason());
+        assertNull(item.getTakenDownAt());
+        assertEquals("hello", item.getCaption());
+        assertEquals("signed-img", item.getMediaUrl());
     }
 }

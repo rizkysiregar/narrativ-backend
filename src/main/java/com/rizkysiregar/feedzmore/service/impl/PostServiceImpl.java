@@ -18,6 +18,7 @@ import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
 import com.rizkysiregar.feedzmore.model.request.CreatePostUploadUrlRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.model.enums.MediaType;
+import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
 import com.rizkysiregar.feedzmore.repository.*;
 import com.rizkysiregar.feedzmore.service.FileStorageService;
 import com.rizkysiregar.feedzmore.service.PostService;
@@ -97,6 +98,26 @@ public class PostServiceImpl implements PostService {
         return buildPaginatedResponse(postPage, viewerId);
     }
 
+    /**
+     * A taken down post stays in the list with its status so the client can filter on it. Its author also gets
+     * the reason and keeps seeing his own caption and media; everybody else gets neither, so the content
+     * cannot be read through the API.
+     */
+    private void applyModeration(PostFeedResponse response, PostEntity post, UUID viewerId) {
+        response.setModerationStatus(post.getModerationStatus());
+        if (post.getModerationStatus() != ModerationStatus.TAKEN_DOWN) {
+            return;
+        }
+        response.setTakenDownAt(post.getModeratedAt());
+        if (viewerId != null && viewerId.equals(post.getUser().getId())) {
+            response.setTakedownReason(post.getModerationReason());
+        } else {
+            response.setCaption(null);
+            response.setMediaUrl(null);
+            response.setThumbnailUrl(null);
+        }
+    }
+
     private PaginatedResponse<PostFeedResponse> buildPaginatedResponse(Page<PostEntity> postPage, UUID statusUserId) {
         List<PostEntity> posts = postPage.getContent();
         List<PostFeedResponse> content = List.of();
@@ -122,6 +143,10 @@ public class PostServiceImpl implements PostService {
                         commentCounts.getOrDefault(post.getId(), 0L),
                         likedPostIds.contains(post.getId())
                 );
+                applyModeration(response, post, statusUserId);
+                if (response.getMediaUrl() == null) {
+                    return response;
+                }
                 try {
                     response.setMediaUrl(fileStorageService.getPresignUrl(response.getMediaUrl()));
                     if (response.getThumbnailUrl() != null) {

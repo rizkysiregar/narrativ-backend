@@ -1,8 +1,10 @@
 package com.rizkysiregar.feedzmore.model.response;
 
 import com.rizkysiregar.feedzmore.model.enums.MediaType;
+import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -20,6 +22,10 @@ public class PostFeedResponse {
     private long likeCount;
     private long commentCount;
     private boolean isLiked;
+    // TAKEN_DOWN posts are still listed so the client can filter on this; caption and media are only sent to the author
+    private ModerationStatus moderationStatus = ModerationStatus.ACTIVE;
+    private String takedownReason;
+    private Instant takenDownAt;
 
     public PostFeedResponse(UUID id, String username, String caption, String mediaUrl, MediaType mediaType,
                             String thumbnailUrl, LocalDateTime createdAt,

@@ -6,10 +6,12 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 import com.rizkysiregar.feedzmore.model.enums.MediaType;
+import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
 
 @Entity
 @Table(name = "posts")
@@ -44,4 +46,19 @@ public class PostEntity {
 
     @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted;
+
+    // admin moderation, independent of the owner's own delete
+    @Enumerated(EnumType.STRING)
+    @Column(name = "moderation_status", nullable = false, length = 20)
+    @Builder.Default
+    private ModerationStatus moderationStatus = ModerationStatus.ACTIVE;
+
+    @Column(name = "moderated_at")
+    private Instant moderatedAt;
+
+    @Column(name = "moderated_by")
+    private UUID moderatedBy;
+
+    @Column(name = "moderation_reason", length = 500)
+    private String moderationReason;
 }
