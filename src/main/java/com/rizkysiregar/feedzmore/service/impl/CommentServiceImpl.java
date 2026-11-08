@@ -4,6 +4,7 @@ import com.rizkysiregar.feedzmore.model.response.CommentResponse;
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
+import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.CommentRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
@@ -33,13 +34,16 @@ public class CommentServiceImpl implements CommentService {
     @Override
     public Operation addComment(UUID postId, UUID userId, String content, UUID parentId) {
         // add new comment
-        PostEntity post = postCrudRepository.findByIdAndIsDeletedFalse(postId)
+        PostEntity post = postCrudRepository.findInteractableById(postId)
                 .orElseThrow(() -> new EntityNotFoundException("Post Not Found"));
 
         CommentEntity parentComment = null;
         if (parentId != null) {
             parentComment = commentRepository.findById(parentId)
                     .orElseThrow(() -> new EntityNotFoundException("Parent comment not found"));
+            if (parentComment.getModerationStatus() == ModerationStatus.TAKEN_DOWN) {
+                throw new EntityNotFoundException("Parent comment not found");
+            }
         }
 
         UserEntity user = userRepository.findById(userId).orElseThrow(() -> new EntityNotFoundException("User not found"));
@@ -56,15 +60,15 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
-    public PaginatedResponse<CommentResponse> getComment(UUID postId, int page, int size) {
-        if (!postCrudRepository.existsByIdAndIsDeletedFalse(postId)) {
+    public PaginatedResponse<CommentResponse> getComment(UUID postId, int page, int size, UUID viewerId) {
+        if (!postCrudRepository.existsInteractableById(postId)) {
             throw new EntityNotFoundException("Post Not Found");
         }
         Pageable pageable = PageRequest.of(page, size);
         Page<CommentResponse> commentPage = commentRepository.findTopLevelCommentResponses(postId, pageable);
 
         return new PaginatedResponse<>(
-                commentPage.getContent(),
+                commentPage.getContent().stream().map(comment -> comment.forViewer(viewerId)).toList(),
                 commentPage.getNumber(),
                 commentPage.getSize(),
                 commentPage.getTotalElements(),
@@ -74,8 +78,10 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
-    public List<CommentEntity> getReplies(UUID commentId) {
-        return commentRepository.findByParentIdOrderByCreatedAtAsc(commentId);
+    public List<CommentResponse> getReplies(UUID commentId, UUID viewerId) {
+        return commentRepository.findReplyResponses(commentId).stream()
+                .map(reply -> reply.forViewer(viewerId))
+                .toList();
     }
 
     @Override

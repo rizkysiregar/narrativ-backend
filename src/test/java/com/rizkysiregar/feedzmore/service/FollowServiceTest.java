@@ -82,21 +82,21 @@ class FollowServiceTest {
 
     @Test
     void followRejectsDeletedRequester() {
-        when(userRepository.findByIdAndIsDeletedFalse(requesterId)).thenReturn(Optional.empty());
+        when(userRepository.findActiveById(requesterId)).thenReturn(Optional.empty());
 
         BusinessException error = assertThrows(BusinessException.class,
                 () -> followService.follow(targetId, requesterId));
 
         assertEquals(GlobalMessage.USER_NOT_FOUND.getMessage(), error.getMessage());
         assertEquals(HttpStatus.NOT_FOUND, error.getHttpStatus());
-        verify(userRepository, never()).findByIdAndIsDeletedFalse(targetId);
+        verify(userRepository, never()).findActiveById(targetId);
         verifyNoInteractions(followRepository);
     }
 
     @Test
     void followRejectsDeletedTarget() {
-        when(userRepository.findByIdAndIsDeletedFalse(requesterId)).thenReturn(Optional.of(new UserEntity()));
-        when(userRepository.findByIdAndIsDeletedFalse(targetId)).thenReturn(Optional.empty());
+        when(userRepository.findActiveById(requesterId)).thenReturn(Optional.of(new UserEntity()));
+        when(userRepository.findActiveById(targetId)).thenReturn(Optional.empty());
 
         BusinessException error = assertThrows(BusinessException.class,
                 () -> followService.follow(targetId, requesterId));
@@ -116,7 +116,7 @@ class FollowServiceTest {
 
     @Test
     void unfollowRejectsInactiveTarget() {
-        when(userRepository.findByIdAndIsDeletedFalse(requesterId)).thenReturn(Optional.of(new UserEntity()));
+        when(userRepository.findActiveById(requesterId)).thenReturn(Optional.of(new UserEntity()));
 
         assertThrows(BusinessException.class, () -> followService.unfollow(targetId, requesterId));
         verifyNoInteractions(followRepository);
@@ -170,7 +170,7 @@ class FollowServiceTest {
 
     @Test
     void inactiveRequesterCannotReadLists() {
-        when(userRepository.findByIdAndIsDeletedFalse(requesterId)).thenReturn(Optional.empty());
+        when(userRepository.findActiveById(requesterId)).thenReturn(Optional.empty());
 
         assertThrows(BusinessException.class, () -> followService.getFollowers(targetId, requesterId, 0, 20));
         verifyNoInteractions(followRepository);
@@ -202,7 +202,7 @@ class FollowServiceTest {
     }
 
     private void activeUsers() {
-        when(userRepository.findByIdAndIsDeletedFalse(requesterId)).thenReturn(Optional.of(new UserEntity()));
-        when(userRepository.findByIdAndIsDeletedFalse(targetId)).thenReturn(Optional.of(new UserEntity()));
+        when(userRepository.findActiveById(requesterId)).thenReturn(Optional.of(new UserEntity()));
+        when(userRepository.findActiveById(targetId)).thenReturn(Optional.of(new UserEntity()));
     }
 }

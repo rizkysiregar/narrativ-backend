@@ -18,6 +18,7 @@ import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
 import com.rizkysiregar.feedzmore.model.request.CreatePostUploadUrlRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.model.enums.MediaType;
+import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
 import com.rizkysiregar.feedzmore.repository.*;
 import com.rizkysiregar.feedzmore.service.FileStorageService;
 import com.rizkysiregar.feedzmore.service.PostService;
@@ -89,12 +90,32 @@ public class PostServiceImpl implements PostService {
     public PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String username, UUID viewerId) {
         log.info("FETCH.FEED.BY.USERNAME =  {}, size= {} , username= {}", page, size, username);
 
-        UserEntity user = userRepository.findByUsernameAndIsDeletedFalse(username)
+        UserEntity user = userRepository.findActiveByUsername(username)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
 
         Pageable pageable = PageRequest.of(page, size);
         Page<PostEntity> postPage = postPaginationRepository.findAllActivePostsByUserId(pageable, user.getId());
         return buildPaginatedResponse(postPage, viewerId);
+    }
+
+    /**
+     * A taken down post stays in the list with its status so the client can filter on it. Its author also gets
+     * the reason and keeps seeing his own caption and media; everybody else gets neither, so the content
+     * cannot be read through the API.
+     */
+    private void applyModeration(PostFeedResponse response, PostEntity post, UUID viewerId) {
+        response.setModerationStatus(post.getModerationStatus());
+        if (post.getModerationStatus() != ModerationStatus.TAKEN_DOWN) {
+            return;
+        }
+        response.setTakenDownAt(post.getModeratedAt());
+        if (viewerId != null && viewerId.equals(post.getUser().getId())) {
+            response.setTakedownReason(post.getModerationReason());
+        } else {
+            response.setCaption(null);
+            response.setMediaUrl(null);
+            response.setThumbnailUrl(null);
+        }
     }
 
     private PaginatedResponse<PostFeedResponse> buildPaginatedResponse(Page<PostEntity> postPage, UUID statusUserId) {
@@ -122,6 +143,10 @@ public class PostServiceImpl implements PostService {
                         commentCounts.getOrDefault(post.getId(), 0L),
                         likedPostIds.contains(post.getId())
                 );
+                applyModeration(response, post, statusUserId);
+                if (response.getMediaUrl() == null) {
+                    return response;
+                }
                 try {
                     response.setMediaUrl(fileStorageService.getPresignUrl(response.getMediaUrl()));
                     if (response.getThumbnailUrl() != null) {
@@ -147,7 +172,7 @@ public class PostServiceImpl implements PostService {
     public CreatePostUploadUrlResponse createUploadUrl(UUID userId, CreatePostUploadUrlRequest request) {
         log.info("NEW.POST.UPLOAD.URL: {}", userId);
 
-        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+        UserEntity user = userRepository.findActiveById(userId)
                 .orElseThrow(() -> {
                     log.error("Active user not found {}", userId);
                     return new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
@@ -189,7 +214,7 @@ public class PostServiceImpl implements PostService {
     public CreatePostResponse addNewPost(UUID userId, AddPostRequest request) {
         log.info("NEW.FEED.POST: {}", userId);
 
-        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+        UserEntity user = userRepository.findActiveById(userId)
                 .orElseThrow(() -> {
                     log.error("Active user not found {}", userId);
                     return new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);

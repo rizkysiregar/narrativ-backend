@@ -35,6 +35,10 @@ public interface LikeRepository extends JpaRepository<LikeEntity, UUID> {
     Optional<LikeEntity> findByUserIdAndPostId(UUID userId, UUID postId);
 
     @Modifying
+    @Query("DELETE FROM LikeEntity l WHERE l.post.id = :postId")
+    int deleteAllByPostId(@Param("postId") UUID postId);
+
+    @Modifying
     @Query("DELETE FROM LikeEntity l WHERE l.user.id = :userId AND l.post.id = :postId")
     int deleteDirectly(UUID userId, UUID postId);
 

@@ -37,14 +37,16 @@ public class CommentController {
     public PaginatedResponse<CommentResponse> getComments(
             @PathVariable UUID postId,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        return commentService.getComment(postId, page, size);
+        return commentService.getComment(postId, page, size, userPrincipal.getUserId());
     }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Get a replay of a comment")
     @GetMapping("/replies/{commentId}")
-    List<CommentEntity> getReplies(@PathVariable UUID commentId) {
-        return commentService.getReplies(commentId);
+    List<CommentResponse> getReplies(@PathVariable UUID commentId,
+                                     @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return commentService.getReplies(commentId, userPrincipal.getUserId());
     }
 }

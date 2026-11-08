@@ -1,16 +1,22 @@
 package com.rizkysiregar.feedzmore.controller;
 
+import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.request.BroadcastNotificationRequest;
-import com.rizkysiregar.feedzmore.service.firebase.FirebaseNotificationService;
+import com.rizkysiregar.feedzmore.service.AdminBroadcastService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Mono;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Author: Habib Rizky Almajid Siregar
- * Date: 24/09/25
+ * Date: 07/11/25
  * Description: Programmer
  */
 
@@ -18,14 +24,20 @@ import reactor.core.publisher.Mono;
 @RequestMapping("/notifications")
 @RequiredArgsConstructor
 public class NotificationController {
-    private final FirebaseNotificationService notificationService;
+    private final AdminBroadcastService broadcastService;
 
-    @Operation(summary = "Broadcast notification via firebase by super admin or admin", description = "only admin role that can use this api")
+    /**
+     * @deprecated moved to POST /admin/notifications/broadcast. Kept for one release as an alias that now goes
+     * through the same validation, history and audit log, and still answers with the Firebase response as before.
+     */
+    @Deprecated
+    @Operation(summary = "DEPRECATED, use POST /admin/notifications/broadcast. Broadcast notification via firebase by an admin", description = "only admin role that can use this api")
     @PostMapping("broadcast")
     @PreAuthorize("hasRole('ADMIN')")
-    public Mono<String> adminBroadcastTopic(
-            @RequestBody BroadcastNotificationRequest request
-            ) {
-        return notificationService.sendNotificationToTopic(request.getTopic(), request.getTitle(), request.getBody());
+    public String adminBroadcastTopic(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal admin,
+            @Valid @RequestBody BroadcastNotificationRequest request
+    ) {
+        return broadcastService.broadcast(request, admin.getUserId()).getFcmResponse();
     }
 }

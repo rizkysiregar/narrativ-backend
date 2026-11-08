@@ -1,6 +1,7 @@
 package com.rizkysiregar.feedzmore.model.entity;
 
 import com.rizkysiregar.feedzmore.model.enums.Role;
+import com.rizkysiregar.feedzmore.model.enums.UserStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.Data;
@@ -8,6 +9,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -63,5 +65,19 @@ public class UserEntity {
 
     @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted;
+
+    // admin moderation, independent of isDeleted (which the user controls by deleting the account)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserStatus status = UserStatus.ACTIVE;
+
+    @Column(name = "banned_at")
+    private Instant bannedAt;
+
+    @Column(name = "banned_by")
+    private UUID bannedBy;
+
+    @Column(name = "ban_reason", length = 500)
+    private String banReason;
 
 }

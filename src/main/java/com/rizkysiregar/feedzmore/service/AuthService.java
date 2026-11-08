@@ -1,7 +1,10 @@
 package com.rizkysiregar.feedzmore.service;
 
 import com.rizkysiregar.feedzmore.model.dto.GoogleUserInfo;
+import com.rizkysiregar.feedzmore.model.enums.AdminAuditAction;
+import com.rizkysiregar.feedzmore.model.enums.AuditTargetType;
 import com.rizkysiregar.feedzmore.model.enums.Role;
+import com.rizkysiregar.feedzmore.model.enums.UserStatus;
 import com.rizkysiregar.feedzmore.model.request.*;
 import com.rizkysiregar.feedzmore.service.auth.GoogleTokenVerifierService;
 import com.rizkysiregar.feedzmore.util.RedisUtil;
@@ -12,6 +15,7 @@ import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
+import com.rizkysiregar.feedzmore.util.BanMessages;
 import com.rizkysiregar.feedzmore.util.Operation;
 import com.rizkysiregar.feedzmore.util.UsernameGenerator;
 import jakarta.persistence.criteria.Predicate;
@@ -37,6 +41,8 @@ import java.util.UUID;
 public class AuthService {
 
     private static final String REFRESH_TOKEN_PREFIX = "refresh_token:";
+    // set of the refresh tokens a user currently holds, so they can all be revoked at once (ban, force logout)
+    private static final String USER_REFRESH_TOKENS_PREFIX = "user_refresh_tokens:";
     private static final long REFRESH_TOKEN_TTL_SECONDS = 60L * 60 * 24 * 30; // 30 days
 
     final UserRepository userRepository;
@@ -47,6 +53,7 @@ public class AuthService {
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
     private final GoogleTokenVerifierService googleTokenVerifierService;
     private final UsernameGenerator usernameGenerator;
+    private final AuditLogService auditLogService;
 
     public AuthService(UserRepository userRepository,
                        AuthenticationManager authManager,
@@ -54,7 +61,8 @@ public class AuthService {
                        RedisUtil redisUtil,
                        GoogleTokenVerifierService googleTokenVerifierService,
                        UsernameGenerator usernameGenerator,
-                       UserSearchService userSearchService
+                       UserSearchService userSearchService,
+                       AuditLogService auditLogService
     ) {
         this.userRepository = userRepository;
         this.authManager = authManager;
@@ -63,8 +71,10 @@ public class AuthService {
         this.googleTokenVerifierService = googleTokenVerifierService;
         this.usernameGenerator = usernameGenerator;
         this.userSearchService = userSearchService;
+        this.auditLogService = auditLogService;
     }
 
+    @Transactional
     public Operation register(RegisterUserRequest registerUserRequest, Boolean isAdmin) {
 
         if (userRepository.findByUsername(registerUserRequest.getUsername()).isPresent()) {
@@ -92,8 +102,14 @@ public class AuthService {
         entity.setProfileImage(registerUserRequest.getProfileImage());
         entity.setRole(role);
 
-        userRepository.save(entity);
+        UserEntity saved = userRepository.save(entity);
         userSearchService.indexUser(entity); // dual write into ES
+
+        if (isAdmin) {
+            auditLogService.record(AdminAuditAction.ADMIN_REGISTER, AuditTargetType.USER,
+                    saved.getId().toString(), null,
+                    AuditLogService.metadata("username", entity.getUsername()));
+        }
         return Operation.CREATED;
     }
 
@@ -111,6 +127,9 @@ public class AuthService {
         if (userEntity.isEmpty()) {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
+
+        // after the password was verified, so the ban status is never revealed to someone guessing credentials
+        assertNotBanned(userEntity.get());
 
         String token = jwtService.generateToken(
                 userEntity.get().getUsername(),
@@ -154,6 +173,7 @@ public class AuthService {
                 })
                 .orElseGet(() -> createGoogleUser(googleUser));
 
+        assertNotBanned(user);
         userRepository.save(user);
         userSearchService.indexUser(user);
         // Generate JWT - same as regular login
@@ -175,16 +195,28 @@ public class AuthService {
             throw new BusinessException(GlobalMessage.UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
         }
 
-        // rotation: a refresh token can only be used once
-        redisUtil.delete(key);
-
         UserEntity user;
         try {
-            user = userRepository.findByIdAndIsDeletedFalse(UUID.fromString(storedUserId.toString()))
-                    .orElseThrow(() -> new BusinessException(GlobalMessage.UNAUTHORIZED, HttpStatus.UNAUTHORIZED));
+            user = userRepository.findById(UUID.fromString(storedUserId.toString()))
+                    .filter(found -> !found.isDeleted())
+                    .orElse(null);
         } catch (IllegalArgumentException e) {
+            user = null;
+        }
+
+        if (user == null) {
+            // the token belongs to nobody (anymore): it is useless, drop it
+            redisUtil.delete(key);
             throw new BusinessException(GlobalMessage.UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
         }
+
+        // a banned user keeps the token on purpose: every retry must tell the app the account is banned, and why.
+        // The tokens are revoked on unban, so a session from before the ban never silently comes back.
+        assertNotBanned(user);
+
+        // rotation: a refresh token can only be used once
+        redisUtil.delete(key);
+        redisUtil.removeFromSet(USER_REFRESH_TOKENS_PREFIX.concat(storedUserId.toString()), refreshToken);
 
         return LoginResponse.builder()
                 .token(jwtService.generateToken(user.getUsername(), user.getId(), user.getRole()))
@@ -198,7 +230,27 @@ public class AuthService {
     private String issueRefreshToken(UUID userId) {
         String refreshToken = UUID.randomUUID().toString();
         redisUtil.set(REFRESH_TOKEN_PREFIX.concat(refreshToken), userId.toString(), REFRESH_TOKEN_TTL_SECONDS);
+        redisUtil.addToSet(USER_REFRESH_TOKENS_PREFIX.concat(userId.toString()), refreshToken, REFRESH_TOKEN_TTL_SECONDS);
         return refreshToken;
+    }
+
+    /**
+     * Revokes every refresh token the user holds (force logout, unban). Access tokens stay valid until they
+     * expire (15 minutes), tokens issued before the per-user index existed are not covered and die on their
+     * own TTL or on use.
+     */
+    public void revokeRefreshTokens(UUID userId) {
+        String indexKey = USER_REFRESH_TOKENS_PREFIX.concat(userId.toString());
+        for (String token : redisUtil.membersOfSet(indexKey)) {
+            redisUtil.delete(REFRESH_TOKEN_PREFIX.concat(token));
+        }
+        redisUtil.delete(indexKey);
+    }
+
+    private void assertNotBanned(UserEntity user) {
+        if (user.getStatus() == UserStatus.BANNED) {
+            throw BanMessages.bannedException(user.getBanReason());
+        }
     }
 
     private UserEntity createGoogleUser(GoogleUserInfo googleUser) {
@@ -246,7 +298,7 @@ public class AuthService {
     public UserDetailDTO getUserById(String userId) {
         log.info("Getting user by userId: {}", userId);
         try {
-            return userRepository.findById(UUID.fromString(userId))
+            return userRepository.findActiveById(UUID.fromString(userId))
                     .map(UserDetailDTO::from)
                     .orElseThrow(() ->
                             new BusinessException(
@@ -272,6 +324,7 @@ public class AuthService {
             List<Predicate> predicates = new ArrayList<>();
 
             predicates.add(cb.isFalse(root.get("isDeleted")));
+            predicates.add(cb.equal(root.get("status"), UserStatus.ACTIVE));
 
             if (request.username() != null) {
                 predicates.add(cb.like(
@@ -309,6 +362,7 @@ public class AuthService {
             List<Predicate> predicates = new ArrayList<>();
 
             predicates.add(cb.isFalse(root.get("isDeleted")));
+            predicates.add(cb.equal(root.get("status"), UserStatus.ACTIVE));
 
             if (request.username() != null) {
                 predicates.add(cb.like(

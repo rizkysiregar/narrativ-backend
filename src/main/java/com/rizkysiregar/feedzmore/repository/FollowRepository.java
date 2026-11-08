@@ -14,6 +14,11 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface FollowRepository extends JpaRepository<FollowEntity, UUID> {
+    // raw row counts for the admin view (the "active" counts below hide banned/deleted counterparts)
+    long countByFollowedId(UUID followedId);
+
+    long countByFollowerId(UUID followerId);
+
     @Modifying
     @Query(value = """
             INSERT INTO follows (id, follower_id, followed_id, created_at)
@@ -31,21 +36,21 @@ public interface FollowRepository extends JpaRepository<FollowEntity, UUID> {
     @Query("""
             SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END FROM FollowEntity f
             WHERE f.follower.id = :followerId AND f.followed.id = :followedId
-              AND f.follower.isDeleted = false AND f.followed.isDeleted = false
+              AND f.follower.isDeleted = false AND f.follower.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND f.followed.isDeleted = false AND f.followed.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
             """)
     boolean existsActiveFollow(@Param("followerId") UUID followerId, @Param("followedId") UUID followedId);
 
     @Query("""
             SELECT COUNT(f) FROM FollowEntity f
             WHERE f.followed.id = :followedId
-              AND f.follower.isDeleted = false AND f.followed.isDeleted = false
+              AND f.follower.isDeleted = false AND f.follower.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND f.followed.isDeleted = false AND f.followed.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
             """)
     long countActiveFollowers(@Param("followedId") UUID followedId);
 
     @Query("""
             SELECT COUNT(f) FROM FollowEntity f
             WHERE f.follower.id = :followerId
-              AND f.follower.isDeleted = false AND f.followed.isDeleted = false
+              AND f.follower.isDeleted = false AND f.follower.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND f.followed.isDeleted = false AND f.followed.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
             """)
     long countActiveFollowing(@Param("followerId") UUID followerId);
 
@@ -53,11 +58,11 @@ public interface FollowRepository extends JpaRepository<FollowEntity, UUID> {
             SELECT new com.rizkysiregar.feedzmore.model.response.FollowUserResponse(
                 follower.id, follower.username, follower.firstName, follower.lastName, follower.profileImage)
             FROM FollowEntity f JOIN f.follower follower JOIN f.followed followed
-            WHERE followed.id = :followedId AND follower.isDeleted = false AND followed.isDeleted = false
+            WHERE followed.id = :followedId AND follower.isDeleted = false AND follower.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND followed.isDeleted = false AND followed.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
             ORDER BY follower.id ASC
             """, countQuery = """
             SELECT COUNT(f) FROM FollowEntity f JOIN f.follower follower JOIN f.followed followed
-            WHERE followed.id = :followedId AND follower.isDeleted = false AND followed.isDeleted = false
+            WHERE followed.id = :followedId AND follower.isDeleted = false AND follower.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND followed.isDeleted = false AND followed.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
             """)
     Page<FollowUserResponse> findActiveFollowers(@Param("followedId") UUID followedId, Pageable pageable);
 
@@ -65,24 +70,24 @@ public interface FollowRepository extends JpaRepository<FollowEntity, UUID> {
             SELECT new com.rizkysiregar.feedzmore.model.response.FollowUserResponse(
                 followed.id, followed.username, followed.firstName, followed.lastName, followed.profileImage)
             FROM FollowEntity f JOIN f.follower follower JOIN f.followed followed
-            WHERE follower.id = :followerId AND follower.isDeleted = false AND followed.isDeleted = false
+            WHERE follower.id = :followerId AND follower.isDeleted = false AND follower.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND followed.isDeleted = false AND followed.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
             ORDER BY followed.id ASC
             """, countQuery = """
             SELECT COUNT(f) FROM FollowEntity f JOIN f.follower follower JOIN f.followed followed
-            WHERE follower.id = :followerId AND follower.isDeleted = false AND followed.isDeleted = false
+            WHERE follower.id = :followerId AND follower.isDeleted = false AND follower.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND followed.isDeleted = false AND followed.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
             """)
     Page<FollowUserResponse> findActiveFollowing(@Param("followerId") UUID followerId, Pageable pageable);
 
     @Query("""
             SELECT follower.id FROM FollowEntity f JOIN f.follower follower JOIN f.followed followed
-            WHERE followed.id = :followedId AND follower.isDeleted = false AND followed.isDeleted = false
+            WHERE followed.id = :followedId AND follower.isDeleted = false AND follower.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND followed.isDeleted = false AND followed.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
             ORDER BY follower.id ASC
             """)
     List<UUID> findActiveFollowerIdsByFollowedId(@Param("followedId") UUID followedId, Pageable pageable);
 
     @Query("""
             SELECT follower.id FROM FollowEntity f JOIN f.follower follower JOIN f.followed followed
-            WHERE followed.id = :followedId AND follower.isDeleted = false AND followed.isDeleted = false
+            WHERE followed.id = :followedId AND follower.isDeleted = false AND follower.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND followed.isDeleted = false AND followed.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
               AND follower.id > :afterFollowerId
             ORDER BY follower.id ASC
             """)

@@ -14,10 +14,14 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.context.MessageSourceResolvable;
+import org.springframework.validation.method.ParameterErrors;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.stream.Collectors;
 
@@ -90,6 +94,42 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
                 .build(),
                 HttpStatus.FORBIDDEN
         );
+    }
+
+    // thrown instead of MethodArgumentNotValidException when a controller method also has constraints on its
+    // own parameters (e.g. @PathVariable @NotBlank next to @Valid @RequestBody)
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    @ResponseStatus(value = HttpStatus.BAD_REQUEST)
+    public ResponseEntity<?> handlerMethodValidationException(HandlerMethodValidationException ex) {
+        String errorMessage = ex.getParameterValidationResults().stream()
+                .flatMap(result -> {
+                    if (result instanceof ParameterErrors parameterErrors) {
+                        return parameterErrors.getFieldErrors().stream()
+                                .map(error -> error.getField() + ": " + error.getDefaultMessage());
+                    }
+                    return result.getResolvableErrors().stream().map(MessageSourceResolvable::getDefaultMessage);
+                })
+                .collect(Collectors.joining("; "));
+
+        log.warn("Method validation failed: {}", errorMessage);
+
+        return new ResponseEntity<>(BaseResponse.builder()
+                .code(GlobalMessage.BAD_REQUEST.getCode())
+                .message(errorMessage.isBlank() ? GlobalMessage.BAD_REQUEST.getMessage() : errorMessage)
+                .build(),
+                HttpStatus.BAD_REQUEST);
+    }
+
+    // a request parameter that cannot be read as its type, e.g. from=abc for a date or an id that is no UUID
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    @ResponseStatus(value = HttpStatus.BAD_REQUEST)
+    public ResponseEntity<?> methodArgumentTypeMismatchException(MethodArgumentTypeMismatchException ex) {
+        log.warn("Invalid value for parameter {}", ex.getName());
+        return new ResponseEntity<>(BaseResponse.builder()
+                .code(GlobalMessage.BAD_REQUEST.getCode())
+                .message("Invalid value for parameter '" + ex.getName() + "'")
+                .build(),
+                HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

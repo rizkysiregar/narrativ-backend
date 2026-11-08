@@ -34,6 +34,8 @@ import org.springframework.http.HttpStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -162,7 +164,7 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
         when(fileStorageService.getPresignUploadUrl(anyString(), eq("video/mp4")))
                 .thenReturn("http://minio/presigned-url");
@@ -188,7 +190,7 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
 
         // Act & Assert
@@ -214,7 +216,7 @@ public class PostServiceTest {
         user.setUsername("testuser");
         user.setEmail("test@mail.com");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
                 .thenReturn(ObjectStat.builder().size(1024L).contentType("image/jpeg").build());
@@ -236,7 +238,7 @@ public class PostServiceTest {
         assertNotNull(result);
         assertEquals(GlobalMessage.CREATED.getMessage(), result.getStatus());
         verify(fileStorageService, times(1)).statObject(objectKey);
-        verify(userRepository).findByIdAndIsDeletedFalse(userId);
+        verify(userRepository).findActiveById(userId);
         verify(postCrudRepository, times(1))
                 .save(any(PostEntity.class));
         ArgumentCaptor<PostCreatedEvent> event = ArgumentCaptor.forClass(PostCreatedEvent.class);
@@ -254,7 +256,7 @@ public class PostServiceTest {
         AddPostRequest request = new AddPostRequest();
         request.setObjectKey(objectKey);
         request.setCaption("clip");
-        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.of(user));
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
                 .thenReturn(ObjectStat.builder().size(1024L).contentType("video/mp4").build());
         PostEntity saved = PostEntity.builder().id(UUID.randomUUID()).caption("clip").mediaUrl(objectKey)
@@ -279,7 +281,7 @@ public class PostServiceTest {
         String objectKey = "testuser/POST_FEED/photo.jpg";
         AddPostRequest request = new AddPostRequest();
         request.setObjectKey(objectKey);
-        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.of(user));
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
                 .thenReturn(ObjectStat.builder().size(1024L).contentType("image/jpeg").build());
         when(postCrudRepository.save(any(PostEntity.class))).thenReturn(PostEntity.builder()
@@ -308,7 +310,7 @@ public class PostServiceTest {
         List<PostEntity> posts = List.of(p1);
         Page<PostEntity> postPage = new PageImpl<>(posts, PageRequest.of(page, size), posts.size());
 
-        when(userRepository.findByUsernameAndIsDeletedFalse(username)).thenReturn(Optional.of(user));
+        when(userRepository.findActiveByUsername(username)).thenReturn(Optional.of(user));
         when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(userId)))
                 .thenReturn(postPage);
         when(likeRepository.findLikedPostIds(viewerId, List.of(p1.getId())))
@@ -321,7 +323,7 @@ public class PostServiceTest {
         assertNotNull(response);
         assertEquals(username, response.getContent().get(0).getUsername());
         assertTrue(response.getContent().get(0).isLiked());
-        verify(userRepository).findByUsernameAndIsDeletedFalse(username);
+        verify(userRepository).findActiveByUsername(username);
         verify(postPaginationRepository).findAllActivePostsByUserId(any(Pageable.class), eq(userId));
     }
 
@@ -329,7 +331,7 @@ public class PostServiceTest {
     void testGetAllPostByUserId_UserNotFound_ThrowsBusinessException() {
         // Arrange
         String username = "nouser";
-        when(userRepository.findByUsernameAndIsDeletedFalse(username)).thenReturn(Optional.empty());
+        when(userRepository.findActiveByUsername(username)).thenReturn(Optional.empty());
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class,
@@ -346,7 +348,7 @@ public class PostServiceTest {
                 .objectKey("testuser/POST_FEED/x.jpg")
                 .build();
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.empty());
 
         // Act & Assert
@@ -366,7 +368,7 @@ public class PostServiceTest {
                 .objectKey(" ")
                 .build();
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(new UserEntity()));
 
         // Act & Assert
@@ -390,7 +392,7 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
 
         // Act & Assert
@@ -415,7 +417,7 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
                 .thenReturn(ObjectStat.builder()
@@ -444,7 +446,7 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
                 .thenReturn(ObjectStat.builder()
@@ -473,7 +475,7 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
 
-        when(userRepository.findByIdAndIsDeletedFalse(userId))
+        when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(user));
 
         // Act & Assert
@@ -524,5 +526,79 @@ public class PostServiceTest {
 
         assertEquals(GlobalMessage.ACCESS_DENIED.getMessage(), exception.getMessage());
         verify(postCrudRepository, never()).save(any());
+    }
+
+    // ------------------------------------------------------------ takedown in the feed
+
+    private PostEntity takenDownPost(UserEntity author) {
+        return PostEntity.builder().id(UUID.randomUUID()).user(author).caption("secret caption")
+                .mediaUrl("media.jpg").thumbnailUrl("thumb.jpg").mediaType(MediaType.VIDEO)
+                .createdAt(LocalDateTime.now())
+                .moderationStatus(ModerationStatus.TAKEN_DOWN)
+                .moderatedAt(Instant.parse("2026-11-08T01:00:00Z"))
+                .moderationReason("melanggar aturan komunitas")
+                .build();
+    }
+
+    @Test
+    void feed_takenDownPost_isListedWithStatusButWithoutContentForOtherUsers() throws Exception {
+        UUID viewerId = UUID.randomUUID();
+        UserEntity author = new UserEntity();
+        author.setId(UUID.randomUUID());
+        author.setUsername("author");
+        PostEntity post = takenDownPost(author);
+        when(postPaginationRepository.findAllActivePosts(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
+
+        PostFeedResponse item = postService.getExplorePosts(0, 10, viewerId).getContent().get(0);
+
+        assertEquals(ModerationStatus.TAKEN_DOWN, item.getModerationStatus());
+        assertEquals(Instant.parse("2026-11-08T01:00:00Z"), item.getTakenDownAt());
+        assertNull(item.getTakedownReason());
+        assertNull(item.getCaption());
+        assertNull(item.getMediaUrl());
+        assertNull(item.getThumbnailUrl());
+        verify(fileStorageService, never()).getPresignUrl(any());
+    }
+
+    @Test
+    void feed_takenDownPost_authorStillSeesHisContentAndTheReason() throws Exception {
+        UserEntity author = new UserEntity();
+        author.setId(UUID.randomUUID());
+        author.setUsername("author");
+        PostEntity post = takenDownPost(author);
+        when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(author.getId())))
+                .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
+        when(userRepository.findActiveByUsername("author")).thenReturn(Optional.of(author));
+        when(fileStorageService.getPresignUrl("media.jpg")).thenReturn("signed-media");
+        when(fileStorageService.getPresignUrl("thumb.jpg")).thenReturn("signed-thumb");
+
+        PostFeedResponse item = postService.getAllPostByUserId(0, 10, "author", author.getId()).getContent().get(0);
+
+        assertEquals(ModerationStatus.TAKEN_DOWN, item.getModerationStatus());
+        assertEquals("melanggar aturan komunitas", item.getTakedownReason());
+        assertEquals("secret caption", item.getCaption());
+        assertEquals("signed-media", item.getMediaUrl());
+        assertEquals("signed-thumb", item.getThumbnailUrl());
+    }
+
+    @Test
+    void feed_activePost_hasActiveStatusAndNoTakedownFields() throws Exception {
+        UserEntity author = new UserEntity();
+        author.setId(UUID.randomUUID());
+        author.setUsername("author");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("hello")
+                .mediaUrl("img.jpg").mediaType(MediaType.IMAGE).createdAt(LocalDateTime.now()).build();
+        when(postPaginationRepository.findAllActivePosts(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
+        when(fileStorageService.getPresignUrl("img.jpg")).thenReturn("signed-img");
+
+        PostFeedResponse item = postService.getExplorePosts(0, 10, UUID.randomUUID()).getContent().get(0);
+
+        assertEquals(ModerationStatus.ACTIVE, item.getModerationStatus());
+        assertNull(item.getTakedownReason());
+        assertNull(item.getTakenDownAt());
+        assertEquals("hello", item.getCaption());
+        assertEquals("signed-img", item.getMediaUrl());
     }
 }

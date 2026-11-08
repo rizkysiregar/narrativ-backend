@@ -6,7 +6,11 @@ import com.rizkysiregar.feedzmore.model.dto.GoogleUserInfo;
 import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
 import com.rizkysiregar.feedzmore.model.response.LoginResponse;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
+import com.rizkysiregar.feedzmore.model.enums.AdminAuditAction;
+import com.rizkysiregar.feedzmore.model.enums.AuditTargetType;
 import com.rizkysiregar.feedzmore.model.enums.Role;
+import com.rizkysiregar.feedzmore.model.enums.UserStatus;
+import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.model.request.*;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
@@ -61,6 +65,9 @@ public class AuthServiceTest {
     @Mock
     private UsernameGenerator usernameGenerator;
 
+    @Mock
+    private AuditLogService auditLogService;
+
     @InjectMocks
     private AuthService authService;
 
@@ -98,6 +105,34 @@ public class AuthServiceTest {
         assertEquals(Operation.CREATED, result);
         verify(userRepository, times(1))
                 .save(any(UserEntity.class));
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void testRegisterAdmin_RecordsAuditLog() {
+        UUID newAdminId = UUID.randomUUID();
+        UserEntity saved = new UserEntity();
+        saved.setId(newAdminId);
+        saved.setUsername("newadmin");
+        when(userRepository.save(any(UserEntity.class))).thenReturn(saved);
+
+        RegisterUserRequest request = new RegisterUserRequest();
+        request.setUsername("newadmin");
+        request.setPassword("password");
+        request.setEmail("admin@mail.com");
+        request.setFirstName("New");
+        request.setLastName("Admin");
+        request.setPhoneNumber("1234567890");
+
+        Operation result = authService.register(request, true);
+
+        assertEquals(Operation.CREATED, result);
+        verify(auditLogService).record(
+                eq(AdminAuditAction.ADMIN_REGISTER),
+                eq(AuditTargetType.USER),
+                eq(newAdminId.toString()),
+                isNull(),
+                any());
     }
 
     @Test
@@ -231,7 +266,7 @@ public class AuthServiceTest {
         user.setPhoneNumber("123");
         user.setProfileImage("img.png");
 
-        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+        when(userRepository.findActiveById(id)).thenReturn(Optional.of(user));
 
         // Act
         UserDetailDTO dto = authService.getUserById(id.toString());
@@ -248,7 +283,7 @@ public class AuthServiceTest {
     void testGetUserById_NotFound() {
         // Arrange
         UUID id = UUID.randomUUID();
-        when(userRepository.findById(id)).thenReturn(Optional.empty());
+        when(userRepository.findActiveById(id)).thenReturn(Optional.empty());
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.getUserById(id.toString()));
@@ -386,7 +421,7 @@ public class AuthServiceTest {
         user.setRole(Role.USER);
 
         when(redisUtil.get("refresh_token:old-token")).thenReturn(userId.toString());
-        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.of(user));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(jwtService.generateToken("testuser", userId, Role.USER)).thenReturn("newAccess");
 
         LoginResponse result = authService.refreshToken("old-token");
@@ -396,7 +431,9 @@ public class AuthServiceTest {
         assertNotEquals("old-token", result.getRefreshToken());
         assertEquals(userId.toString(), result.getUserId());
         verify(redisUtil).delete("refresh_token:old-token");
+        verify(redisUtil).removeFromSet("user_refresh_tokens:" + userId, "old-token");
         verify(redisUtil).set(eq("refresh_token:" + result.getRefreshToken()), eq(userId.toString()), anyLong());
+        verify(redisUtil).addToSet(eq("user_refresh_tokens:" + userId), eq(result.getRefreshToken()), anyLong());
     }
 
     @Test
@@ -411,10 +448,99 @@ public class AuthServiceTest {
     void testRefreshToken_UserDeleted() {
         UUID userId = UUID.randomUUID();
         when(redisUtil.get("refresh_token:tok")).thenReturn(userId.toString());
-        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.empty());
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         assertThrows(BusinessException.class, () -> authService.refreshToken("tok"));
         verify(redisUtil).delete("refresh_token:tok");
     }
 
+
+    @Test
+    void testRefreshToken_DeletedUser_DropsTheTokenAndIsUnauthorized() {
+        UUID userId = UUID.randomUUID();
+        UserEntity deleted = new UserEntity();
+        deleted.setId(userId);
+        deleted.setDeleted(true);
+        when(redisUtil.get("refresh_token:tok")).thenReturn(userId.toString());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(deleted));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> authService.refreshToken("tok"));
+
+        assertEquals(GlobalMessage.UNAUTHORIZED.getMessage(), exception.getMessage());
+        verify(redisUtil).delete("refresh_token:tok");
+    }
+
+    @Test
+    void testRefreshToken_BannedUser_GetsTheBanReasonAndKeepsTheTokenSoEveryRetryExplainsIt() {
+        UUID userId = UUID.randomUUID();
+        UserEntity banned = new UserEntity();
+        banned.setId(userId);
+        banned.setStatus(UserStatus.BANNED);
+        banned.setBanReason("posting spam");
+        when(redisUtil.get("refresh_token:tok")).thenReturn(userId.toString());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(banned));
+
+        for (int attempt = 0; attempt < 2; attempt++) {
+            BusinessException exception = assertThrows(BusinessException.class, () -> authService.refreshToken("tok"));
+            assertEquals(org.springframework.http.HttpStatus.UNAUTHORIZED, exception.getHttpStatus());
+            assertEquals("Akun Anda telah diblokir oleh admin. Alasan: posting spam", exception.getMessage());
+        }
+
+        verify(redisUtil, never()).delete(anyString());
+        verifyNoInteractions(jwtService);
+    }
+
+    @Test
+    void testRevokeRefreshTokens_DeletesEveryIndexedTokenAndTheIndex() {
+        UUID userId = UUID.randomUUID();
+        when(redisUtil.membersOfSet("user_refresh_tokens:" + userId)).thenReturn(java.util.Set.of("t1", "t2"));
+
+        authService.revokeRefreshTokens(userId);
+
+        verify(redisUtil).delete("refresh_token:t1");
+        verify(redisUtil).delete("refresh_token:t2");
+        verify(redisUtil).delete("user_refresh_tokens:" + userId);
+    }
+
+    @Test
+    void testLogin_BannedUser_IsRejectedAfterPasswordCheckAndIssuesNothing() {
+        UserLoginRequest loginRequest = new UserLoginRequest();
+        loginRequest.setUsername("banned");
+        loginRequest.setPassword("password");
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+
+        UserEntity banned = new UserEntity();
+        banned.setId(UUID.randomUUID());
+        banned.setUsername("banned");
+        banned.setStatus(UserStatus.BANNED);
+        banned.setBanReason("posting spam");
+        when(userRepository.findByUsername("banned")).thenReturn(Optional.of(banned));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> authService.login(loginRequest));
+
+        assertEquals(org.springframework.http.HttpStatus.UNAUTHORIZED, exception.getHttpStatus());
+        assertEquals("Akun Anda telah diblokir oleh admin. Alasan: posting spam", exception.getMessage());
+        verifyNoInteractions(jwtService, redisUtil);
+    }
+
+    @Test
+    void testGoogleLogin_BannedUser_IsRejectedBeforeAnythingIsSavedOrIndexed() {
+        GoogleLoginRequest request = new GoogleLoginRequest();
+        request.setIdToken("id-token");
+        GoogleUserInfo info = GoogleUserInfo.builder().email("banned@mail.com").googleId("g-1").build();
+        when(googleTokenVerifierService.verifyToken("id-token")).thenReturn(info);
+
+        UserEntity banned = new UserEntity();
+        banned.setId(UUID.randomUUID());
+        banned.setGoogleId("g-1");
+        banned.setStatus(UserStatus.BANNED);
+        when(userRepository.findByEmail("banned@mail.com")).thenReturn(Optional.of(banned));
+
+        assertThrows(BusinessException.class, () -> authService.googleLogin(request));
+
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(userSearchService, jwtService);
+    }
 }

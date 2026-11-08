@@ -3,6 +3,7 @@ package com.rizkysiregar.feedzmore.repository;
 import com.rizkysiregar.feedzmore.model.entity.NotificationTemplateEntity;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -11,7 +12,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface NotificationTemplateRepository extends JpaRepository<NotificationTemplateEntity, UUID> {
+public interface NotificationTemplateRepository extends JpaRepository<NotificationTemplateEntity, UUID>, JpaSpecificationExecutor<NotificationTemplateEntity> {
+
+    boolean existsByCode(String code);
+
 
     // Get by stable code (event-based, OTP, admin)
     Optional<NotificationTemplateEntity> findByCodeAndIsActiveTrue(String code);

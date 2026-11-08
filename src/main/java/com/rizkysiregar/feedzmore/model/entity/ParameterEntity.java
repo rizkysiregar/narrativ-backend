@@ -24,7 +24,7 @@ public class ParameterEntity {
     @Column(name = "param_key", unique = true, nullable = false)
     private String paramKey;
 
-    @Column(name = "param_value", unique = true, nullable = false)
+    @Column(name = "param_value", nullable = false)
     private String paramValue;
 
     @Column(name = "description", nullable = false)

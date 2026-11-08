@@ -1,6 +1,7 @@
 package com.rizkysiregar.feedzmore.model;
 
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
+import com.rizkysiregar.feedzmore.model.enums.UserStatus;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -57,8 +58,17 @@ public class UserPrincipal implements UserDetails {
         return  true;
     }
 
+    // "enabled" only covers the account the user deleted himself; a ban is reported separately (USER_BANNED)
     @Override
     public boolean isEnabled() {
         return !this.userEntity.isDeleted();
+    }
+
+    public String getBanReason() {
+        return this.userEntity.getBanReason();
+    }
+
+    public boolean isBanned() {
+        return this.userEntity.getStatus() == UserStatus.BANNED;
     }
 }
