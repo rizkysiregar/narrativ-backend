@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.stream.Collectors;
 
@@ -115,6 +116,18 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.BAD_REQUEST.getCode())
                 .message(errorMessage.isBlank() ? GlobalMessage.BAD_REQUEST.getMessage() : errorMessage)
+                .build(),
+                HttpStatus.BAD_REQUEST);
+    }
+
+    // a request parameter that cannot be read as its type, e.g. from=abc for a date or an id that is no UUID
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    @ResponseStatus(value = HttpStatus.BAD_REQUEST)
+    public ResponseEntity<?> methodArgumentTypeMismatchException(MethodArgumentTypeMismatchException ex) {
+        log.warn("Invalid value for parameter {}", ex.getName());
+        return new ResponseEntity<>(BaseResponse.builder()
+                .code(GlobalMessage.BAD_REQUEST.getCode())
+                .message("Invalid value for parameter '" + ex.getName() + "'")
                 .build(),
                 HttpStatus.BAD_REQUEST);
     }
