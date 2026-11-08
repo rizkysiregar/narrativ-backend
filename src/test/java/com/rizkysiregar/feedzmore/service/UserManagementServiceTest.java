@@ -6,6 +6,8 @@ import com.rizkysiregar.feedzmore.model.dto.AdminUserDetailDTO;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.enums.AdminAuditAction;
 import com.rizkysiregar.feedzmore.model.enums.AuditTargetType;
+import com.rizkysiregar.feedzmore.model.enums.ReportAction;
+import com.rizkysiregar.feedzmore.model.enums.ReportTargetType;
 import com.rizkysiregar.feedzmore.model.enums.Role;
 import com.rizkysiregar.feedzmore.model.enums.UserStatus;
 import com.rizkysiregar.feedzmore.model.request.AdminUpdateUserRequest;
@@ -63,6 +65,8 @@ class UserManagementServiceTest {
     private CommentRepository commentRepository;
     @Mock
     private FollowRepository followRepository;
+    @Mock
+    private ReportClosingService reportClosingService;
 
     @InjectMocks
     private UserManagementService userManagementService;
@@ -182,8 +186,9 @@ class UserManagementServiceTest {
         assertEquals("spam account", result.banReason());
         assertEquals(adminId.toString(), result.bannedBy());
 
-        InOrder order = inOrder(userRepository, auditLogService, userSearchService);
+        InOrder order = inOrder(userRepository, reportClosingService, auditLogService, userSearchService);
         order.verify(userRepository).save(target);
+        order.verify(reportClosingService).closeOpenReports(ReportTargetType.USER, id, adminId, ReportAction.BAN);
         order.verify(auditLogService).record(AdminAuditAction.USER_BAN, AuditTargetType.USER, id.toString(),
                 "spam account", null);
         order.verify(userSearchService).deleteUser(id.toString());
@@ -221,7 +226,7 @@ class UserManagementServiceTest {
                 userManagementService.banUserForAdmin(bannedId.toString(), new BanUserRequest("some reason"), adminId));
 
         verify(userRepository, never()).save(any());
-        verifyNoInteractions(auditLogService, authService, userSearchService);
+        verifyNoInteractions(auditLogService, authService, userSearchService, reportClosingService);
     }
 
     @Test

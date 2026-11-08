@@ -10,6 +10,8 @@ import com.rizkysiregar.feedzmore.model.enums.AdminAuditAction;
 import com.rizkysiregar.feedzmore.model.enums.AuditTargetType;
 import com.rizkysiregar.feedzmore.model.enums.MediaType;
 import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
+import com.rizkysiregar.feedzmore.model.enums.ReportAction;
+import com.rizkysiregar.feedzmore.model.enums.ReportTargetType;
 import com.rizkysiregar.feedzmore.model.request.AdminCommentSearchRequest;
 import com.rizkysiregar.feedzmore.model.request.AdminPostSearchRequest;
 import com.rizkysiregar.feedzmore.model.request.ModerationReasonRequest;
@@ -55,6 +57,7 @@ public class AdminContentModerationService {
     private final AuditLogService auditLogService;
     private final FileStorageService fileStorageService;
     private final ContentModerationNotifier notifier;
+    private final ReportClosingService reportClosingService;
 
     // ------------------------------------------------------------------ posts
 
@@ -123,6 +126,7 @@ public class AdminContentModerationService {
         post.setModerationReason(reason);
         PostEntity saved = postRepository.save(post);
 
+        reportClosingService.closeOpenReports(ReportTargetType.POST, saved.getId(), adminId, ReportAction.TAKEDOWN);
         auditLogService.record(AdminAuditAction.POST_TAKEDOWN, AuditTargetType.POST, saved.getId().toString(),
                 reason, AuditLogService.metadata("authorId", saved.getUser().getId().toString()));
         notifier.postTakenDown(saved.getUser().getId(), reason);
@@ -156,7 +160,7 @@ public class AdminContentModerationService {
      * can be cleaned up by hand.
      */
     @Transactional
-    public Operation hardDeletePost(String postId, ModerationReasonRequest request) {
+    public Operation hardDeletePost(String postId, ModerationReasonRequest request, UUID adminId) {
         PostEntity post = findPost(parseUuid(postId));
         String reason = request.reason().trim();
 
@@ -164,6 +168,10 @@ public class AdminContentModerationService {
         String thumbnailKey = post.getThumbnailUrl();
         String caption = post.getCaption() != null && post.getCaption().length() > AUDIT_CAPTION_MAX
                 ? post.getCaption().substring(0, AUDIT_CAPTION_MAX) : post.getCaption();
+
+        // close the reports first: the comments they may point at are about to disappear with the post
+        int reportsClosed = reportClosingService.closeOpenReports(ReportTargetType.POST, post.getId(), adminId, ReportAction.HARD_DELETE)
+                + reportClosingService.closeOpenReportsOfCommentsOnPost(post.getId(), adminId, ReportAction.HARD_DELETE);
 
         int likesRemoved = likeRepository.deleteAllByPostId(post.getId());
         int commentsRemoved = commentRepository.deleteAllByPostId(post.getId());
@@ -182,7 +190,8 @@ public class AdminContentModerationService {
                         "moderationStatus", post.getModerationStatus().name(),
                         "moderationReason", post.getModerationReason(),
                         "likesRemoved", likesRemoved,
-                        "commentsRemoved", commentsRemoved));
+                        "commentsRemoved", commentsRemoved,
+                        "reportsClosed", reportsClosed));
 
         // only after the commit, so a rolled back delete never loses the media. deleteObject logs its own failure.
         AfterCommit.run("delete media of post " + post.getId(), () -> {
@@ -238,6 +247,7 @@ public class AdminContentModerationService {
         comment.setModerationReason(reason);
         CommentEntity saved = commentRepository.save(comment);
 
+        reportClosingService.closeOpenReports(ReportTargetType.COMMENT, saved.getId(), adminId, ReportAction.TAKEDOWN);
         auditLogService.record(AdminAuditAction.COMMENT_TAKEDOWN, AuditTargetType.COMMENT, saved.getId().toString(),
                 reason, AuditLogService.metadata(
                         "authorId", saved.getUser().getId().toString(),

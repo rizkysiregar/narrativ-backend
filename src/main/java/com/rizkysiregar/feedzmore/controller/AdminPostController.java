@@ -74,9 +74,10 @@ public class AdminPostController {
             description = "IRREVERSIBLE. Removes the post, its likes and comments and the media in object storage. Works on a post in any state. A reason is required and what was removed is kept in the audit log.")
     @PostMapping("{postId}/hard-delete")
     public com.rizkysiregar.feedzmore.util.Operation hardDeletePost(
+            @AuthenticationPrincipal UserPrincipal admin,
             @PathVariable @NotBlank String postId,
             @Valid @RequestBody ModerationReasonRequest request
     ) {
-        return moderationService.hardDeletePost(postId, request);
+        return moderationService.hardDeletePost(postId, request, admin.getUserId());
     }
 }

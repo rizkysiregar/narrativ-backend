@@ -7,6 +7,8 @@ import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.enums.AdminAuditAction;
 import com.rizkysiregar.feedzmore.model.enums.AuditTargetType;
+import com.rizkysiregar.feedzmore.model.enums.ReportAction;
+import com.rizkysiregar.feedzmore.model.enums.ReportTargetType;
 import com.rizkysiregar.feedzmore.model.enums.Role;
 import com.rizkysiregar.feedzmore.model.enums.UserStatus;
 import com.rizkysiregar.feedzmore.model.request.AdminUpdateUserRequest;
@@ -48,6 +50,7 @@ public class UserManagementService {
     private final PostCrudRepository postCrudRepository;
     private final CommentRepository commentRepository;
     private final FollowRepository followRepository;
+    private final ReportClosingService reportClosingService;
 
     public UserDetailDTO getMyProfile(UUID currentUserId) {
         UserEntity user = findActiveUserOrThrow(currentUserId);
@@ -227,6 +230,7 @@ public class UserManagementService {
         user.setBanReason(reason);
         UserEntity savedUser = userRepository.save(user);
 
+        reportClosingService.closeOpenReports(ReportTargetType.USER, savedUser.getId(), adminId, ReportAction.BAN);
         auditLogService.record(AdminAuditAction.USER_BAN, AuditTargetType.USER, savedUser.getId().toString(),
                 reason, null);
 

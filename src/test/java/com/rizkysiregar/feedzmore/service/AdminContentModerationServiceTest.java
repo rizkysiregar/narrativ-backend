@@ -11,6 +11,8 @@ import com.rizkysiregar.feedzmore.model.enums.AdminAuditAction;
 import com.rizkysiregar.feedzmore.model.enums.AuditTargetType;
 import com.rizkysiregar.feedzmore.model.enums.MediaType;
 import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
+import com.rizkysiregar.feedzmore.model.enums.ReportAction;
+import com.rizkysiregar.feedzmore.model.enums.ReportTargetType;
 import com.rizkysiregar.feedzmore.model.request.AdminCommentSearchRequest;
 import com.rizkysiregar.feedzmore.model.request.AdminPostSearchRequest;
 import com.rizkysiregar.feedzmore.model.request.ModerationReasonRequest;
@@ -63,6 +65,8 @@ class AdminContentModerationServiceTest {
     private FileStorageService fileStorageService;
     @Mock
     private ContentModerationNotifier notifier;
+    @Mock
+    private ReportClosingService reportClosingService;
 
     @InjectMocks
     private AdminContentModerationService service;
@@ -113,6 +117,7 @@ class AdminContentModerationServiceTest {
         verify(auditLogService).record(eq(AdminAuditAction.POST_TAKEDOWN), eq(AuditTargetType.POST),
                 eq(post.getId().toString()), eq("melanggar aturan"), any());
         verify(notifier).postTakenDown(post.getUser().getId(), "melanggar aturan");
+        verify(reportClosingService).closeOpenReports(ReportTargetType.POST, post.getId(), adminId, ReportAction.TAKEDOWN);
     }
 
     @Test
@@ -190,12 +195,16 @@ class AdminContentModerationServiceTest {
         when(postRepository.findById(post.getId())).thenReturn(Optional.of(post));
         when(likeRepository.deleteAllByPostId(post.getId())).thenReturn(3);
         when(commentRepository.deleteAllByPostId(post.getId())).thenReturn(2);
+        when(reportClosingService.closeOpenReports(ReportTargetType.POST, post.getId(), adminId, ReportAction.HARD_DELETE)).thenReturn(2);
+        when(reportClosingService.closeOpenReportsOfCommentsOnPost(post.getId(), adminId, ReportAction.HARD_DELETE)).thenReturn(1);
 
-        Operation result = service.hardDeletePost(post.getId().toString(), reason);
+        Operation result = service.hardDeletePost(post.getId().toString(), reason, adminId);
 
         assertEquals(Operation.DELETED, result);
         ArgumentCaptor<Map<String, Object>> metadata = ArgumentCaptor.forClass(Map.class);
-        InOrder order = inOrder(likeRepository, commentRepository, postRepository, auditLogService, fileStorageService);
+        InOrder order = inOrder(reportClosingService, likeRepository, commentRepository, postRepository, auditLogService, fileStorageService);
+        // the reports are closed before the comments they may point at are deleted
+        order.verify(reportClosingService).closeOpenReportsOfCommentsOnPost(post.getId(), adminId, ReportAction.HARD_DELETE);
         order.verify(likeRepository).deleteAllByPostId(post.getId());
         order.verify(commentRepository).deleteAllByPostId(post.getId());
         order.verify(postRepository).delete(post);
@@ -211,6 +220,7 @@ class AdminContentModerationServiceTest {
         assertEquals("thumb.jpg", snapshot.get("thumbnailKey"));
         assertEquals(3, snapshot.get("likesRemoved"));
         assertEquals(2, snapshot.get("commentsRemoved"));
+        assertEquals(3, snapshot.get("reportsClosed"));
         assertEquals("TAKEN_DOWN", snapshot.get("moderationStatus"));
         assertEquals(false, snapshot.get("deletedByOwner"));
     }
@@ -223,7 +233,7 @@ class AdminContentModerationServiceTest {
         post.setThumbnailUrl(null);
         when(postRepository.findById(post.getId())).thenReturn(Optional.of(post));
 
-        service.hardDeletePost(post.getId().toString(), reason);
+        service.hardDeletePost(post.getId().toString(), reason, adminId);
 
         ArgumentCaptor<Map<String, Object>> metadata = ArgumentCaptor.forClass(Map.class);
         verify(auditLogService).record(eq(AdminAuditAction.POST_HARD_DELETE), eq(AuditTargetType.POST),
@@ -238,7 +248,7 @@ class AdminContentModerationServiceTest {
         UUID unknown = UUID.randomUUID();
         when(postRepository.findById(unknown)).thenReturn(Optional.empty());
 
-        assertFails(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND, () -> service.hardDeletePost(unknown.toString(), reason));
+        assertFails(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND, () -> service.hardDeletePost(unknown.toString(), reason, adminId));
 
         verifyNoInteractions(likeRepository, auditLogService, fileStorageService);
         verify(commentRepository, never()).deleteAllByPostId(any());
@@ -292,6 +302,7 @@ class AdminContentModerationServiceTest {
         verify(auditLogService).record(eq(AdminAuditAction.COMMENT_TAKEDOWN), eq(AuditTargetType.COMMENT),
                 eq(comment.getId().toString()), eq("melanggar aturan"), any());
         verify(notifier).commentTakenDown(author.getId(), "melanggar aturan");
+        verify(reportClosingService).closeOpenReports(ReportTargetType.COMMENT, comment.getId(), adminId, ReportAction.TAKEDOWN);
     }
 
     @Test

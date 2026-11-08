@@ -38,6 +38,12 @@ public enum GlobalMessage {
     CONTENT_ALREADY_TAKEN_DOWN("409", "Konten ini sudah di-takedown."),
     CONTENT_NOT_TAKEN_DOWN("409", "Konten ini tidak sedang di-takedown."),
     POST_ALREADY_DELETED("409", "Post ini sudah dihapus oleh pemiliknya sehingga tidak dapat dimoderasi."),
+    REPORT_ALREADY_EXISTS("409", "Anda sudah melaporkan ini sebelumnya."),
+    CANNOT_REPORT_OWN("400", "Anda tidak dapat melaporkan diri sendiri atau konten Anda sendiri."),
+    REPORT_DESCRIPTION_REQUIRED("400", "Deskripsi wajib diisi jika alasan laporan adalah OTHER."),
+    REPORT_ALREADY_CLOSED("409", "Laporan ini sudah ditutup."),
+    REPORT_ACTION_NOT_APPLICABLE("400", "Aksi ini tidak berlaku untuk jenis target laporan tersebut."),
+    REPORT_NOTE_REQUIRED("400", "Catatan sepanjang 5 sampai 500 karakter wajib diisi untuk aksi ini."),
     EMAIL_ALREADY_TAKEN("400", "Email ini sudah terdaftar. Silakan gunakan email lain atau masuk ke akun Anda."),
     ;
 
