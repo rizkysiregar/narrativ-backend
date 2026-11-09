@@ -46,6 +46,10 @@ logging:
     org.flywaydb: ${LOGGING_LEVEL_ORG_FLYWAYDB}
 
 management:
+  # actuator moves to its own port when MANAGEMENT_SERVER_PORT is set (see SecurityConfig)
+  metrics:
+    tags:
+      application: ${spring.application.name}
   tracing:
     sampling:
       probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY}

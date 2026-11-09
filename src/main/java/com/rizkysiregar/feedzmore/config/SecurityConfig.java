@@ -5,6 +5,7 @@ import com.rizkysiregar.feedzmore.constant.Constants;
 import com.rizkysiregar.feedzmore.filter.RateLimitFilter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -21,6 +22,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
@@ -51,6 +53,10 @@ public class SecurityConfig {
     @Autowired
     private JsonAccessDeniedHandler accessDeniedHandler;
 
+    // set via MANAGEMENT_SERVER_PORT; empty when actuator shares the application port
+    @Value("${management.server.port:}")
+    private String managementPort;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
@@ -58,6 +64,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(request -> request
                         .requestMatchers(Constants.JWT_WHITELIST.toArray(String[]::new)).permitAll()
+                        // dedicated management port is not routed by the Service/Ingress, so probes and Prometheus need no login there
+                        .requestMatchers(managementPortProbesAndMetrics()).permitAll()
                         // only health and info are public (kubernetes probes); metrics/prometheus/etc. need an admin
                         .requestMatchers("/actuator/**", "/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
@@ -70,6 +78,13 @@ public class SecurityConfig {
                 .build();
     }
 
+
+    private RequestMatcher managementPortProbesAndMetrics() {
+        return request -> !managementPort.isBlank()
+                && request.getLocalPort() == Integer.parseInt(managementPort)
+                && (request.getRequestURI().startsWith("/actuator/health")
+                || request.getRequestURI().equals("/actuator/prometheus"));
+    }
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
