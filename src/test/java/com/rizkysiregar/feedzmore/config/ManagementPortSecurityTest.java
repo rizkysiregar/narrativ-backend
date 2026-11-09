@@ -29,6 +29,8 @@ import static org.mockito.Mockito.doAnswer;
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
+                // do not load application.yml: it needs the deployment env vars, which CI does not have
+                "spring.config.name=management-port-test",
                 "management.server.port=19092",
                 "management.endpoints.web.exposure.include=health,info,metrics,prometheus",
                 "management.endpoint.health.probes.enabled=true",
