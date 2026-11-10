@@ -16,12 +16,15 @@ public interface PostPaginationRepository extends PagingAndSortingRepository<Pos
     @Query(value = """
             SELECT p FROM PostEntity p JOIN FETCH p.user author
             WHERE p.isDeleted = false AND author.isDeleted = false AND author.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+              AND (:mediaOnly = false OR EXISTS (SELECT m.id FROM PostMediaEntity m WHERE m.postId = p.id))
             ORDER BY p.createdAt DESC, p.id DESC
             """, countQuery = """
             SELECT COUNT(p) FROM PostEntity p JOIN p.user author
             WHERE p.isDeleted = false AND author.isDeleted = false AND author.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+              AND (:mediaOnly = false OR EXISTS (SELECT m.id FROM PostMediaEntity m WHERE m.postId = p.id))
             """)
-    Page<PostEntity> findAllActivePosts(Pageable pageable);
+    // mediaOnly keeps only posts holding at least one image or video, for the grid view
+    Page<PostEntity> findAllActivePosts(Pageable pageable, @Param("mediaOnly") boolean mediaOnly);
 
     @Query(value = """
             SELECT p FROM PostEntity p JOIN FETCH p.user author
@@ -44,10 +47,13 @@ public interface PostPaginationRepository extends PagingAndSortingRepository<Pos
     @Query(value = """
             SELECT p FROM PostEntity p JOIN FETCH p.user author
             WHERE author.id = :userId AND author.isDeleted = false AND author.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND p.isDeleted = false
+              AND (:mediaOnly = false OR EXISTS (SELECT m.id FROM PostMediaEntity m WHERE m.postId = p.id))
             ORDER BY p.createdAt DESC, p.id DESC
             """, countQuery = """
             SELECT COUNT(p) FROM PostEntity p JOIN p.user author
             WHERE author.id = :userId AND author.isDeleted = false AND author.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND p.isDeleted = false
+              AND (:mediaOnly = false OR EXISTS (SELECT m.id FROM PostMediaEntity m WHERE m.postId = p.id))
             """)
-    Page<PostEntity> findAllActivePostsByUserId(Pageable pageable, @Param("userId") UUID userId);
+    Page<PostEntity> findAllActivePostsByUserId(Pageable pageable, @Param("userId") UUID userId,
+                                                @Param("mediaOnly") boolean mediaOnly);
 }
