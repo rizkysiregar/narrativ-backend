@@ -77,10 +77,10 @@ public class PostServiceImpl implements PostService {
     private static final long PRESIGN_UPLOAD_EXPIRY_SECONDS = 15L * 60;
 
     @Override
-    public PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, UUID userId) {
-        log.info("FETCH.EXPLORE.FEED: {}, size= {} ,userId={}", page, size, userId);
+    public PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, UUID userId, boolean mediaOnly) {
+        log.info("FETCH.EXPLORE.FEED: {}, size= {} ,userId={}, mediaOnly={}", page, size, userId, mediaOnly);
         Pageable pageable = PageRequest.of(page, size);
-        Page<PostEntity> postPage = postPaginationRepository.findAllActivePosts(pageable);
+        Page<PostEntity> postPage = postPaginationRepository.findAllActivePosts(pageable, mediaOnly);
         return buildPaginatedResponse(postPage, userId);
     }
 
@@ -94,14 +94,14 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String username, UUID viewerId) {
-        log.info("FETCH.FEED.BY.USERNAME =  {}, size= {} , username= {}", page, size, username);
+    public PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String username, UUID viewerId, boolean mediaOnly) {
+        log.info("FETCH.FEED.BY.USERNAME =  {}, size= {} , username= {}, mediaOnly= {}", page, size, username, mediaOnly);
 
         UserEntity user = userRepository.findActiveByUsername(username)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<PostEntity> postPage = postPaginationRepository.findAllActivePostsByUserId(pageable, user.getId());
+        Page<PostEntity> postPage = postPaginationRepository.findAllActivePostsByUserId(pageable, user.getId(), mediaOnly);
         return buildPaginatedResponse(postPage, viewerId);
     }
 

@@ -36,14 +36,15 @@ public class FeedPostController {
         return postService.getFollowingPosts(page, size, userPrincipal.getUserId());
     }
 
-    @Operation(summary = "Get all public posts for Explore feed")
+    @Operation(summary = "Get all public posts for Explore feed. mediaOnly=true leaves out caption only posts (grid view).")
     @GetMapping("/explore")
     public PaginatedResponse<PostFeedResponse> getExplorePosts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "false") boolean mediaOnly,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        return postService.getExplorePosts(page, size, userPrincipal.getUserId());
+        return postService.getExplorePosts(page, size, userPrincipal.getUserId(), mediaOnly);
     }
 
     @Operation(summary = "Get posts from followed users")
@@ -56,14 +57,15 @@ public class FeedPostController {
         return postService.getFollowingPosts(page, size, userPrincipal.getUserId());
     }
 
-    @Operation(summary = "Getting feed user specific feed post by username")
+    @Operation(summary = "Getting feed user specific feed post by username. mediaOnly=true leaves out caption only posts (grid view).")
     @GetMapping("/users/{username}/posts")
     public PaginatedResponse<PostFeedResponse> getAllPostByUserId(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "false") boolean mediaOnly,
             @PathVariable String username,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
-        return postService.getAllPostByUserId(page, size, username, userPrincipal.getUserId());
+        return postService.getAllPostByUserId(page, size, username, userPrincipal.getUserId(), mediaOnly);
     }
 
     @Operation(summary = "Get presigned upload URL for post media. Client uploads the file directly to object storage using this URL.")
