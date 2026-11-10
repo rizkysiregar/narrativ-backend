@@ -27,14 +27,6 @@ public class Constants {
             "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
     );
 
-    public static final List<String> CORS_WHITELIST_ORIGIN = List.of(
-            "http://localhost:53375",
-            "http://localhost:8083",
-            "http://localhost:3000", // web admin react
-            "http://api-dev-feedzmore.rizkysiregar.my.id",
-            "https://api-dev-feedzmore.rizkysiregar.my.id"
-    );
-
     // time zone used for admin calendar boundaries (audit log date filters, dashboard statistics)
     public static final ZoneId ADMIN_ZONE = ZoneId.of("Asia/Jakarta");
 

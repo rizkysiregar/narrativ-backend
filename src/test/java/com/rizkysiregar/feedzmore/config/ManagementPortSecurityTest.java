@@ -31,6 +31,7 @@ import static org.mockito.Mockito.doAnswer;
         properties = {
                 // do not load application.yml: it needs the deployment env vars, which CI does not have
                 "spring.config.name=management-port-test",
+                "app.cors.allowed-origins=http://localhost:3000",
                 "management.server.port=19092",
                 "management.endpoints.web.exposure.include=health,info,metrics,prometheus",
                 "management.endpoint.health.probes.enabled=true",
