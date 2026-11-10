@@ -25,6 +25,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -38,8 +39,9 @@ import java.util.List;
 @Slf4j
 public class SecurityConfig {
 
-//    @Value("${cors.allowed-origins}")
-//    List<String> corsUrlClient;
+    // comma separated, set per environment through APP_CORS_ALLOWED_ORIGINS
+    @Value("${app.cors.allowed-origins}")
+    String[] corsAllowedOrigins;
 
     @Autowired
     private UserDetailsService userDetailsService;
@@ -102,7 +104,7 @@ public class SecurityConfig {
     @Bean
     public UrlBasedCorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Constants.CORS_WHITELIST_ORIGIN);
+        config.setAllowedOrigins(Arrays.stream(corsAllowedOrigins).map(String::trim).filter(o -> !o.isEmpty()).toList());
         config.setAllowedMethods(Constants.METHOD_LIST);
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
