@@ -24,7 +24,7 @@ public class AdminMetricsRepository {
     public record UserCounts(long total, long active, long banned, long deleted,
                              long newToday, long newThisWeek, long newThisMonth) {}
 
-    public record PostCounts(long total, long image, long video, long active, long takenDown, long deleted,
+    public record PostCounts(long total, long image, long video, long textOnly, long active, long takenDown, long deleted,
                              long newToday, long newThisWeek, long newThisMonth) {}
 
     private final EntityManager entityManager;
@@ -84,8 +84,9 @@ public class AdminMetricsRepository {
     public PostCounts postCounts(LocalDateTime todayStart, LocalDateTime weekStart, LocalDateTime monthStart) {
         Query query = entityManager.createNativeQuery("""
                 SELECT COUNT(*),
-                       COUNT(*) FILTER (WHERE media_type = 'IMAGE'),
-                       COUNT(*) FILTER (WHERE media_type = 'VIDEO'),
+                       COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM post_media m WHERE m.post_id = posts.id AND m.media_type = 'IMAGE')),
+                       COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM post_media m WHERE m.post_id = posts.id AND m.media_type = 'VIDEO')),
+                       COUNT(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM post_media m WHERE m.post_id = posts.id)),
                        COUNT(*) FILTER (WHERE NOT is_deleted AND moderation_status = 'ACTIVE'),
                        COUNT(*) FILTER (WHERE NOT is_deleted AND moderation_status = 'TAKEN_DOWN'),
                        COUNT(*) FILTER (WHERE is_deleted),
@@ -96,7 +97,7 @@ public class AdminMetricsRepository {
                 """);
         bindPeriods(query, todayStart, weekStart, monthStart);
         long[] c = row(query);
-        return new PostCounts(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8]);
+        return new PostCounts(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9]);
     }
 
     private void bindPeriods(Query query, LocalDateTime todayStart, LocalDateTime weekStart, LocalDateTime monthStart) {

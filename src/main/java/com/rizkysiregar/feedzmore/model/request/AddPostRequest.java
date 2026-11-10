@@ -5,11 +5,14 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class AddPostRequest {
     private String caption;
-    private String objectKey;
+    /** Object keys from {@code /posts/upload-url}, in display order. Empty or null for a caption-only post. */
+    private List<String> mediaKeys;
 }

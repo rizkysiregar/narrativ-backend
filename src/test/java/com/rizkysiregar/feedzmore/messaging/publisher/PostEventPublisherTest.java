@@ -66,7 +66,7 @@ class PostEventPublisherTest {
     void publishesThumbnailRequestWithItsOwnRoutingKey() {
         UUID postId = UUID.randomUUID();
         VideoThumbnailRequestedEvent event =
-                VideoThumbnailRequestedEvent.of(postId, "user/POST_FEED/video.mp4");
+                VideoThumbnailRequestedEvent.of(postId, UUID.randomUUID(), "user/POST_FEED/video.mp4");
 
         publisher.publishVideoThumbnailRequested(event);
 

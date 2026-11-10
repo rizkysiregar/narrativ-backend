@@ -6,6 +6,7 @@ import com.rizkysiregar.feedzmore.model.dto.AdminCommentDTO;
 import com.rizkysiregar.feedzmore.model.dto.AdminPostDTO;
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
+import com.rizkysiregar.feedzmore.model.entity.PostMediaEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.enums.AdminAuditAction;
 import com.rizkysiregar.feedzmore.model.enums.AuditTargetType;
@@ -19,6 +20,7 @@ import com.rizkysiregar.feedzmore.model.request.ModerationReasonRequest;
 import com.rizkysiregar.feedzmore.repository.CommentRepository;
 import com.rizkysiregar.feedzmore.repository.LikeRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
+import com.rizkysiregar.feedzmore.repository.PostMediaRepository;
 import com.rizkysiregar.feedzmore.util.Operation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +35,7 @@ import org.springframework.http.HttpStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,7 +44,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
@@ -55,6 +60,8 @@ class AdminContentModerationServiceTest {
 
     @Mock
     private PostCrudRepository postRepository;
+    @Mock
+    private PostMediaRepository postMediaRepository;
     @Mock
     private CommentRepository commentRepository;
     @Mock
@@ -83,8 +90,12 @@ class AdminContentModerationServiceTest {
 
     private PostEntity post(UserEntity author) {
         return PostEntity.builder().id(UUID.randomUUID()).user(author).caption("a caption")
-                .mediaUrl("media.jpg").thumbnailUrl("thumb.jpg").mediaType(MediaType.VIDEO)
                 .createdAt(LocalDateTime.of(2026, 11, 7, 10, 0)).build();
+    }
+
+    private PostMediaEntity media(PostEntity post, int position, String key, MediaType type, String thumbnailKey) {
+        return PostMediaEntity.builder().id(UUID.randomUUID()).postId(post.getId()).position(position)
+                .mediaKey(key).mediaType(type).thumbnailKey(thumbnailKey).createdAt(LocalDateTime.now()).build();
     }
 
     private CommentEntity comment(UserEntity author, PostEntity post) {
@@ -193,6 +204,9 @@ class AdminContentModerationServiceTest {
         post.setModerationStatus(ModerationStatus.TAKEN_DOWN);
         post.setModerationReason("melanggar");
         when(postRepository.findById(post.getId())).thenReturn(Optional.of(post));
+        when(postMediaRepository.findByPostIdOrderByPositionAsc(post.getId())).thenReturn(List.of(
+                media(post, 0, "media.jpg", MediaType.IMAGE, null),
+                media(post, 1, "clip.mp4", MediaType.VIDEO, "thumb.jpg")));
         when(likeRepository.deleteAllByPostId(post.getId())).thenReturn(3);
         when(commentRepository.deleteAllByPostId(post.getId())).thenReturn(2);
         when(reportClosingService.closeOpenReports(ReportTargetType.POST, post.getId(), adminId, ReportAction.HARD_DELETE)).thenReturn(2);
@@ -202,22 +216,26 @@ class AdminContentModerationServiceTest {
 
         assertEquals(Operation.DELETED, result);
         ArgumentCaptor<Map<String, Object>> metadata = ArgumentCaptor.forClass(Map.class);
-        InOrder order = inOrder(reportClosingService, likeRepository, commentRepository, postRepository, auditLogService, fileStorageService);
+        InOrder order = inOrder(reportClosingService, likeRepository, commentRepository, postMediaRepository, postRepository, auditLogService, fileStorageService);
         // the reports are closed before the comments they may point at are deleted
         order.verify(reportClosingService).closeOpenReportsOfCommentsOnPost(post.getId(), adminId, ReportAction.HARD_DELETE);
         order.verify(likeRepository).deleteAllByPostId(post.getId());
         order.verify(commentRepository).deleteAllByPostId(post.getId());
+        // the media rows reference the post, so they go before it
+        order.verify(postMediaRepository).deleteAllByPostId(post.getId());
         order.verify(postRepository).delete(post);
         order.verify(auditLogService).record(eq(AdminAuditAction.POST_HARD_DELETE), eq(AuditTargetType.POST),
                 eq(post.getId().toString()), eq("melanggar aturan"), metadata.capture());
         order.verify(fileStorageService).deleteObject("media.jpg");
+        order.verify(fileStorageService).deleteObject("clip.mp4");
         order.verify(fileStorageService).deleteObject("thumb.jpg");
 
         Map<String, Object> snapshot = metadata.getValue();
         assertEquals("author", snapshot.get("authorUsername"));
         assertEquals("a caption", snapshot.get("caption"));
-        assertEquals("media.jpg", snapshot.get("mediaKey"));
-        assertEquals("thumb.jpg", snapshot.get("thumbnailKey"));
+        assertEquals(List.of("media.jpg", "clip.mp4"), snapshot.get("mediaKeys"));
+        assertEquals(List.of("thumb.jpg"), snapshot.get("thumbnailKeys"));
+        assertEquals(List.of("IMAGE", "VIDEO"), snapshot.get("mediaTypes"));
         assertEquals(3, snapshot.get("likesRemoved"));
         assertEquals(2, snapshot.get("commentsRemoved"));
         assertEquals(3, snapshot.get("reportsClosed"));
@@ -230,8 +248,9 @@ class AdminContentModerationServiceTest {
     void hardDeletePost_worksOnAPostTheOwnerAlreadyDeletedAndSkipsAMissingThumbnail() {
         PostEntity post = post(author());
         post.setDeleted(true);
-        post.setThumbnailUrl(null);
         when(postRepository.findById(post.getId())).thenReturn(Optional.of(post));
+        when(postMediaRepository.findByPostIdOrderByPositionAsc(post.getId()))
+                .thenReturn(List.of(media(post, 0, "media.jpg", MediaType.IMAGE, null)));
 
         service.hardDeletePost(post.getId().toString(), reason, adminId);
 
@@ -267,8 +286,7 @@ class AdminContentModerationServiceTest {
         AdminPostDTO result = service.getPost(post.getId().toString());
 
         assertEquals(new AdminPostDTO.Stats(4, 6), result.stats());
-        assertNull(result.mediaUrl());
-        assertNull(result.thumbnailUrl());
+        assertTrue(result.media().isEmpty());
         verify(fileStorageService, never()).getPresignUrl(any());
     }
 
@@ -276,12 +294,40 @@ class AdminContentModerationServiceTest {
     void getPost_aFailedPresignDoesNotBreakTheDetail() throws Exception {
         PostEntity post = post(author());
         when(postRepository.findById(post.getId())).thenReturn(Optional.of(post));
+        when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
+                .thenReturn(List.of(media(post, 0, "media.jpg", MediaType.IMAGE, null)));
         when(fileStorageService.getPresignUrl(any())).thenThrow(new RuntimeException("storage down"));
 
         AdminPostDTO result = service.getPost(post.getId().toString());
 
-        assertNull(result.mediaUrl());
+        assertNull(result.media().get(0).url());
         assertEquals("a caption", result.caption());
+    }
+
+    @Test
+    void getPost_returnsEveryMediaInOrderWithPresignedUrls() throws Exception {
+        PostEntity post = post(author());
+        when(postRepository.findById(post.getId())).thenReturn(Optional.of(post));
+        when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any())).thenReturn(List.of(
+                media(post, 0, "a.jpg", MediaType.IMAGE, null),
+                media(post, 1, "b.mp4", MediaType.VIDEO, "b_thumb.jpg")));
+        when(fileStorageService.getPresignUrl(anyString())).thenAnswer(inv -> "signed-" + inv.getArgument(0));
+
+        AdminPostDTO result = service.getPost(post.getId().toString());
+
+        assertEquals(2, result.media().size());
+        assertEquals("signed-a.jpg", result.media().get(0).url());
+        assertNull(result.media().get(0).thumbnailUrl());
+        assertEquals(MediaType.VIDEO, result.media().get(1).type());
+        assertEquals("signed-b_thumb.jpg", result.media().get(1).thumbnailUrl());
+    }
+
+    @Test
+    void getPost_captionOnlyPostHasNoMedia() {
+        PostEntity post = post(author());
+        when(postRepository.findById(post.getId())).thenReturn(Optional.of(post));
+
+        assertTrue(service.getPost(post.getId().toString()).media().isEmpty());
     }
 
     // ------------------------------------------------------------- comments
@@ -349,13 +395,13 @@ class AdminContentModerationServiceTest {
         PageRequest page = PageRequest.of(0, 20);
 
         assertFails(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST, () -> service.searchPosts(
-                new AdminPostSearchRequest("not-a-uuid", null, null, null, null, null, null), page));
+                new AdminPostSearchRequest("not-a-uuid", null, null, null, null, null, null, null), page));
         assertFails(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST, () -> service.searchPosts(
-                new AdminPostSearchRequest(null, "AUDIO", null, null, null, null, null), page));
+                new AdminPostSearchRequest(null, "AUDIO", null, null, null, null, null, null), page));
         assertFails(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST, () -> service.searchPosts(
-                new AdminPostSearchRequest(null, null, "HIDDEN", null, null, null, null), page));
+                new AdminPostSearchRequest(null, null, null, "HIDDEN", null, null, null, null), page));
         assertFails(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST, () -> service.searchPosts(
-                new AdminPostSearchRequest(null, null, null, null, null, LocalDate.of(2026, 11, 8), LocalDate.of(2026, 11, 7)), page));
+                new AdminPostSearchRequest(null, null, null, null, null, null, LocalDate.of(2026, 11, 8), LocalDate.of(2026, 11, 7)), page));
         assertFails(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST, () -> service.searchComments(
                 new AdminCommentSearchRequest("not-a-uuid", null, null, null), page));
         assertFails(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST, () -> service.searchComments(

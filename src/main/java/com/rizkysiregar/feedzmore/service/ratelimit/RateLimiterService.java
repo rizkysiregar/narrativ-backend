@@ -19,6 +19,10 @@ public class RateLimiterService {
     @Value("${app.rate-limit.post-create}")
     private int postCreateLimit;
 
+    // a post can carry up to 5 media and each one asks for its own upload url
+    @Value("${app.rate-limit.post-upload:60}")
+    private int postUploadLimit;
+
     @Value("${app.rate-limit.interaction}")
     private int interactionLimit;
 
@@ -53,6 +57,7 @@ public class RateLimiterService {
         int capacity = switch (endpointType) {
             case "feed" -> feedLimit;
             case "post-create" -> postCreateLimit;
+            case "post-upload" -> postUploadLimit;
             case "interaction" -> interactionLimit;
             case "auth" -> authLimit;
             default -> defaultLimit;

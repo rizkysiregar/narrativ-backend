@@ -7,6 +7,7 @@ import com.rizkysiregar.feedzmore.model.enums.ReportStatus;
 import com.rizkysiregar.feedzmore.model.enums.ReportTargetType;
 
 import java.time.Instant;
+import java.util.List;
 
 public record AdminReportDTO(
         String id,
@@ -35,15 +36,14 @@ public record AdminReportDTO(
             String authorId,
             String authorUsername,
             String text,
-            String mediaUrl,
-            String thumbnailUrl,
+            List<AdminPostDTO.Media> media,
             String moderationStatus,
             String userStatus,
             boolean deletedByOwner,
             String postId
     ) {
         public static Target missing() {
-            return new Target(false, null, null, null, null, null, null, null, false, null);
+            return new Target(false, null, null, null, List.of(), null, null, false, null);
         }
     }
 

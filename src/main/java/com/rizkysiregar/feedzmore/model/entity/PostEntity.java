@@ -10,7 +10,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-import com.rizkysiregar.feedzmore.model.enums.MediaType;
 import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
 
 @Entity
@@ -30,16 +29,6 @@ public class PostEntity {
 
     @Column(name = "caption", columnDefinition = "TEXT")
     private String caption;
-
-    @Column(name = "media_url", nullable = false)
-    private String mediaUrl;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "media_type", nullable = false)
-    private MediaType mediaType;
-
-    @Column(name = "thumbnail_url")
-    private String thumbnailUrl;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

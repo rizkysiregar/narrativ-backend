@@ -1,11 +1,11 @@
 package com.rizkysiregar.feedzmore.model.response;
 
-import com.rizkysiregar.feedzmore.model.enums.MediaType;
 import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
 import lombok.*;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 
@@ -15,9 +15,8 @@ public class PostFeedResponse {
     private UUID id;
     private String username;
     private String caption;
-    private String mediaUrl;
-    private MediaType mediaType;
-    private String thumbnailUrl;
+    // empty for a caption-only post
+    private List<PostMediaResponse> media = List.of();
     private LocalDateTime createdAt;
     private long likeCount;
     private long commentCount;
@@ -27,15 +26,13 @@ public class PostFeedResponse {
     private String takedownReason;
     private Instant takenDownAt;
 
-    public PostFeedResponse(UUID id, String username, String caption, String mediaUrl, MediaType mediaType,
-                            String thumbnailUrl, LocalDateTime createdAt,
+    public PostFeedResponse(UUID id, String username, String caption, List<PostMediaResponse> media,
+                            LocalDateTime createdAt,
                             long likeCount, long commentCount, boolean isLiked) {
         this.id = id;
         this.username = username;
         this.caption = caption;
-        this.mediaUrl = mediaUrl;
-        this.mediaType = mediaType;
-        this.thumbnailUrl = thumbnailUrl;
+        this.media = media;
         this.createdAt = createdAt;
         this.likeCount = likeCount;
         this.commentCount = commentCount;

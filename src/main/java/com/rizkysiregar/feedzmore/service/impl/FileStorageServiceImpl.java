@@ -4,10 +4,12 @@ import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.dto.ImageObject;
 import com.rizkysiregar.feedzmore.model.dto.ObjectStat;
+import com.rizkysiregar.feedzmore.model.dto.StoredObject;
 import com.rizkysiregar.feedzmore.service.FileStorageService;
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;
 import io.minio.http.Method;
+import io.minio.messages.Item;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -18,6 +20,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.awt.*;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -177,6 +181,22 @@ public class FileStorageServiceImpl implements FileStorageService {
                         .build()
         );
         return objectName;
+    }
+
+    @Override
+    public Stream<StoredObject> listObjects(String prefix) {
+        Iterable<Result<Item>> results = minioClient.listObjects(
+                ListObjectsArgs.builder().bucket(bucketName).prefix(prefix).recursive(true).build());
+        return StreamSupport.stream(results.spliterator(), false)
+                .map(result -> {
+                    try {
+                        return result.get();
+                    } catch (Exception e) {
+                        throw new IllegalStateException("cannot list objects with prefix '" + prefix + "'", e);
+                    }
+                })
+                .filter(item -> !item.isDir() && item.lastModified() != null)
+                .map(item -> new StoredObject(item.objectName(), item.lastModified().toInstant()));
     }
 
     @Override
