@@ -7,6 +7,7 @@ import com.rizkysiregar.feedzmore.model.enums.UserStatus;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record AdminPostDTO(
         String id,
@@ -14,9 +15,7 @@ public record AdminPostDTO(
         String authorUsername,
         UserStatus authorStatus,
         String caption,
-        MediaType mediaType,
-        String mediaUrl,
-        String thumbnailUrl,
+        List<Media> media,
         LocalDateTime createdAt,
         boolean deleted,
         ModerationStatus moderationStatus,
@@ -25,19 +24,20 @@ public record AdminPostDTO(
         String moderatedBy,
         Stats stats
 ) {
+    /** One image or video of the post, in display order; {@code url} and {@code thumbnailUrl} are presigned. */
+    public record Media(String id, MediaType type, String url, String thumbnailUrl) {}
+
     /** Raw row counts for the admin detail view; null in list responses. */
     public record Stats(long likeCount, long commentCount) {}
 
-    public static AdminPostDTO from(PostEntity post, String mediaUrl, String thumbnailUrl, Stats stats) {
+    public static AdminPostDTO from(PostEntity post, List<Media> media, Stats stats) {
         return new AdminPostDTO(
                 post.getId().toString(),
                 post.getUser().getId().toString(),
                 post.getUser().getUsername(),
                 post.getUser().getStatus(),
                 post.getCaption(),
-                post.getMediaType(),
-                mediaUrl,
-                thumbnailUrl,
+                media,
                 post.getCreatedAt(),
                 post.isDeleted(),
                 post.getModerationStatus(),

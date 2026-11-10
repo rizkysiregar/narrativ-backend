@@ -73,7 +73,7 @@ public class AdminMetricsService {
                     Constants.ADMIN_ZONE.getId(),
                     new AdminOverviewDTO.Users(users.total(), users.active(), users.banned(), users.deleted(),
                             users.newToday(), users.newThisWeek(), users.newThisMonth()),
-                    new AdminOverviewDTO.Posts(posts.total(), posts.image(), posts.video(), posts.active(),
+                    new AdminOverviewDTO.Posts(posts.total(), posts.image(), posts.video(), posts.textOnly(), posts.active(),
                             posts.takenDown(), posts.deleted(), posts.newToday(), posts.newThisWeek(), posts.newThisMonth()),
                     commentRepository.count(),
                     reportRepository.countByStatus(ReportStatus.OPEN));

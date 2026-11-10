@@ -17,14 +17,17 @@ import java.util.UUID;
 @AllArgsConstructor
 public class VideoThumbnailRequestedEvent {
     private UUID postId;
+    /** The post_media row the thumbnail belongs to; echoed back in the result. */
+    private UUID mediaId;
     /** Object key of the uploaded video. */
     private String mediaUrl;
     /** Object key the worker must write the generated thumbnail to. */
     private String thumbnailObjectKey;
 
-    public static VideoThumbnailRequestedEvent of(UUID postId, String mediaUrl) {
+    public static VideoThumbnailRequestedEvent of(UUID postId, UUID mediaId, String mediaUrl) {
         return VideoThumbnailRequestedEvent.builder()
                 .postId(postId)
+                .mediaId(mediaId)
                 .mediaUrl(mediaUrl)
                 .thumbnailObjectKey(thumbnailObjectKeyFor(mediaUrl))
                 .build();

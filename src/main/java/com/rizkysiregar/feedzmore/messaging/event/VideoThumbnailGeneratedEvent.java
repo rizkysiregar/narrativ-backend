@@ -16,6 +16,8 @@ import java.util.UUID;
 @AllArgsConstructor
 public class VideoThumbnailGeneratedEvent {
     private UUID postId;
+    /** The post_media row the thumbnail belongs to, echoed from the request. */
+    private UUID mediaId;
     /** Object key of the generated thumbnail, echoed from the request. */
     private String thumbnailObjectKey;
 }

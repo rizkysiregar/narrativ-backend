@@ -3,6 +3,7 @@ package com.rizkysiregar.feedzmore.service;
 import com.rizkysiregar.feedzmore.constant.Constants;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
+import com.rizkysiregar.feedzmore.model.dto.AdminPostDTO;
 import com.rizkysiregar.feedzmore.model.dto.AdminReportDTO;
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
@@ -25,6 +26,7 @@ import com.rizkysiregar.feedzmore.model.request.ResolveReportRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.CommentRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
+import com.rizkysiregar.feedzmore.repository.PostMediaRepository;
 import com.rizkysiregar.feedzmore.repository.ReportRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.util.Operation;
@@ -69,6 +71,7 @@ public class ReportService {
 
     private final ReportRepository reportRepository;
     private final PostCrudRepository postRepository;
+    private final PostMediaRepository postMediaRepository;
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final AdminContentModerationService moderationService;
@@ -281,19 +284,23 @@ public class ReportService {
             case POST -> postRepository.findById(report.getTargetId())
                     .map(post -> new AdminReportDTO.Target(true,
                             post.getUser().getId().toString(), post.getUser().getUsername(), post.getCaption(),
-                            post.isDeleted() ? null : presign(post.getMediaUrl()),
-                            post.isDeleted() || post.getThumbnailUrl() == null ? null : presign(post.getThumbnailUrl()),
+                            post.isDeleted() ? List.<AdminPostDTO.Media>of() : postMediaRepository
+                                    .findByPostIdOrderByPositionAsc(post.getId()).stream()
+                                    .map(m -> new AdminPostDTO.Media(m.getId().toString(), m.getMediaType(),
+                                            presign(m.getMediaKey()),
+                                            m.getThumbnailKey() == null ? null : presign(m.getThumbnailKey())))
+                                    .toList(),
                             post.getModerationStatus().name(), post.getUser().getStatus().name(), post.isDeleted(), null))
                     .orElseGet(AdminReportDTO.Target::missing);
             case COMMENT -> commentRepository.findById(report.getTargetId())
                     .map(comment -> new AdminReportDTO.Target(true,
                             comment.getUser().getId().toString(), comment.getUser().getUsername(), comment.getContent(),
-                            null, null, comment.getModerationStatus().name(), comment.getUser().getStatus().name(), false,
+                            List.of(), comment.getModerationStatus().name(), comment.getUser().getStatus().name(), false,
                             comment.getPost().getId().toString()))
                     .orElseGet(AdminReportDTO.Target::missing);
             case USER -> userRepository.findById(report.getTargetId())
                     .map(user -> new AdminReportDTO.Target(true,
-                            user.getId().toString(), user.getUsername(), null, null, null,
+                            user.getId().toString(), user.getUsername(), null, List.of(),
                             null, user.getStatus().name(), user.isDeleted(), null))
                     .orElseGet(AdminReportDTO.Target::missing);
         };

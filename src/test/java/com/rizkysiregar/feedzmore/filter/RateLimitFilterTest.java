@@ -170,4 +170,16 @@ class RateLimitFilterTest {
         verify(rateLimiterService).resolveBucket("rizky", "feed");
         verify(rateLimiterService, never()).resolveIpBucket(anyString(), anyString());
     }
+
+    @Test
+    void uploadUrl_UsesItsOwnBucketSoMediaUploadsDoNotEatThePostCreateBudget() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("rizky", null, AuthorityUtils.createAuthorityList("ROLE_USER")));
+
+        call(request("/posts/upload-url", null), new MockHttpServletResponse());
+        call(request("/posts", null), new MockHttpServletResponse());
+
+        verify(rateLimiterService).resolveBucket("rizky", "post-upload");
+        verify(rateLimiterService).resolveBucket("rizky", "post-create");
+    }
 }

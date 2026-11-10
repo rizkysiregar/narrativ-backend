@@ -6,6 +6,7 @@ import com.rizkysiregar.feedzmore.model.dto.AdminCommentDTO;
 import com.rizkysiregar.feedzmore.model.dto.AdminPostDTO;
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
+import com.rizkysiregar.feedzmore.model.entity.PostMediaEntity;
 import com.rizkysiregar.feedzmore.model.enums.AdminAuditAction;
 import com.rizkysiregar.feedzmore.model.enums.AuditTargetType;
 import com.rizkysiregar.feedzmore.model.enums.MediaType;
@@ -19,11 +20,16 @@ import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.CommentRepository;
 import com.rizkysiregar.feedzmore.repository.LikeRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
+import com.rizkysiregar.feedzmore.repository.PostMediaRepository;
 import com.rizkysiregar.feedzmore.util.AdminDates;
 import com.rizkysiregar.feedzmore.util.AfterCommit;
 import com.rizkysiregar.feedzmore.util.LikePatterns;
 import com.rizkysiregar.feedzmore.util.Operation;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -36,7 +42,10 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Admin moderation of posts and comments.
@@ -54,6 +63,7 @@ public class AdminContentModerationService {
     private final PostCrudRepository postRepository;
     private final CommentRepository commentRepository;
     private final LikeRepository likeRepository;
+    private final PostMediaRepository postMediaRepository;
     private final AuditLogService auditLogService;
     private final FileStorageService fileStorageService;
     private final ContentModerationNotifier notifier;
@@ -77,7 +87,11 @@ public class AdminContentModerationService {
                 predicates.add(cb.equal(root.get("user").get("id"), authorId));
             }
             if (mediaType != null) {
-                predicates.add(cb.equal(root.get("mediaType"), mediaType));
+                predicates.add(hasMedia(root, query, cb, mediaType));
+            }
+            if (request.hasMedia() != null) {
+                Predicate any = hasMedia(root, query, cb, null);
+                predicates.add(request.hasMedia() ? any : cb.not(any));
             }
             if (moderationStatus != null) {
                 predicates.add(cb.equal(root.get("moderationStatus"), moderationStatus));
@@ -97,7 +111,8 @@ public class AdminContentModerationService {
             return cb.and(predicates.toArray(new Predicate[0]));
         }, pageable);
 
-        return toPage(page, post -> toDto(post, null));
+        Map<UUID, List<AdminPostDTO.Media>> media = mediaOf(page.getContent());
+        return toPage(page, post -> toDto(post, media.getOrDefault(post.getId(), List.of()), null));
     }
 
     @Transactional(readOnly = true)
@@ -106,7 +121,7 @@ public class AdminContentModerationService {
         AdminPostDTO.Stats stats = new AdminPostDTO.Stats(
                 likeRepository.countByPostId(post.getId()),
                 commentRepository.countByPostId(post.getId()));
-        return toDto(post, stats);
+        return toDto(post, mediaOf(List.of(post)).getOrDefault(post.getId(), List.of()), stats);
     }
 
     @Transactional
@@ -131,7 +146,7 @@ public class AdminContentModerationService {
                 reason, AuditLogService.metadata("authorId", saved.getUser().getId().toString()));
         notifier.postTakenDown(saved.getUser().getId(), reason);
 
-        return toDto(saved, null);
+        return toDto(saved, mediaOf(List.of(saved)).getOrDefault(saved.getId(), List.of()), null);
     }
 
     @Transactional
@@ -151,7 +166,7 @@ public class AdminContentModerationService {
         auditLogService.record(AdminAuditAction.POST_RESTORE, AuditTargetType.POST, saved.getId().toString(),
                 null, AuditLogService.metadata("authorId", saved.getUser().getId().toString()));
 
-        return toDto(saved, null);
+        return toDto(saved, mediaOf(List.of(saved)).getOrDefault(saved.getId(), List.of()), null);
     }
 
     /**
@@ -164,8 +179,9 @@ public class AdminContentModerationService {
         PostEntity post = findPost(parseUuid(postId));
         String reason = request.reason().trim();
 
-        String mediaKey = post.getMediaUrl();
-        String thumbnailKey = post.getThumbnailUrl();
+        List<PostMediaEntity> media = postMediaRepository.findByPostIdOrderByPositionAsc(post.getId());
+        List<String> mediaKeys = media.stream().map(PostMediaEntity::getMediaKey).toList();
+        List<String> thumbnailKeys = media.stream().map(PostMediaEntity::getThumbnailKey).filter(Objects::nonNull).toList();
         String caption = post.getCaption() != null && post.getCaption().length() > AUDIT_CAPTION_MAX
                 ? post.getCaption().substring(0, AUDIT_CAPTION_MAX) : post.getCaption();
 
@@ -175,6 +191,7 @@ public class AdminContentModerationService {
 
         int likesRemoved = likeRepository.deleteAllByPostId(post.getId());
         int commentsRemoved = commentRepository.deleteAllByPostId(post.getId());
+        postMediaRepository.deleteAllByPostId(post.getId());
         postRepository.delete(post);
 
         auditLogService.record(AdminAuditAction.POST_HARD_DELETE, AuditTargetType.POST, post.getId().toString(),
@@ -182,9 +199,9 @@ public class AdminContentModerationService {
                         "authorId", post.getUser().getId().toString(),
                         "authorUsername", post.getUser().getUsername(),
                         "caption", caption,
-                        "mediaType", post.getMediaType() == null ? null : post.getMediaType().name(),
-                        "mediaKey", mediaKey,
-                        "thumbnailKey", thumbnailKey,
+                        "mediaTypes", media.stream().map(m -> m.getMediaType().name()).toList(),
+                        "mediaKeys", mediaKeys,
+                        "thumbnailKeys", thumbnailKeys,
                         "createdAt", post.getCreatedAt() == null ? null : post.getCreatedAt().toString(),
                         "deletedByOwner", post.isDeleted(),
                         "moderationStatus", post.getModerationStatus().name(),
@@ -195,10 +212,8 @@ public class AdminContentModerationService {
 
         // only after the commit, so a rolled back delete never loses the media. deleteObject logs its own failure.
         AfterCommit.run("delete media of post " + post.getId(), () -> {
-            fileStorageService.deleteObject(mediaKey);
-            if (thumbnailKey != null) {
-                fileStorageService.deleteObject(thumbnailKey);
-            }
+            mediaKeys.forEach(fileStorageService::deleteObject);
+            thumbnailKeys.forEach(fileStorageService::deleteObject);
         });
 
         return Operation.DELETED;
@@ -302,14 +317,31 @@ public class AdminContentModerationService {
     }
 
     // media of a post the owner deleted is already gone, and a failed presign must not break the whole list
-    private AdminPostDTO toDto(PostEntity post, AdminPostDTO.Stats stats) {
-        String mediaUrl = null;
-        String thumbnailUrl = null;
-        if (!post.isDeleted()) {
-            mediaUrl = presign(post.getMediaUrl());
-            thumbnailUrl = post.getThumbnailUrl() == null ? null : presign(post.getThumbnailUrl());
+    private AdminPostDTO toDto(PostEntity post, List<AdminPostDTO.Media> media, AdminPostDTO.Stats stats) {
+        return AdminPostDTO.from(post, post.isDeleted() ? List.of() : media, stats);
+    }
+
+    /** Media of the given posts in display order, presigned, loaded with one query. */
+    private Map<UUID, List<AdminPostDTO.Media>> mediaOf(List<PostEntity> posts) {
+        if (posts.isEmpty()) {
+            return Map.of();
         }
-        return AdminPostDTO.from(post, mediaUrl, thumbnailUrl, stats);
+        return postMediaRepository
+                .findByPostIdInOrderByPostIdAscPositionAsc(posts.stream().map(PostEntity::getId).toList()).stream()
+                .collect(Collectors.groupingBy(PostMediaEntity::getPostId,
+                        Collectors.mapping(m -> new AdminPostDTO.Media(m.getId().toString(), m.getMediaType(),
+                                presign(m.getMediaKey()),
+                                m.getThumbnailKey() == null ? null : presign(m.getThumbnailKey())),
+                                Collectors.toList())));
+    }
+
+    /** True when the post has a media, of the given type when one is passed. */
+    private static Predicate hasMedia(Root<PostEntity> post, CriteriaQuery<?> query, CriteriaBuilder cb, MediaType type) {
+        Subquery<Integer> sub = query.subquery(Integer.class);
+        Root<PostMediaEntity> media = sub.from(PostMediaEntity.class);
+        Predicate samePost = cb.equal(media.get("postId"), post.get("id"));
+        sub.select(cb.literal(1)).where(type == null ? samePost : cb.and(samePost, cb.equal(media.get("mediaType"), type)));
+        return cb.exists(sub);
     }
 
     private String presign(String objectKey) {

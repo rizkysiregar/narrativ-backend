@@ -30,11 +30,12 @@ public class AdminPostController {
     private final AdminContentModerationService moderationService;
 
     @Operation(summary = "Admin list posts",
-            description = "Includes taken down posts and posts the owner deleted. moderationStatus: ACTIVE or TAKEN_DOWN, mediaType: IMAGE or VIDEO, deleted: true/false, createdFrom/createdTo are inclusive dates (yyyy-MM-dd) in Asia/Jakarta time.")
+            description = "Includes taken down posts and posts the owner deleted. moderationStatus: ACTIVE or TAKEN_DOWN, mediaType: IMAGE or VIDEO (posts with at least one media of that type), hasMedia: false selects caption-only posts, deleted: true/false, createdFrom/createdTo are inclusive dates (yyyy-MM-dd) in Asia/Jakarta time.")
     @GetMapping
     public PaginatedResponse<AdminPostDTO> searchPosts(
             @RequestParam(required = false) String authorId,
             @RequestParam(required = false) String mediaType,
+            @RequestParam(required = false) Boolean hasMedia,
             @RequestParam(required = false) String moderationStatus,
             @RequestParam(required = false) Boolean deleted,
             @RequestParam(required = false) String keyword,
@@ -44,10 +45,10 @@ public class AdminPostController {
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         return moderationService.searchPosts(new AdminPostSearchRequest(
-                authorId, mediaType, moderationStatus, deleted, keyword, createdFrom, createdTo), pageable);
+                authorId, mediaType, hasMedia, moderationStatus, deleted, keyword, createdFrom, createdTo), pageable);
     }
 
-    @Operation(summary = "Admin get post detail with media URLs, like and comment counts")
+    @Operation(summary = "Admin get post detail with its media URLs, like and comment counts")
     @GetMapping("{postId}")
     public AdminPostDTO getPost(@PathVariable @NotBlank String postId) {
         return moderationService.getPost(postId);

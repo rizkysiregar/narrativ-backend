@@ -4,7 +4,10 @@ import com.rizkysiregar.feedzmore.config.RabbitMQConfig;
 import com.rizkysiregar.feedzmore.messaging.event.VideoThumbnailGeneratedEvent;
 import com.rizkysiregar.feedzmore.messaging.event.VideoThumbnailRequestedEvent;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
+import com.rizkysiregar.feedzmore.model.entity.PostMediaEntity;
+import com.rizkysiregar.feedzmore.model.enums.MediaType;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
+import com.rizkysiregar.feedzmore.repository.PostMediaRepository;
 import com.rizkysiregar.feedzmore.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,8 +17,8 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 
 /**
- * Stores the thumbnail produced by the media worker on the post. The update is
- * idempotent (same post, same key), so redelivery needs no deduplication.
+ * Stores the thumbnail produced by the media worker on the post media. The update is
+ * idempotent (same media, same key), so redelivery needs no deduplication.
  */
 @Component
 @Slf4j
@@ -23,6 +26,7 @@ import java.util.Optional;
 public class VideoThumbnailResultConsumer {
 
     private final PostCrudRepository postCrudRepository;
+    private final PostMediaRepository postMediaRepository;
     private final FileStorageService fileStorageService;
 
     @RabbitListener(queues = RabbitMQConfig.VIDEO_THUMBNAIL_RESULT_QUEUE)
@@ -41,17 +45,36 @@ public class VideoThumbnailResultConsumer {
             return;
         }
 
-        PostEntity post = found.get();
-        String expectedKey = VideoThumbnailRequestedEvent.thumbnailObjectKeyFor(post.getMediaUrl());
-        if (!expectedKey.equals(event.getThumbnailObjectKey())) {
+        Optional<PostMediaEntity> media = findMedia(event);
+        if (media.isEmpty()) {
+            log.warn("THUMBNAIL RESULT REJECTED postId={}: no video matches mediaId={} key={}",
+                    event.getPostId(), event.getMediaId(), event.getThumbnailObjectKey());
+            return;
+        }
+
+        PostMediaEntity item = media.get();
+        String expectedKey = VideoThumbnailRequestedEvent.thumbnailObjectKeyFor(item.getMediaKey());
+        if (item.getMediaType() != MediaType.VIDEO || !expectedKey.equals(event.getThumbnailObjectKey())) {
             log.warn("THUMBNAIL RESULT REJECTED postId={}: unexpected key {} (expected {})",
                     event.getPostId(), event.getThumbnailObjectKey(), expectedKey);
             return;
         }
 
-        post.setThumbnailUrl(expectedKey);
-        postCrudRepository.save(post);
-        log.info("THUMBNAIL SAVED for postId={} -> {}", event.getPostId(), expectedKey);
+        item.setThumbnailKey(expectedKey);
+        postMediaRepository.save(item);
+        log.info("THUMBNAIL SAVED for postId={} mediaId={} -> {}", event.getPostId(), item.getId(), expectedKey);
+    }
+
+    // a worker that predates mediaId does not echo it: fall back to the video whose derived thumbnail key matches
+    private Optional<PostMediaEntity> findMedia(VideoThumbnailGeneratedEvent event) {
+        if (event.getMediaId() != null) {
+            return postMediaRepository.findById(event.getMediaId())
+                    .filter(item -> item.getPostId().equals(event.getPostId()));
+        }
+        return postMediaRepository.findByPostIdOrderByPositionAsc(event.getPostId()).stream()
+                .filter(item -> VideoThumbnailRequestedEvent.thumbnailObjectKeyFor(item.getMediaKey())
+                        .equals(event.getThumbnailObjectKey()))
+                .findFirst();
     }
 
     private void deleteQuietly(String objectKey) {

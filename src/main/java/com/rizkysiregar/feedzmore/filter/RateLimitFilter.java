@@ -103,6 +103,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String uri = request.getRequestURI();
         String method = request.getMethod();
 
+        // the presigned upload urls have their own, higher bucket: every media of a post needs one
+        if (uri.endsWith("/posts/upload-url") && "POST".equals(method)) return "post-upload";
         if (uri.contains("/posts") && "GET".equals(method)) return "feed";
         if (uri.contains("/posts") && "POST".equals(method)) return "post-create";
         if (uri.contains("/likes") || uri.contains("/comments")) return "interaction";

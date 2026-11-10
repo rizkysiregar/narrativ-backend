@@ -267,7 +267,7 @@ class AdminMetricsServiceTest {
         when(metricsRepository.userCounts(todayStart, weekStart, monthStart))
                 .thenReturn(new AdminMetricsRepository.UserCounts(10, 7, 2, 1, 1, 3, 5));
         when(metricsRepository.postCounts(todayStart, weekStart, monthStart))
-                .thenReturn(new AdminMetricsRepository.PostCounts(20, 12, 8, 15, 3, 2, 2, 6, 9));
+                .thenReturn(new AdminMetricsRepository.PostCounts(20, 12, 8, 3, 15, 3, 2, 2, 6, 9));
         when(commentRepository.count()).thenReturn(42L);
         when(reportRepository.countByStatus(ReportStatus.OPEN)).thenReturn(4L);
         Instant now = Instant.parse("2026-11-08T03:00:00Z");
@@ -276,7 +276,7 @@ class AdminMetricsServiceTest {
 
         assertEquals(now, result.generatedAt());
         assertEquals(new AdminOverviewDTO.Users(10, 7, 2, 1, 1, 3, 5), result.users());
-        assertEquals(new AdminOverviewDTO.Posts(20, 12, 8, 15, 3, 2, 2, 6, 9), result.posts());
+        assertEquals(new AdminOverviewDTO.Posts(20, 12, 8, 3, 15, 3, 2, 2, 6, 9), result.posts());
         assertEquals(42, result.comments());
         assertEquals(4, result.openReports());
         verify(redisUtil).set(eq("admin:metrics:overview:2026-11-08"), any(String.class), eq(60L));
@@ -285,7 +285,7 @@ class AdminMetricsServiceTest {
     @Test
     void overview_cameFromTheCacheWhenItIsThere() throws Exception {
         AdminOverviewDTO cached = new AdminOverviewDTO(Instant.parse("2026-11-08T03:00:00Z"), "Asia/Jakarta",
-                new AdminOverviewDTO.Users(1, 1, 0, 0, 0, 0, 0), new AdminOverviewDTO.Posts(0, 0, 0, 0, 0, 0, 0, 0, 0), 0, 0);
+                new AdminOverviewDTO.Users(1, 1, 0, 0, 0, 0, 0), new AdminOverviewDTO.Posts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 0, 0);
         when(redisUtil.get("admin:metrics:overview:2026-11-08")).thenReturn(objectMapper.writeValueAsString(cached));
 
         assertEquals(cached, service.overview(TODAY, Instant.now()));

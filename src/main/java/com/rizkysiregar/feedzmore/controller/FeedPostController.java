@@ -76,7 +76,7 @@ public class FeedPostController {
         return postService.createUploadUrl(userPrincipal.getUserId(), request);
     }
 
-    @Operation(summary = "Create new post feed with media that has been uploaded via presigned URL")
+    @Operation(summary = "Create a new post: a caption (max 500 chars), up to 5 media uploaded via presigned URL (images and videos can be mixed), or both. A post needs a caption or at least one media.")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasRole('USER')")
     public CreatePostResponse upload(

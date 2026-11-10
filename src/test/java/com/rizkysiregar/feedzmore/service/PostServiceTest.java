@@ -12,6 +12,7 @@ import com.rizkysiregar.feedzmore.model.response.CreatePostResponse;
 import com.rizkysiregar.feedzmore.model.response.CreatePostUploadUrlResponse;
 import com.rizkysiregar.feedzmore.model.response.PostFeedResponse;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
+import com.rizkysiregar.feedzmore.model.entity.PostMediaEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.request.AddPostRequest;
 import com.rizkysiregar.feedzmore.model.request.CreatePostUploadUrlRequest;
@@ -50,6 +51,8 @@ public class PostServiceTest {
     @Mock
     private PostCrudRepository postCrudRepository;
     @Mock
+    private PostMediaRepository postMediaRepository;
+    @Mock
     private UserRepository userRepository;
     @Mock
     private LikeRepository likeRepository;
@@ -63,6 +66,15 @@ public class PostServiceTest {
     @InjectMocks
     private PostServiceImpl postService;
 
+    private static PostMediaEntity media(UUID postId, int position, String key, MediaType type, String thumbnailKey) {
+        return PostMediaEntity.builder().id(UUID.randomUUID()).postId(postId).position(position)
+                .mediaKey(key).mediaType(type).thumbnailKey(thumbnailKey).createdAt(LocalDateTime.now()).build();
+    }
+
+    private static AddPostRequest request(String caption, String... mediaKeys) {
+        return AddPostRequest.builder().caption(caption).mediaKeys(List.of(mediaKeys)).build();
+    }
+
     @Test
     void testExplorePosts_ReturnsPaginatedResponse() {
         // Arrange
@@ -74,14 +86,18 @@ public class PostServiceTest {
         UserEntity bob = new UserEntity();
         bob.setUsername("bob");
         PostEntity p1 = PostEntity.builder().id(UUID.randomUUID()).user(alice).caption("hello")
-                .mediaUrl("img1.jpg").createdAt(LocalDateTime.now()).build();
+                .createdAt(LocalDateTime.now()).build();
         PostEntity p2 = PostEntity.builder().id(UUID.randomUUID()).user(bob).caption("world")
-                .mediaUrl("img2.jpg").createdAt(LocalDateTime.now().minusMinutes(1)).build();
+                .createdAt(LocalDateTime.now().minusMinutes(1)).build();
         List<PostEntity> posts = List.of(p1, p2);
         Page<PostEntity> postPage = new PageImpl<>(posts, PageRequest.of(page, size), posts.size());
 
         when(postPaginationRepository.findAllActivePosts(any(Pageable.class)))
                 .thenReturn(postPage);
+
+        when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any())).thenReturn(List.of(
+                media(p1.getId(), 0, "img1.jpg", MediaType.IMAGE, null),
+                media(p2.getId(), 0, "img2.jpg", MediaType.IMAGE, null)));
 
         try {
             when(fileStorageService.getPresignUrl("img1.jpg")).thenReturn("img1.jpg");
@@ -101,8 +117,8 @@ public class PostServiceTest {
         assertEquals(posts.size(), response.getTotalElements());
         assertEquals(1, response.getTotalPages());
         // image url should be kept as is
-        assertEquals("img1.jpg", response.getContent().get(0).getMediaUrl());
-        assertEquals("img2.jpg", response.getContent().get(1).getMediaUrl());
+        assertEquals("img1.jpg", response.getContent().get(0).getMedia().get(0).url());
+        assertEquals("img2.jpg", response.getContent().get(1).getMedia().get(0).url());
 
         verify(postPaginationRepository, times(1))
                 .findAllActivePosts(any(Pageable.class));
@@ -130,10 +146,12 @@ public class PostServiceTest {
         UserEntity author = new UserEntity();
         author.setUsername("followed");
         PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(author)
-                .caption("hello").mediaUrl("image.jpg").createdAt(LocalDateTime.now()).build();
+                .caption("hello").createdAt(LocalDateTime.now()).build();
         PageRequest pageable = PageRequest.of(0, 10);
         when(postPaginationRepository.findFollowingPosts(pageable, viewerId))
                 .thenReturn(new PageImpl<>(List.of(post), pageable, 1));
+        when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
+                .thenReturn(List.of(media(post.getId(), 0, "image.jpg", MediaType.IMAGE, null)));
         when(likeRepository.findLikedPostIds(viewerId, List.of(post.getId())))
                 .thenReturn(List.of(post.getId()));
         when(fileStorageService.getPresignUrl("image.jpg")).thenReturn("signed-image.jpg");
@@ -142,7 +160,7 @@ public class PostServiceTest {
 
         assertEquals(1, response.getTotalElements());
         assertEquals("followed", response.getContent().getFirst().getUsername());
-        assertEquals("signed-image.jpg", response.getContent().getFirst().getMediaUrl());
+        assertEquals("signed-image.jpg", response.getContent().getFirst().getMedia().getFirst().url());
         assertTrue(response.getContent().getFirst().isLiked());
         verify(postPaginationRepository).findFollowingPosts(pageable, viewerId);
     }
@@ -206,10 +224,7 @@ public class PostServiceTest {
         // Arrange
         UUID userId = UUID.randomUUID();
         String objectKey = "testuser/POST_FEED/" + UUID.randomUUID() + ".jpg";
-        AddPostRequest request = AddPostRequest.builder()
-                .caption("My first post")
-                .objectKey(objectKey)
-                .build();
+        AddPostRequest request = request("My first post", objectKey);
 
         UserEntity user = new UserEntity();
         user.setId(userId);
@@ -224,12 +239,12 @@ public class PostServiceTest {
         PostEntity postEntity = PostEntity.builder()
                 .id(UUID.randomUUID())
                 .caption("My first post")
-                .mediaUrl(objectKey)
                 .user(user)
                 .createdAt(LocalDateTime.now())
                 .build();
 
         when(postCrudRepository.save(any(PostEntity.class))).thenReturn(postEntity);
+        when(postMediaRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
         // Act
         CreatePostResponse result = postService.addNewPost(userId, request);
@@ -244,6 +259,136 @@ public class PostServiceTest {
         ArgumentCaptor<PostCreatedEvent> event = ArgumentCaptor.forClass(PostCreatedEvent.class);
         verify(postEventPublisher).publishPostCreatedEvent(event.capture());
         assertEquals(userId, event.getValue().getAuthorId());
+        assertEquals(1, event.getValue().getMediaCount());
+    }
+
+    private UserEntity author(UUID userId) {
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setUsername("testuser");
+        return user;
+    }
+
+    @Test
+    void addNewPost_captionOnly_savesPostWithoutMedia() {
+        UUID userId = UUID.randomUUID();
+        UserEntity user = author(userId);
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
+        when(postCrudRepository.save(any(PostEntity.class))).thenReturn(PostEntity.builder()
+                .id(UUID.randomUUID()).caption("just words").user(user).createdAt(LocalDateTime.now()).build());
+
+        CreatePostResponse result = postService.addNewPost(userId, AddPostRequest.builder().caption("just words").build());
+
+        assertEquals(GlobalMessage.CREATED.getMessage(), result.getStatus());
+        verifyNoInteractions(fileStorageService, postMediaRepository);
+        ArgumentCaptor<PostCreatedEvent> event = ArgumentCaptor.forClass(PostCreatedEvent.class);
+        verify(postEventPublisher).publishPostCreatedEvent(event.capture());
+        assertEquals(0, event.getValue().getMediaCount());
+        verify(postEventPublisher, never()).publishVideoThumbnailRequested(any());
+    }
+
+    @Test
+    void addNewPost_mixedMedia_keepsOrderAndRequestsThumbnailPerVideo() {
+        UUID userId = UUID.randomUUID();
+        UserEntity user = author(userId);
+        String photo = "testuser/POST_FEED/a.jpg";
+        String clip1 = "testuser/POST_FEED/b.mp4";
+        String clip2 = "testuser/POST_FEED/c.mov";
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
+        when(fileStorageService.statObject(anyString()))
+                .thenReturn(ObjectStat.builder().size(1024L).contentType("x").build());
+        when(postCrudRepository.save(any(PostEntity.class))).thenReturn(PostEntity.builder()
+                .id(UUID.randomUUID()).user(user).createdAt(LocalDateTime.now()).build());
+        when(postMediaRepository.saveAll(anyList())).thenAnswer(inv -> {
+            List<PostMediaEntity> items = inv.getArgument(0);
+            items.forEach(item -> item.setId(UUID.randomUUID()));
+            return items;
+        });
+
+        postService.addNewPost(userId, request(null, photo, clip1, clip2));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<PostMediaEntity>> saved = ArgumentCaptor.forClass(List.class);
+        verify(postMediaRepository).saveAll(saved.capture());
+        assertEquals(List.of(photo, clip1, clip2), saved.getValue().stream().map(PostMediaEntity::getMediaKey).toList());
+        assertEquals(List.of(0, 1, 2), saved.getValue().stream().map(PostMediaEntity::getPosition).toList());
+        assertEquals(List.of(MediaType.IMAGE, MediaType.VIDEO, MediaType.VIDEO),
+                saved.getValue().stream().map(PostMediaEntity::getMediaType).toList());
+        verify(postEventPublisher, times(2)).publishVideoThumbnailRequested(any());
+        // no caption: the email gets a title that says what the post holds
+        ArgumentCaptor<PostCreatedEvent> created = ArgumentCaptor.forClass(PostCreatedEvent.class);
+        verify(postEventPublisher).publishPostCreatedEvent(created.capture());
+        assertEquals("Untitled post (3 media)", created.getValue().getEmailProps().get("postTitle"));
+    }
+
+    @Test
+    void addNewPost_noCaptionAndNoMedia_isRejected() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(author(userId)));
+
+        for (AddPostRequest bad : List.of(new AddPostRequest(), request("   "))) {
+            BusinessException ex = assertThrows(BusinessException.class, () -> postService.addNewPost(userId, bad));
+            assertEquals(GlobalMessage.BAD_REQUEST.getMessage(), ex.getMessage());
+        }
+        verify(postCrudRepository, never()).save(any());
+    }
+
+    @Test
+    void addNewPost_moreThanFiveMedia_isRejected() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(author(userId)));
+        String[] keys = new String[6];
+        for (int i = 0; i < keys.length; i++) {
+            keys[i] = "testuser/POST_FEED/" + i + ".jpg";
+        }
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> postService.addNewPost(userId, request("caption", keys)));
+
+        assertEquals(GlobalMessage.BAD_REQUEST.getMessage(), ex.getMessage());
+        verify(fileStorageService, never()).statObject(anyString());
+        verify(postCrudRepository, never()).save(any());
+    }
+
+    @Test
+    void addNewPost_duplicateMediaKey_isRejected() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(author(userId)));
+
+        assertThrows(BusinessException.class, () -> postService.addNewPost(userId,
+                request("caption", "testuser/POST_FEED/a.jpg", "testuser/POST_FEED/a.jpg")));
+        verify(postCrudRepository, never()).save(any());
+    }
+
+    @Test
+    void addNewPost_captionOver500Chars_isRejected() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(author(userId)));
+
+        assertThrows(BusinessException.class,
+                () -> postService.addNewPost(userId, request("a".repeat(501))));
+        verify(postCrudRepository, never()).save(any());
+
+        // exactly 500 is fine
+        when(postCrudRepository.save(any(PostEntity.class))).thenReturn(PostEntity.builder()
+                .id(UUID.randomUUID()).user(author(userId)).createdAt(LocalDateTime.now()).build());
+        postService.addNewPost(userId, request("a".repeat(500)));
+        verify(postCrudRepository).save(any());
+    }
+
+    @Test
+    void addNewPost_secondMediaOwnedByOtherUser_savesNothing() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(author(userId)));
+        when(fileStorageService.statObject("testuser/POST_FEED/a.jpg"))
+                .thenReturn(ObjectStat.builder().size(1024L).contentType("image/jpeg").build());
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> postService.addNewPost(userId,
+                request("caption", "testuser/POST_FEED/a.jpg", "other/POST_FEED/b.jpg")));
+
+        assertEquals(GlobalMessage.ACCESS_DENIED.getMessage(), ex.getMessage());
+        verify(postCrudRepository, never()).save(any());
+        verifyNoInteractions(postMediaRepository);
     }
 
     @Test
@@ -253,15 +398,18 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
         String objectKey = "testuser/POST_FEED/clip.mp4";
-        AddPostRequest request = new AddPostRequest();
-        request.setObjectKey(objectKey);
-        request.setCaption("clip");
+        AddPostRequest request = request("clip", objectKey);
         when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
                 .thenReturn(ObjectStat.builder().size(1024L).contentType("video/mp4").build());
-        PostEntity saved = PostEntity.builder().id(UUID.randomUUID()).caption("clip").mediaUrl(objectKey)
-                .mediaType(MediaType.VIDEO).user(user).createdAt(LocalDateTime.now()).build();
+        PostEntity saved = PostEntity.builder().id(UUID.randomUUID()).caption("clip")
+                .user(user).createdAt(LocalDateTime.now()).build();
         when(postCrudRepository.save(any(PostEntity.class))).thenReturn(saved);
+        when(postMediaRepository.saveAll(anyList())).thenAnswer(inv -> {
+            List<PostMediaEntity> items = inv.getArgument(0);
+            items.forEach(item -> item.setId(UUID.randomUUID()));
+            return items;
+        });
 
         postService.addNewPost(userId, request);
 
@@ -269,6 +417,7 @@ public class PostServiceTest {
                 ArgumentCaptor.forClass(VideoThumbnailRequestedEvent.class);
         verify(postEventPublisher).publishVideoThumbnailRequested(requested.capture());
         assertEquals(saved.getId(), requested.getValue().getPostId());
+        assertNotNull(requested.getValue().getMediaId());
         assertEquals("testuser/POST_FEED/clip_thumb.jpg", requested.getValue().getThumbnailObjectKey());
     }
 
@@ -279,14 +428,13 @@ public class PostServiceTest {
         user.setId(userId);
         user.setUsername("testuser");
         String objectKey = "testuser/POST_FEED/photo.jpg";
-        AddPostRequest request = new AddPostRequest();
-        request.setObjectKey(objectKey);
+        AddPostRequest request = request(null, objectKey);
         when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
                 .thenReturn(ObjectStat.builder().size(1024L).contentType("image/jpeg").build());
         when(postCrudRepository.save(any(PostEntity.class))).thenReturn(PostEntity.builder()
-                .id(UUID.randomUUID()).mediaUrl(objectKey).mediaType(MediaType.IMAGE)
-                .user(user).createdAt(LocalDateTime.now()).build());
+                .id(UUID.randomUUID()).user(user).createdAt(LocalDateTime.now()).build());
+        when(postMediaRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
         postService.addNewPost(userId, request);
 
@@ -306,7 +454,7 @@ public class PostServiceTest {
         UUID viewerId = UUID.randomUUID();
 
         PostEntity p1 = PostEntity.builder().id(UUID.randomUUID()).user(user).caption("hello")
-                .mediaUrl("img1.jpg").createdAt(LocalDateTime.now()).build();
+                .createdAt(LocalDateTime.now()).build();
         List<PostEntity> posts = List.of(p1);
         Page<PostEntity> postPage = new PageImpl<>(posts, PageRequest.of(page, size), posts.size());
 
@@ -343,10 +491,7 @@ public class PostServiceTest {
     void testAddNewPost_UserNotFound_ThrowsBadRequest() {
         // Arrange
         UUID userId = UUID.randomUUID();
-        AddPostRequest request = AddPostRequest.builder()
-                .caption("caption")
-                .objectKey("testuser/POST_FEED/x.jpg")
-                .build();
+        AddPostRequest request = request("caption", "testuser/POST_FEED/x.jpg");
 
         when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.empty());
@@ -363,10 +508,7 @@ public class PostServiceTest {
     void testAddNewPost_BlankObjectKey_ThrowsBadRequest() {
         // Arrange
         UUID userId = UUID.randomUUID();
-        AddPostRequest request = AddPostRequest.builder()
-                .caption("caption")
-                .objectKey(" ")
-                .build();
+        AddPostRequest request = request("caption", " ");
 
         when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.of(new UserEntity()));
@@ -383,10 +525,7 @@ public class PostServiceTest {
     void testAddNewPost_ObjectKeyOwnedByOtherUser_ThrowsAccessDenied() {
         // Arrange
         UUID userId = UUID.randomUUID();
-        AddPostRequest request = AddPostRequest.builder()
-                .caption("caption")
-                .objectKey("otheruser/POST_FEED/" + UUID.randomUUID() + ".jpg")
-                .build();
+        AddPostRequest request = request("caption", "otheruser/POST_FEED/" + UUID.randomUUID() + ".jpg");
 
         UserEntity user = new UserEntity();
         user.setId(userId);
@@ -408,10 +547,7 @@ public class PostServiceTest {
         // Arrange
         UUID userId = UUID.randomUUID();
         String objectKey = "testuser/POST_FEED/" + UUID.randomUUID() + ".jpg";
-        AddPostRequest request = AddPostRequest.builder()
-                .caption("caption")
-                .objectKey(objectKey)
-                .build();
+        AddPostRequest request = request("caption", objectKey);
 
         UserEntity user = new UserEntity();
         user.setId(userId);
@@ -437,10 +573,7 @@ public class PostServiceTest {
         // Arrange
         UUID userId = UUID.randomUUID();
         String objectKey = "testuser/POST_FEED/" + UUID.randomUUID() + ".mp4";
-        AddPostRequest request = AddPostRequest.builder()
-                .caption("caption")
-                .objectKey(objectKey)
-                .build();
+        AddPostRequest request = request("caption", objectKey);
 
         UserEntity user = new UserEntity();
         user.setId(userId);
@@ -466,10 +599,7 @@ public class PostServiceTest {
         // Arrange
         UUID userId = UUID.randomUUID();
         String objectKey = "testuser/POST_FEED/" + UUID.randomUUID() + ".bin";
-        AddPostRequest request = AddPostRequest.builder()
-                .caption("caption")
-                .objectKey(objectKey)
-                .build();
+        AddPostRequest request = request("caption", objectKey);
 
         UserEntity user = new UserEntity();
         user.setId(userId);
@@ -494,17 +624,22 @@ public class PostServiceTest {
         PostEntity post = PostEntity.builder()
                 .id(postId)
                 .user(user)
-                .mediaUrl("object/name.jpg")
                 .createdAt(LocalDateTime.now())
                 .build();
 
         when(postCrudRepository.findByIdAndIsDeletedFalse(postId)).thenReturn(Optional.of(post));
+        when(postMediaRepository.findByPostIdOrderByPositionAsc(postId)).thenReturn(List.of(
+                media(postId, 0, "object/a.jpg", MediaType.IMAGE, null),
+                media(postId, 1, "object/b.mp4", MediaType.VIDEO, "object/b_thumb.jpg")));
 
         Operation result = postService.deletePost(postId, userId);
 
         assertEquals(Operation.DELETED, result);
         assertTrue(post.isDeleted());
         verify(postCrudRepository).save(post);
+        verify(fileStorageService).deleteObject("object/a.jpg");
+        verify(fileStorageService).deleteObject("object/b.mp4");
+        verify(fileStorageService).deleteObject("object/b_thumb.jpg");
     }
 
     @Test
@@ -515,7 +650,6 @@ public class PostServiceTest {
         PostEntity post = PostEntity.builder()
                 .id(postId)
                 .user(owner)
-                .mediaUrl("object/name.jpg")
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -528,11 +662,26 @@ public class PostServiceTest {
         verify(postCrudRepository, never()).save(any());
     }
 
+    @Test
+    void feed_captionOnlyPost_hasEmptyMedia() throws Exception {
+        UserEntity author = new UserEntity();
+        author.setId(UUID.randomUUID());
+        author.setUsername("author");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("hello")
+                .createdAt(LocalDateTime.now()).build();
+        when(postPaginationRepository.findAllActivePosts(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
+
+        PostFeedResponse item = postService.getExplorePosts(0, 10, UUID.randomUUID()).getContent().get(0);
+
+        assertTrue(item.getMedia().isEmpty());
+        verify(fileStorageService, never()).getPresignUrl(any());
+    }
+
     // ------------------------------------------------------------ takedown in the feed
 
     private PostEntity takenDownPost(UserEntity author) {
         return PostEntity.builder().id(UUID.randomUUID()).user(author).caption("secret caption")
-                .mediaUrl("media.jpg").thumbnailUrl("thumb.jpg").mediaType(MediaType.VIDEO)
                 .createdAt(LocalDateTime.now())
                 .moderationStatus(ModerationStatus.TAKEN_DOWN)
                 .moderatedAt(Instant.parse("2026-11-08T01:00:00Z"))
@@ -547,6 +696,8 @@ public class PostServiceTest {
         author.setId(UUID.randomUUID());
         author.setUsername("author");
         PostEntity post = takenDownPost(author);
+        when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
+                .thenReturn(List.of(media(post.getId(), 0, "media.jpg", MediaType.VIDEO, "thumb.jpg")));
         when(postPaginationRepository.findAllActivePosts(any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
 
@@ -556,8 +707,7 @@ public class PostServiceTest {
         assertEquals(Instant.parse("2026-11-08T01:00:00Z"), item.getTakenDownAt());
         assertNull(item.getTakedownReason());
         assertNull(item.getCaption());
-        assertNull(item.getMediaUrl());
-        assertNull(item.getThumbnailUrl());
+        assertTrue(item.getMedia().isEmpty());
         verify(fileStorageService, never()).getPresignUrl(any());
     }
 
@@ -567,6 +717,8 @@ public class PostServiceTest {
         author.setId(UUID.randomUUID());
         author.setUsername("author");
         PostEntity post = takenDownPost(author);
+        when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
+                .thenReturn(List.of(media(post.getId(), 0, "media.jpg", MediaType.VIDEO, "thumb.jpg")));
         when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(author.getId())))
                 .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
         when(userRepository.findActiveByUsername("author")).thenReturn(Optional.of(author));
@@ -578,8 +730,8 @@ public class PostServiceTest {
         assertEquals(ModerationStatus.TAKEN_DOWN, item.getModerationStatus());
         assertEquals("melanggar aturan komunitas", item.getTakedownReason());
         assertEquals("secret caption", item.getCaption());
-        assertEquals("signed-media", item.getMediaUrl());
-        assertEquals("signed-thumb", item.getThumbnailUrl());
+        assertEquals("signed-media", item.getMedia().get(0).url());
+        assertEquals("signed-thumb", item.getMedia().get(0).thumbnailUrl());
     }
 
     @Test
@@ -588,9 +740,11 @@ public class PostServiceTest {
         author.setId(UUID.randomUUID());
         author.setUsername("author");
         PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("hello")
-                .mediaUrl("img.jpg").mediaType(MediaType.IMAGE).createdAt(LocalDateTime.now()).build();
+                .createdAt(LocalDateTime.now()).build();
         when(postPaginationRepository.findAllActivePosts(any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
+        when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
+                .thenReturn(List.of(media(post.getId(), 0, "img.jpg", MediaType.IMAGE, null)));
         when(fileStorageService.getPresignUrl("img.jpg")).thenReturn("signed-img");
 
         PostFeedResponse item = postService.getExplorePosts(0, 10, UUID.randomUUID()).getContent().get(0);
@@ -599,6 +753,6 @@ public class PostServiceTest {
         assertNull(item.getTakedownReason());
         assertNull(item.getTakenDownAt());
         assertEquals("hello", item.getCaption());
-        assertEquals("signed-img", item.getMediaUrl());
+        assertEquals("signed-img", item.getMedia().get(0).url());
     }
 }

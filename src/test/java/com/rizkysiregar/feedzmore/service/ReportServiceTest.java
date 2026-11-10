@@ -25,6 +25,7 @@ import com.rizkysiregar.feedzmore.model.request.ModerationReasonRequest;
 import com.rizkysiregar.feedzmore.model.request.ResolveReportRequest;
 import com.rizkysiregar.feedzmore.repository.CommentRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
+import com.rizkysiregar.feedzmore.repository.PostMediaRepository;
 import com.rizkysiregar.feedzmore.repository.ReportRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.util.Operation;
@@ -67,6 +68,8 @@ class ReportServiceTest {
     @Mock
     private PostCrudRepository postRepository;
     @Mock
+    private PostMediaRepository postMediaRepository;
+    @Mock
     private CommentRepository commentRepository;
     @Mock
     private UserRepository userRepository;
@@ -95,7 +98,7 @@ class ReportServiceTest {
 
     private PostEntity post(UserEntity author) {
         return PostEntity.builder().id(UUID.randomUUID()).user(author).caption("caption")
-                .mediaUrl("m.jpg").mediaType(MediaType.IMAGE).createdAt(LocalDateTime.now()).build();
+                .createdAt(LocalDateTime.now()).build();
     }
 
     private CommentEntity comment(UserEntity author, PostEntity post) {
