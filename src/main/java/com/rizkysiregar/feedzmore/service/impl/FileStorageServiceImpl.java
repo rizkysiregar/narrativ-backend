@@ -128,7 +128,11 @@ public class FileStorageServiceImpl implements FileStorageService {
                 log.warn(":: STAT.MINIO.OBJECT.NOT.FOUND: {} code={}", objectName, code);
                 throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
             }
-            log.error(":: STAT.MINIO.FAILED: {} code={} message={}", objectName, code, e.getMessage());
+            // the ids let a failure be traced in the MinIO log and in Cloudflare
+            String amzRequestId = e.response() == null ? null : e.response().header("x-amz-request-id");
+            String cfRay = e.response() == null ? null : e.response().header("cf-ray");
+            log.error(":: STAT.MINIO.FAILED: {} code={} message={} amzRequestId={} cfRay={}",
+                    objectName, code, e.getMessage(), amzRequestId, cfRay);
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (Exception e) {
             log.error(":: STAT.MINIO.OBJECT.FAILED: {}, because of {}", objectName, e.getMessage());

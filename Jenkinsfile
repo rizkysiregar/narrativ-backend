@@ -91,7 +91,9 @@ pipeline {
                     deleteDir()
                     git branch: "${GITOPS_BRANCH}",
                         credentialsId: 'github-all-repo-pat',
-                        url: "${GITOPS_REPOSITORY}"
+                        url: "${GITOPS_REPOSITORY}",
+                        poll: false,
+                        changelog: false
 
                     withCredentials([
                         gitUsernamePassword(

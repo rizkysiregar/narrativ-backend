@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -151,6 +152,43 @@ class ProfileImageServiceTest {
         assertFails(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST,
                 () -> profileImageService.setProfileImage(userId, new SetProfileImageRequest(key("fake.jpg"))));
         verify(fileStorageService).deleteObject(key("fake.jpg"));
+    }
+
+    @Test
+    void setProfileImage_retriesATransientStatFailure() {
+        when(fileStorageService.statObject(key("new.jpg")))
+                .thenThrow(new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR))
+                .thenReturn(new ObjectStat(1024, "image/jpeg"));
+        when(userRepository.save(user)).thenReturn(user);
+
+        profileImageService.setProfileImage(userId, new SetProfileImageRequest(key("new.jpg")));
+
+        assertEquals(key("new.jpg"), user.getProfileImage());
+        verify(fileStorageService, times(2)).statObject(key("new.jpg"));
+    }
+
+    @Test
+    void setProfileImage_toleratesStatFailingEveryTime() {
+        when(fileStorageService.statObject(key("new.jpg")))
+                .thenThrow(new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+        when(userRepository.save(user)).thenReturn(user);
+
+        profileImageService.setProfileImage(userId, new SetProfileImageRequest(key("new.jpg")));
+
+        assertEquals(key("new.jpg"), user.getProfileImage());
+        verify(fileStorageService, times(3)).statObject(key("new.jpg"));
+        verify(fileStorageService, never()).deleteObject(anyString());
+    }
+
+    @Test
+    void setProfileImage_missingObjectIsFinalAndNotRetried() {
+        when(fileStorageService.statObject(key("gone.jpg")))
+                .thenThrow(new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND));
+
+        assertFails(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND,
+                () -> profileImageService.setProfileImage(userId, new SetProfileImageRequest(key("gone.jpg"))));
+        verify(fileStorageService, times(1)).statObject(key("gone.jpg"));
+        verify(userRepository, never()).save(any());
     }
 
     // ---------------------------------------------------------------- delete
