@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Data
@@ -16,7 +17,8 @@ public class CommentResponse {
     private String username;
     private String profileImageUrl;
     private String commentContent;
-    private LocalDateTime createdAt;
+    // an absolute moment (serialized with a Z) so clients in any time zone show the right time
+    private Instant createdAt;
     // null for a top-level comment
     private UUID parentId;
     // the comment this one answers and its author, so the client can render the @username tag
@@ -44,7 +46,8 @@ public class CommentResponse {
         this.parentId = parentId;
         this.replyToCommentId = replyToCommentId;
         this.replyToUsername = replyToUsername;
-        this.createdAt = createdAt;
+        // the column is a zone-less local date time written in the JVM default zone
+        this.createdAt = createdAt == null ? null : createdAt.atZone(ZoneId.systemDefault()).toInstant();
         this.replyCount = replyCount == null ? 0 : replyCount;
     }
 
