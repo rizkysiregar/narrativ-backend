@@ -33,6 +33,11 @@ public class CommentEntity {
     @JoinColumn(name = "parent_id")
     private CommentEntity parent;
 
+    // the comment this one answers; for a reply to a reply this differs from parent (always the top-level comment)
+    @ManyToOne
+    @JoinColumn(name = "reply_to_comment_id")
+    private CommentEntity replyTo;
+
     @Column(nullable = false)
     private String content;
 
