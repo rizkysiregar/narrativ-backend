@@ -21,8 +21,10 @@ public interface CommentRepository extends JpaRepository<CommentEntity, UUID>, J
     @Query(value = """
             SELECT new com.rizkysiregar.feedzmore.model.response.CommentResponse(
                 c.id, c.user.id, c.user.username, c.user.profileImage, c.content,
-                c.moderationStatus, c.moderationReason, c.moderatedAt)
-            FROM CommentEntity c
+                c.moderationStatus, c.moderationReason, c.moderatedAt,
+                c.parent.id, rt.id, ru.username, c.createdAt,
+                (SELECT COUNT(r) FROM CommentEntity r WHERE r.parent.id = c.id AND r.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE))
+            FROM CommentEntity c LEFT JOIN c.replyTo rt LEFT JOIN rt.user ru
             WHERE c.post.id = :postId AND c.parent IS NULL AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
             ORDER BY c.createdAt ASC, c.id ASC
             """, countQuery = """
@@ -41,14 +43,34 @@ public interface CommentRepository extends JpaRepository<CommentEntity, UUID>, J
     @Query("""
             SELECT new com.rizkysiregar.feedzmore.model.response.CommentResponse(
                 c.id, c.user.id, c.user.username, c.user.profileImage, c.content,
-                c.moderationStatus, c.moderationReason, c.moderatedAt)
-            FROM CommentEntity c
+                c.moderationStatus, c.moderationReason, c.moderatedAt,
+                c.parent.id, rt.id, ru.username, c.createdAt, 0L)
+            FROM CommentEntity c LEFT JOIN c.replyTo rt LEFT JOIN rt.user ru
             WHERE c.parent.id = :parentId AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
               AND c.post.isDeleted = false AND c.post.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
               AND c.post.moderationStatus = com.rizkysiregar.feedzmore.model.enums.ModerationStatus.ACTIVE
             ORDER BY c.createdAt ASC
             """)
     List<CommentResponse> findReplyResponses(@Param("parentId") UUID parentId);
+
+    // same visibility rules as findReplyResponses, paged
+    @Query(value = """
+            SELECT new com.rizkysiregar.feedzmore.model.response.CommentResponse(
+                c.id, c.user.id, c.user.username, c.user.profileImage, c.content,
+                c.moderationStatus, c.moderationReason, c.moderatedAt,
+                c.parent.id, rt.id, ru.username, c.createdAt, 0L)
+            FROM CommentEntity c LEFT JOIN c.replyTo rt LEFT JOIN rt.user ru
+            WHERE c.parent.id = :parentId AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+              AND c.post.isDeleted = false AND c.post.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+              AND c.post.moderationStatus = com.rizkysiregar.feedzmore.model.enums.ModerationStatus.ACTIVE
+            ORDER BY c.createdAt ASC, c.id ASC
+            """, countQuery = """
+            SELECT COUNT(c) FROM CommentEntity c
+            WHERE c.parent.id = :parentId AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+              AND c.post.isDeleted = false AND c.post.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+              AND c.post.moderationStatus = com.rizkysiregar.feedzmore.model.enums.ModerationStatus.ACTIVE
+            """)
+    Page<CommentResponse> findReplyResponsePage(@Param("parentId") UUID parentId, Pageable pageable);
 
     // raw count for the admin view
     long countByPostId(UUID postId);

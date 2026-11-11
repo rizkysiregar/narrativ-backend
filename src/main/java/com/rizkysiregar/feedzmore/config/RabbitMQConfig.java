@@ -23,23 +23,27 @@ public class RabbitMQConfig {
     // --- Queues ---
     public static final String NOTIFICATION_QUEUE = "notification.queue";
     public static final String EMAIL_QUEUE = "email.queue";
+    public static final String COMMENT_REPLY_QUEUE = "comment.reply.queue";
     public static final String VIDEO_THUMBNAIL_REQUEST_QUEUE = "video.thumbnail.request.queue";
     public static final String VIDEO_THUMBNAIL_RESULT_QUEUE = "video.thumbnail.result.queue";
 
     // --- Dead letter queues ---
     public static final String NOTIFICATION_DLQ = "notification.dlq";
     public static final String EMAIL_DLQ = "email.dlq";
+    public static final String COMMENT_REPLY_DLQ = "comment.reply.dlq";
     public static final String VIDEO_THUMBNAIL_REQUEST_DLQ = "video.thumbnail.request.dlq";
     public static final String VIDEO_THUMBNAIL_RESULT_DLQ = "video.thumbnail.result.dlq";
 
     // --- Routing keys ---
     public static final String POST_CREATED_ROUTING_KEY = "post.created";
+    public static final String COMMENT_REPLIED_ROUTING_KEY = "comment.replied";
     public static final String VIDEO_THUMBNAIL_REQUESTED_ROUTING_KEY = "video.thumbnail.requested";
     public static final String VIDEO_THUMBNAIL_GENERATED_ROUTING_KEY = "video.thumbnail.generated";
 
     // --- Consumer identities (used to build idempotency keys) ---
     public static final String NOTIFICATION_CONSUMER = "notification";
     public static final String EMAIL_CONSUMER = "email";
+    public static final String COMMENT_REPLY_CONSUMER = "comment-reply";
 
     public static final int LISTENER_PREFETCH_COUNT = 10;
     public static final int LISTENER_MAX_RETRIES = 3;
@@ -143,6 +147,36 @@ public class RabbitMQConfig {
                 .bind(emailDlq())
                 .to(deadLetterExchange())
                 .with(EMAIL_DLQ);
+    }
+
+    // --- Comment reply (push when the user has a device, email otherwise) ---
+    @Bean
+    public Queue commentReplyQueue() {
+        return QueueBuilder.durable(COMMENT_REPLY_QUEUE)
+                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", COMMENT_REPLY_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Binding commentReplyBinding() {
+        return BindingBuilder
+                .bind(commentReplyQueue())
+                .to(postExchange())
+                .with(COMMENT_REPLIED_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue commentReplyDlq() {
+        return QueueBuilder.durable(COMMENT_REPLY_DLQ).build();
+    }
+
+    @Bean
+    public Binding commentReplyDlqBinding() {
+        return BindingBuilder
+                .bind(commentReplyDlq())
+                .to(deadLetterExchange())
+                .with(COMMENT_REPLY_DLQ);
     }
 
     // --- Video Thumbnail (media worker) ---

@@ -1,7 +1,10 @@
 package com.rizkysiregar.feedzmore.service;
 
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
+import com.rizkysiregar.feedzmore.messaging.event.CommentRepliedEvent;
+import com.rizkysiregar.feedzmore.messaging.publisher.CommentEventPublisher;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
+import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
 import com.rizkysiregar.feedzmore.model.response.CommentResponse;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
@@ -11,6 +14,7 @@ import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.impl.CommentServiceImpl;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -25,10 +29,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,12 +48,15 @@ class CommentServiceImplTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private CommentEventPublisher commentEventPublisher;
+
     @InjectMocks
     private CommentServiceImpl commentService;
 
     private CommentResponse takenDownComment(UUID authorId) {
         return new CommentResponse(UUID.randomUUID(), authorId, "author", null, "rude text",
-                ModerationStatus.TAKEN_DOWN, "kata kasar", Instant.now());
+                ModerationStatus.TAKEN_DOWN, "kata kasar", Instant.now(), null, null, null, null, 0L);
     }
 
     @Test
@@ -108,5 +117,103 @@ class CommentServiceImplTest {
 
         assertThrows(EntityNotFoundException.class,
                 () -> commentService.addComment(postId, UUID.randomUUID(), "hi", null));
+    }
+
+    private UserEntity user(String username) {
+        UserEntity user = new UserEntity();
+        user.setId(UUID.randomUUID());
+        user.setUsername(username);
+        return user;
+    }
+
+    private CommentEntity comment(PostEntity post, UserEntity author, CommentEntity parent) {
+        return CommentEntity.builder().id(UUID.randomUUID()).post(post).user(author).parent(parent).build();
+    }
+
+    private CommentEntity savedComment() {
+        ArgumentCaptor<CommentEntity> saved = ArgumentCaptor.forClass(CommentEntity.class);
+        verify(commentRepository).save(saved.capture());
+        return saved.getValue();
+    }
+
+    @Test
+    void addComment_replyToATopLevelCommentPointsParentAndReplyToAtIt() {
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).build();
+        UserEntity author = user("ani");
+        UserEntity replier = user("budi");
+        CommentEntity root = comment(post, author, null);
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+        when(commentRepository.findById(root.getId())).thenReturn(Optional.of(root));
+        when(userRepository.findById(replier.getId())).thenReturn(Optional.of(replier));
+
+        commentService.addComment(post.getId(), replier.getId(), "setuju", root.getId());
+
+        CommentEntity saved = savedComment();
+        assertSame(root, saved.getParent());
+        assertSame(root, saved.getReplyTo());
+    }
+
+    @Test
+    void addComment_replyToAReplyStaysOneLevelDeepAndTagsTheAnsweredComment() {
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).build();
+        UserEntity ani = user("ani");
+        UserEntity budi = user("budi");
+        UserEntity citra = user("citra");
+        CommentEntity root = comment(post, ani, null);
+        CommentEntity replyOfBudi = comment(post, budi, root);
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+        when(commentRepository.findById(replyOfBudi.getId())).thenReturn(Optional.of(replyOfBudi));
+        when(userRepository.findById(citra.getId())).thenReturn(Optional.of(citra));
+
+        commentService.addComment(post.getId(), citra.getId(), "kok bisa?", replyOfBudi.getId());
+
+        CommentEntity saved = savedComment();
+        assertSame(root, saved.getParent());
+        assertSame(replyOfBudi, saved.getReplyTo());
+
+        ArgumentCaptor<CommentRepliedEvent> event = ArgumentCaptor.forClass(CommentRepliedEvent.class);
+        verify(commentEventPublisher).publishCommentReplied(event.capture());
+        assertEquals(budi.getId(), event.getValue().getRecipientId());
+        assertEquals("citra", event.getValue().getReplierUsername());
+    }
+
+    @Test
+    void addComment_replyingToYourOwnCommentDoesNotNotifyAnyone() {
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).build();
+        UserEntity ani = user("ani");
+        CommentEntity root = comment(post, ani, null);
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+        when(commentRepository.findById(root.getId())).thenReturn(Optional.of(root));
+        when(userRepository.findById(ani.getId())).thenReturn(Optional.of(ani));
+
+        commentService.addComment(post.getId(), ani.getId(), "tambahan", root.getId());
+
+        verifyNoInteractions(commentEventPublisher);
+    }
+
+    @Test
+    void addComment_topLevelCommentDoesNotNotifyAnyone() {
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).build();
+        UserEntity ani = user("ani");
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+        when(userRepository.findById(ani.getId())).thenReturn(Optional.of(ani));
+
+        commentService.addComment(post.getId(), ani.getId(), "halo", null);
+
+        verifyNoInteractions(commentEventPublisher);
+    }
+
+    @Test
+    void addComment_cannotReplyToACommentOfAnotherPost() {
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).build();
+        PostEntity otherPost = PostEntity.builder().id(UUID.randomUUID()).build();
+        CommentEntity foreign = comment(otherPost, user("ani"), null);
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+        when(commentRepository.findById(foreign.getId())).thenReturn(Optional.of(foreign));
+
+        assertThrows(EntityNotFoundException.class,
+                () -> commentService.addComment(post.getId(), UUID.randomUUID(), "reply", foreign.getId()));
+
+        verify(commentRepository, never()).save(any());
     }
 }

@@ -16,7 +16,7 @@ class CommentResponseTest {
 
     private CommentResponse takenDown() {
         return new CommentResponse(UUID.randomUUID(), authorId, "author", null, "rude text",
-                ModerationStatus.TAKEN_DOWN, "kata kasar", takenDownAt);
+                ModerationStatus.TAKEN_DOWN, "kata kasar", takenDownAt, null, null, null, null, 0L);
     }
 
     @Test
@@ -45,7 +45,7 @@ class CommentResponseTest {
     @Test
     void activeComment_isUntouchedAndCarriesNoTakedownFields() {
         CommentResponse active = new CommentResponse(UUID.randomUUID(), authorId, "author", null, "nice",
-                ModerationStatus.ACTIVE, null, null);
+                ModerationStatus.ACTIVE, null, null, null, null, null, null, 0L);
 
         CommentResponse result = active.forViewer(UUID.randomUUID());
 

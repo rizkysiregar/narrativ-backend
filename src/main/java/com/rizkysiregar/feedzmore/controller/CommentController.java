@@ -43,6 +43,16 @@ public class CommentController {
         return commentService.getComment(postId, page, size, userPrincipal.getUserId());
     }
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "Getting replies of a top-level comment, paged")
+    @GetMapping("/comments/{commentId}/replies")
+    public PaginatedResponse<CommentResponse> getRepliesPage(
+            @PathVariable UUID commentId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return commentService.getRepliesPage(commentId, page, size, userPrincipal.getUserId());
+    }
+
     @io.swagger.v3.oas.annotations.Operation(summary = "Get a replay of a comment")
     @GetMapping("/replies/{commentId}")
     List<CommentResponse> getReplies(@PathVariable UUID commentId,
