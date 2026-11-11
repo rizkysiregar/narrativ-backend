@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,7 +18,8 @@ public class PostFeedResponse {
     private String caption;
     // empty for a caption-only post
     private List<PostMediaResponse> media = List.of();
-    private LocalDateTime createdAt;
+    // an absolute moment (serialized with a Z) so clients in any time zone show the right time
+    private Instant createdAt;
     private long likeCount;
     private long commentCount;
     private boolean isLiked;
@@ -33,7 +35,8 @@ public class PostFeedResponse {
         this.username = username;
         this.caption = caption;
         this.media = media;
-        this.createdAt = createdAt;
+        // the column is a zone-less local date time written in the JVM default zone
+        this.createdAt = createdAt == null ? null : createdAt.atZone(ZoneId.systemDefault()).toInstant();
         this.likeCount = likeCount;
         this.commentCount = commentCount;
         this.isLiked = isLiked;
