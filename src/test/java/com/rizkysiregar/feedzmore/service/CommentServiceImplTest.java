@@ -50,6 +50,8 @@ class CommentServiceImplTest {
 
     @Mock
     private CommentEventPublisher commentEventPublisher;
+    @Mock
+    private ProfileImageUrlResolver profileImageUrlResolver;
 
     @InjectMocks
     private CommentServiceImpl commentService;

@@ -26,6 +26,11 @@ public record AdminUserDetailDTO(
     /** Raw row counts for the admin detail view; null in list and update responses. */
     public record Stats(long postCount, long commentCount, long followerCount, long followingCount) {}
 
+    public AdminUserDetailDTO withProfileImageUrl(String url) {
+        return new AdminUserDetailDTO(id, username, email, firstName, lastName, fullName, phoneNumber, url, role,
+                deleted, status, bannedAt, bannedBy, banReason, stats);
+    }
+
     public static AdminUserDetailDTO from(UserEntity userEntity) {
         return from(userEntity, null);
     }

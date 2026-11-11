@@ -67,6 +67,8 @@ class UserManagementServiceTest {
     private FollowRepository followRepository;
     @Mock
     private ReportClosingService reportClosingService;
+    @Mock
+    private ProfileImageUrlResolver profileImageUrlResolver;
 
     @InjectMocks
     private UserManagementService userManagementService;

@@ -41,6 +41,8 @@ class FollowServiceTest {
 
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private ProfileImageUrlResolver profileImageUrlResolver;
 
     @InjectMocks
     private FollowServiceImpl followService;
@@ -129,10 +131,11 @@ class FollowServiceTest {
         PageRequest pageable = PageRequest.of(1, 2);
         when(followRepository.findActiveFollowers(targetId, pageable))
                 .thenReturn(new PageImpl<>(List.of(follower), pageable, 3));
+        when(profileImageUrlResolver.resolve("image.jpg")).thenReturn("https://signed/image.jpg");
 
         PaginatedResponse<FollowUserResponse> result = followService.getFollowers(targetId, requesterId, 1, 2);
 
-        assertEquals(List.of(follower), result.getContent());
+        assertEquals(List.of(follower.withProfileImage("https://signed/image.jpg")), result.getContent());
         assertEquals(1, result.getPageNumber());
         assertEquals(2, result.getPageSize());
         assertEquals(3, result.getTotalElements());

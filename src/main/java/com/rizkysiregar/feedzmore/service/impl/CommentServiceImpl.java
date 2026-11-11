@@ -12,6 +12,7 @@ import com.rizkysiregar.feedzmore.repository.CommentRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.CommentService;
+import com.rizkysiregar.feedzmore.service.ProfileImageUrlResolver;
 import com.rizkysiregar.feedzmore.util.AfterCommit;
 import com.rizkysiregar.feedzmore.util.Operation;
 import jakarta.persistence.EntityNotFoundException;
@@ -34,6 +35,7 @@ public class CommentServiceImpl implements CommentService {
     private final PostCrudRepository postCrudRepository;
     private final UserRepository userRepository;
     private final CommentEventPublisher commentEventPublisher;
+    private final ProfileImageUrlResolver profileImageUrlResolver;
 
     private static final int NOTIFICATION_PREVIEW_LENGTH = 100;
 
@@ -93,7 +95,7 @@ public class CommentServiceImpl implements CommentService {
         Page<CommentResponse> commentPage = commentRepository.findTopLevelCommentResponses(postId, pageable);
 
         return new PaginatedResponse<>(
-                commentPage.getContent().stream().map(comment -> comment.forViewer(viewerId)).toList(),
+                commentPage.getContent().stream().map(comment -> withResolvedImage(comment.forViewer(viewerId))).toList(),
                 commentPage.getNumber(),
                 commentPage.getSize(),
                 commentPage.getTotalElements(),
@@ -105,7 +107,7 @@ public class CommentServiceImpl implements CommentService {
     @Override
     public List<CommentResponse> getReplies(UUID commentId, UUID viewerId) {
         return commentRepository.findReplyResponses(commentId).stream()
-                .map(reply -> reply.forViewer(viewerId))
+                .map(reply -> withResolvedImage(reply.forViewer(viewerId)))
                 .toList();
     }
 
@@ -113,7 +115,7 @@ public class CommentServiceImpl implements CommentService {
     public PaginatedResponse<CommentResponse> getRepliesPage(UUID commentId, int page, int size, UUID viewerId) {
         Page<CommentResponse> replyPage = commentRepository.findReplyResponsePage(commentId, PageRequest.of(page, size));
         return new PaginatedResponse<>(
-                replyPage.getContent().stream().map(reply -> reply.forViewer(viewerId)).toList(),
+                replyPage.getContent().stream().map(reply -> withResolvedImage(reply.forViewer(viewerId))).toList(),
                 replyPage.getNumber(),
                 replyPage.getSize(),
                 replyPage.getTotalElements(),
@@ -125,6 +127,11 @@ public class CommentServiceImpl implements CommentService {
     @Override
     public long getCountByPostId(UUID postId) {
         return commentRepository.contByPostId(postId);
+    }
+
+    private CommentResponse withResolvedImage(CommentResponse comment) {
+        comment.setProfileImageUrl(profileImageUrlResolver.resolve(comment.getProfileImageUrl()));
+        return comment;
     }
 
     private static String preview(String content) {
