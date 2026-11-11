@@ -12,7 +12,10 @@ import com.rizkysiregar.feedzmore.repository.CommentRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.impl.CommentServiceImpl;
+import com.rizkysiregar.feedzmore.exception.BusinessException;
+import com.rizkysiregar.feedzmore.util.Operation;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.http.HttpStatus;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,7 +68,8 @@ class CommentServiceImplTest {
     void getComment_hidesTheTextOfATakenDownCommentFromOtherUsersButNotFromItsAuthor() {
         UUID postId = UUID.randomUUID();
         UUID authorId = UUID.randomUUID();
-        when(postCrudRepository.existsInteractableById(postId)).thenReturn(true);
+        when(postCrudRepository.findInteractableById(postId)).thenReturn(Optional.of(PostEntity.builder()
+                .id(postId).user(user("owner")).build()));
         when(commentRepository.findTopLevelCommentResponses(any(), any(Pageable.class))).thenAnswer(invocation ->
                 new PageImpl<>(List.of(takenDownComment(authorId)), PageRequest.of(0, 10), 1));
 
@@ -81,7 +85,7 @@ class CommentServiceImplTest {
     @Test
     void getComment_ofATakenDownOrHiddenPostIsNotFound() {
         UUID postId = UUID.randomUUID();
-        when(postCrudRepository.existsInteractableById(postId)).thenReturn(false);
+        when(postCrudRepository.findInteractableById(postId)).thenReturn(Optional.empty());
 
         assertThrows(EntityNotFoundException.class, () -> commentService.getComment(postId, 0, 10, UUID.randomUUID()));
     }
@@ -217,5 +221,75 @@ class CommentServiceImplTest {
                 () -> commentService.addComment(post.getId(), UUID.randomUUID(), "reply", foreign.getId()));
 
         verify(commentRepository, never()).save(any());
+    }
+
+    @Test
+    void getComment_flagsWhoMayDeleteEachComment() {
+        UUID postId = UUID.randomUUID();
+        UUID postOwnerId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        UserEntity postOwner = user("owner");
+        postOwner.setId(postOwnerId);
+        when(postCrudRepository.findInteractableById(postId)).thenReturn(Optional.of(PostEntity.builder()
+                .id(postId).user(postOwner).build()));
+        when(commentRepository.findTopLevelCommentResponses(any(), any(Pageable.class))).thenAnswer(invocation ->
+                new PageImpl<>(List.of(takenDownComment(authorId)), PageRequest.of(0, 10), 1));
+
+        assertEquals(true, commentService.getComment(postId, 0, 10, authorId).getContent().get(0).isCanDelete());
+        assertEquals(true, commentService.getComment(postId, 0, 10, postOwnerId).getContent().get(0).isCanDelete());
+        assertEquals(false, commentService.getComment(postId, 0, 10, UUID.randomUUID()).getContent().get(0).isCanDelete());
+    }
+
+    @Test
+    void deleteComment_authorCanDeleteTheirReplyAndTagsOfAnswersToItAreCleared() {
+        UserEntity postOwner = user("owner");
+        UserEntity author = user("ani");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(postOwner).build();
+        CommentEntity root = comment(post, postOwner, null);
+        CommentEntity reply = comment(post, author, root);
+        when(commentRepository.findById(reply.getId())).thenReturn(Optional.of(reply));
+
+        assertEquals(Operation.DELETED, commentService.deleteComment(reply.getId(), author.getId()));
+
+        verify(commentRepository).clearReplyTo(reply.getId());
+        verify(commentRepository, never()).deleteAllByParentId(any());
+        verify(commentRepository).delete(reply);
+    }
+
+    @Test
+    void deleteComment_postOwnerCanDeleteAnyCommentAndItsRepliesGoWithIt() {
+        UserEntity postOwner = user("owner");
+        UserEntity author = user("ani");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(postOwner).build();
+        CommentEntity root = comment(post, author, null);
+        when(commentRepository.findById(root.getId())).thenReturn(Optional.of(root));
+
+        assertEquals(Operation.DELETED, commentService.deleteComment(root.getId(), postOwner.getId()));
+
+        verify(commentRepository).deleteAllByParentId(root.getId());
+        verify(commentRepository).delete(root);
+    }
+
+    @Test
+    void deleteComment_anotherUserIsForbidden() {
+        UserEntity postOwner = user("owner");
+        UserEntity author = user("ani");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(postOwner).build();
+        CommentEntity root = comment(post, author, null);
+        when(commentRepository.findById(root.getId())).thenReturn(Optional.of(root));
+
+        BusinessException e = assertThrows(BusinessException.class,
+                () -> commentService.deleteComment(root.getId(), UUID.randomUUID()));
+
+        assertEquals(HttpStatus.FORBIDDEN, e.getHttpStatus());
+        verify(commentRepository, never()).delete(any(CommentEntity.class));
+    }
+
+    @Test
+    void deleteComment_unknownCommentIsNotFound() {
+        UUID id = UUID.randomUUID();
+        when(commentRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThrows(EntityNotFoundException.class, () -> commentService.deleteComment(id, UUID.randomUUID()));
     }
 }

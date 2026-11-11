@@ -32,6 +32,15 @@ public class CommentController {
     }
 
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "Delete a comment or reply; allowed for its author and for the owner of the post")
+    @DeleteMapping("/comments/{commentId}")
+    @PreAuthorize("hasRole('USER')")
+    public Operation deleteComment(
+            @PathVariable UUID commentId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return commentService.deleteComment(commentId, userPrincipal.getUserId());
+    }
+
     @io.swagger.v3.oas.annotations.Operation(summary = "Getting comments of a post")
     @GetMapping("/posts/{postId}/comments")
     public PaginatedResponse<CommentResponse> getComments(
