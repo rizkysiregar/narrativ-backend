@@ -54,6 +54,7 @@ public class AuthService {
     private final GoogleTokenVerifierService googleTokenVerifierService;
     private final UsernameGenerator usernameGenerator;
     private final AuditLogService auditLogService;
+    private final ProfileImageUrlResolver profileImageUrlResolver;
 
     public AuthService(UserRepository userRepository,
                        AuthenticationManager authManager,
@@ -62,7 +63,8 @@ public class AuthService {
                        GoogleTokenVerifierService googleTokenVerifierService,
                        UsernameGenerator usernameGenerator,
                        UserSearchService userSearchService,
-                       AuditLogService auditLogService
+                       AuditLogService auditLogService,
+                       ProfileImageUrlResolver profileImageUrlResolver
     ) {
         this.userRepository = userRepository;
         this.authManager = authManager;
@@ -72,6 +74,7 @@ public class AuthService {
         this.usernameGenerator = usernameGenerator;
         this.userSearchService = userSearchService;
         this.auditLogService = auditLogService;
+        this.profileImageUrlResolver = profileImageUrlResolver;
     }
 
     @Transactional
@@ -299,7 +302,7 @@ public class AuthService {
         log.info("Getting user by userId: {}", userId);
         try {
             return userRepository.findActiveById(UUID.fromString(userId))
-                    .map(UserDetailDTO::from)
+                    .map(this::toUserDetail)
                     .orElseThrow(() ->
                             new BusinessException(
                                     GlobalMessage.NOT_FOUND,
@@ -341,7 +344,7 @@ public class AuthService {
         }
 
         List<UserDetailDTO> usersContent = users.getContent().stream()
-                .map(UserDetailDTO::from)
+                .map(this::toUserDetail)
                 .toList();
 
         return new PaginatedResponse<>(
@@ -379,8 +382,12 @@ public class AuthService {
         }
 
         return users.stream()
-                .map(UserDetailDTO::from)
+                .map(this::toUserDetail)
                 .toList();
+    }
+
+    private UserDetailDTO toUserDetail(UserEntity user) {
+        return UserDetailDTO.from(user).withProfileImageUrl(profileImageUrlResolver.resolve(user.getProfileImage()));
     }
 
 }

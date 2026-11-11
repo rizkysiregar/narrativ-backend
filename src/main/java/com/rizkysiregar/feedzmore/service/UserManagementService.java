@@ -51,10 +51,11 @@ public class UserManagementService {
     private final CommentRepository commentRepository;
     private final FollowRepository followRepository;
     private final ReportClosingService reportClosingService;
+    private final ProfileImageUrlResolver profileImageUrlResolver;
 
     public UserDetailDTO getMyProfile(UUID currentUserId) {
         UserEntity user = findActiveUserOrThrow(currentUserId);
-        return UserDetailDTO.from(user);
+        return toUserDetail(user);
     }
 
     @Transactional
@@ -68,13 +69,13 @@ public class UserManagementService {
                 request.firstName(),
                 request.lastName(),
                 request.phoneNumber(),
-                request.profileImage()
+                null // the picture only changes through ProfileImageService
         );
 
         UserEntity savedUser = userRepository.save(user);
         userSearchService.indexUser(savedUser);
 
-        return UserDetailDTO.from(savedUser);
+        return toUserDetail(savedUser);
     }
 
     @Transactional
@@ -140,7 +141,7 @@ public class UserManagementService {
         }, pageable);
 
         List<AdminUserDetailDTO> usersContent = users.getContent().stream()
-                .map(AdminUserDetailDTO::from)
+                .map(user -> toAdminDetail(AdminUserDetailDTO.from(user), user))
                 .toList();
 
         return new PaginatedResponse<>(
@@ -163,7 +164,7 @@ public class UserManagementService {
                 followRepository.countByFollowedId(user.getId()),
                 followRepository.countByFollowerId(user.getId())
         );
-        return AdminUserDetailDTO.from(user, stats);
+        return toAdminDetail(AdminUserDetailDTO.from(user, stats), user);
     }
 
     @Transactional
@@ -203,7 +204,7 @@ public class UserManagementService {
             userSearchService.indexUser(savedUser);
         }
 
-        return AdminUserDetailDTO.from(savedUser);
+        return toAdminDetail(AdminUserDetailDTO.from(savedUser), savedUser);
     }
 
     @Transactional
@@ -238,7 +239,7 @@ public class UserManagementService {
         // They are revoked on unban, so a session from before the ban never silently comes back.
         userSearchService.deleteUser(savedUser.getId().toString());
 
-        return AdminUserDetailDTO.from(savedUser);
+        return toAdminDetail(AdminUserDetailDTO.from(savedUser), savedUser);
     }
 
     @Transactional
@@ -266,7 +267,7 @@ public class UserManagementService {
             userSearchService.indexUser(savedUser);
         }
 
-        return AdminUserDetailDTO.from(savedUser);
+        return toAdminDetail(AdminUserDetailDTO.from(savedUser), savedUser);
     }
 
     @Transactional
@@ -314,6 +315,14 @@ public class UserManagementService {
                 .orElseThrow(() -> new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND));
     }
 
+
+    private UserDetailDTO toUserDetail(UserEntity user) {
+        return UserDetailDTO.from(user).withProfileImageUrl(profileImageUrlResolver.resolve(user.getProfileImage()));
+    }
+
+    private AdminUserDetailDTO toAdminDetail(AdminUserDetailDTO dto, UserEntity user) {
+        return dto.withProfileImageUrl(profileImageUrlResolver.resolve(user.getProfileImage()));
+    }
 
     private void applyCommonUserUpdates(
             UserEntity user,

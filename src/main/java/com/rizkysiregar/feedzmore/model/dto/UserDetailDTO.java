@@ -12,6 +12,10 @@ public record UserDetailDTO(
         String phoneNumber,
         String profileImageUrl
 ) {
+    public UserDetailDTO withProfileImageUrl(String url) {
+        return new UserDetailDTO(id, username, email, firstName, lastName, fullName, phoneNumber, url);
+    }
+
     public static UserDetailDTO from(UserEntity userEntity) {
         return new UserDetailDTO(
                 userEntity.getId().toString(),

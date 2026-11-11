@@ -67,6 +67,8 @@ public class AuthServiceTest {
 
     @Mock
     private AuditLogService auditLogService;
+    @Mock
+    private ProfileImageUrlResolver profileImageUrlResolver;
 
     @InjectMocks
     private AuthService authService;

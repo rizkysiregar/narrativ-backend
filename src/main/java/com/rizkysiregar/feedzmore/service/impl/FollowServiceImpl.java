@@ -8,7 +8,9 @@ import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.FollowRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.FollowService;
+import com.rizkysiregar.feedzmore.service.ProfileImageUrlResolver;
 import com.rizkysiregar.feedzmore.util.Operation;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class FollowServiceImpl implements FollowService {
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
+    private final ProfileImageUrlResolver profileImageUrlResolver;
 
     @Override
     @Transactional
@@ -82,7 +85,10 @@ public class FollowServiceImpl implements FollowService {
     }
 
     private PaginatedResponse<FollowUserResponse> toResponse(Page<FollowUserResponse> results) {
-        return new PaginatedResponse<>(results.getContent(), results.getNumber(), results.getSize(),
+        List<FollowUserResponse> users = results.getContent().stream()
+                .map(user -> user.withProfileImage(profileImageUrlResolver.resolve(user.profileImage())))
+                .toList();
+        return new PaginatedResponse<>(users, results.getNumber(), results.getSize(),
                 results.getTotalElements(), results.getTotalPages(), results.isLast());
     }
 }

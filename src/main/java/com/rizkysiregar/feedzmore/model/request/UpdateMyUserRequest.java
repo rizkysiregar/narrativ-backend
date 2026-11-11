@@ -19,8 +19,6 @@ public record UpdateMyUserRequest(
 
         @Pattern(regexp = "^[0-9]+$", message = "Phone number must contain only digits")
         @Size(min = 10, max = 13, message = "Phone number must be between 10 and 13 digits")
-        String phoneNumber,
-
-        String profileImage
+        String phoneNumber
 ) {
 }
