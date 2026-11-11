@@ -72,6 +72,20 @@ public interface CommentRepository extends JpaRepository<CommentEntity, UUID>, J
             """)
     Page<CommentResponse> findReplyResponsePage(@Param("parentId") UUID parentId, Pageable pageable);
 
+    // the author of the post a comment belongs to, used to decide who may delete it
+    @Query("SELECT c.post.user.id FROM CommentEntity c WHERE c.id = :commentId")
+    Optional<UUID> findPostOwnerId(@Param("commentId") UUID commentId);
+
+    // all replies of a top-level comment in one statement, so they may reference each other
+    @Modifying
+    @Query("DELETE FROM CommentEntity c WHERE c.parent.id = :parentId")
+    int deleteAllByParentId(@Param("parentId") UUID parentId);
+
+    // replies that answered a deleted comment keep existing, they only lose the @tag
+    @Modifying
+    @Query("UPDATE CommentEntity c SET c.replyTo = NULL WHERE c.replyTo.id = :commentId")
+    int clearReplyTo(@Param("commentId") UUID commentId);
+
     // raw count for the admin view
     long countByPostId(UUID postId);
 

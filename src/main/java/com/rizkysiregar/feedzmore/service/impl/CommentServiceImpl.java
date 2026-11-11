@@ -13,6 +13,8 @@ import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.CommentService;
 import com.rizkysiregar.feedzmore.service.ProfileImageUrlResolver;
+import com.rizkysiregar.feedzmore.constant.GlobalMessage;
+import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.util.AfterCommit;
 import com.rizkysiregar.feedzmore.util.Operation;
 import jakarta.persistence.EntityNotFoundException;
@@ -21,7 +23,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -88,14 +92,14 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public PaginatedResponse<CommentResponse> getComment(UUID postId, int page, int size, UUID viewerId) {
-        if (!postCrudRepository.existsInteractableById(postId)) {
-            throw new EntityNotFoundException("Post Not Found");
-        }
+        UUID postOwnerId = postCrudRepository.findInteractableById(postId)
+                .orElseThrow(() -> new EntityNotFoundException("Post Not Found"))
+                .getUser().getId();
         Pageable pageable = PageRequest.of(page, size);
         Page<CommentResponse> commentPage = commentRepository.findTopLevelCommentResponses(postId, pageable);
 
         return new PaginatedResponse<>(
-                commentPage.getContent().stream().map(comment -> withResolvedImage(comment.forViewer(viewerId))).toList(),
+                commentPage.getContent().stream().map(comment -> prepare(comment, viewerId, postOwnerId)).toList(),
                 commentPage.getNumber(),
                 commentPage.getSize(),
                 commentPage.getTotalElements(),
@@ -106,16 +110,18 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public List<CommentResponse> getReplies(UUID commentId, UUID viewerId) {
+        UUID postOwnerId = commentRepository.findPostOwnerId(commentId).orElse(null);
         return commentRepository.findReplyResponses(commentId).stream()
-                .map(reply -> withResolvedImage(reply.forViewer(viewerId)))
+                .map(reply -> prepare(reply, viewerId, postOwnerId))
                 .toList();
     }
 
     @Override
     public PaginatedResponse<CommentResponse> getRepliesPage(UUID commentId, int page, int size, UUID viewerId) {
+        UUID postOwnerId = commentRepository.findPostOwnerId(commentId).orElse(null);
         Page<CommentResponse> replyPage = commentRepository.findReplyResponsePage(commentId, PageRequest.of(page, size));
         return new PaginatedResponse<>(
-                replyPage.getContent().stream().map(reply -> withResolvedImage(reply.forViewer(viewerId))).toList(),
+                replyPage.getContent().stream().map(reply -> prepare(reply, viewerId, postOwnerId)).toList(),
                 replyPage.getNumber(),
                 replyPage.getSize(),
                 replyPage.getTotalElements(),
@@ -124,9 +130,40 @@ public class CommentServiceImpl implements CommentService {
         );
     }
 
+    /**
+     * The author may delete their own comment and the owner of the post may delete any comment on it.
+     * Deleting a top-level comment takes its replies along; deleting a reply only clears the @tag of
+     * the replies that answered it.
+     */
+    @Override
+    @Transactional
+    public Operation deleteComment(UUID commentId, UUID requesterId) {
+        CommentEntity comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new EntityNotFoundException("Comment not found"));
+        boolean isAuthor = comment.getUser().getId().equals(requesterId);
+        boolean isPostOwner = comment.getPost().getUser().getId().equals(requesterId);
+        if (!isAuthor && !isPostOwner) {
+            throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);
+        }
+
+        if (comment.getParent() == null) {
+            commentRepository.deleteAllByParentId(commentId);
+        } else {
+            commentRepository.clearReplyTo(commentId);
+        }
+        commentRepository.delete(comment);
+        commentRepository.flush();
+        log.info("COMMENT.DELETED: id={} by={} asPostOwner={}", commentId, requesterId, !isAuthor);
+        return Operation.DELETED;
+    }
+
     @Override
     public long getCountByPostId(UUID postId) {
         return commentRepository.contByPostId(postId);
+    }
+
+    private CommentResponse prepare(CommentResponse comment, UUID viewerId, UUID postOwnerId) {
+        return withResolvedImage(comment.forViewer(viewerId).withDeletePermission(viewerId, postOwnerId));
     }
 
     private CommentResponse withResolvedImage(CommentResponse comment) {

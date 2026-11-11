@@ -30,6 +30,8 @@ public class CommentResponse {
     private ModerationStatus moderationStatus;
     private String takedownReason;
     private Instant takenDownAt;
+    // true for the author of the comment and for the owner of the post it is on
+    private boolean canDelete;
 
     public CommentResponse(UUID id, UUID authorId, String username, String profileImageUrl, String commentContent,
                            ModerationStatus moderationStatus, String moderationReason, Instant moderatedAt,
@@ -49,6 +51,11 @@ public class CommentResponse {
         // the column is a zone-less local date time written in the JVM default zone
         this.createdAt = createdAt == null ? null : createdAt.atZone(ZoneId.systemDefault()).toInstant();
         this.replyCount = replyCount == null ? 0 : replyCount;
+    }
+
+    public CommentResponse withDeletePermission(UUID viewerId, UUID postOwnerId) {
+        canDelete = viewerId != null && (viewerId.equals(authorId) || viewerId.equals(postOwnerId));
+        return this;
     }
 
     /**
