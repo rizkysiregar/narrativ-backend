@@ -45,6 +45,7 @@ public class FirebaseNotificationServiceTest {
     void sendNotificationToToken_Success() {
         // Stub token service
         when(firebaseTokenService.getAccessToken()).thenReturn(Mono.just("ACCESS_TOKEN"));
+        when(firebaseTokenService.getProjectId()).thenReturn("feedzmore");
 
         // Explicitly stub the WebClient fluent chain
         WebClient.RequestBodyUriSpec postSpec = Mockito.mock(WebClient.RequestBodyUriSpec.class);

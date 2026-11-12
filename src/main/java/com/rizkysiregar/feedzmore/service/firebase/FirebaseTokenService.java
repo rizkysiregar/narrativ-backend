@@ -3,25 +3,47 @@ package com.rizkysiregar.feedzmore.service.firebase;
 
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * Gets the OAuth access token used to call FCM. The service account key is never part of the code or the jar:
+ * it comes from {@code firebase.credentials-file} (path of a mounted Kubernetes secret) or, for local
+ * development, {@code firebase.credentials-json}. Every environment uses the key of its own Firebase project,
+ * and the project id is read from that key so a deployment can never push into another project.
+ */
 @Service
 @Slf4j
 public class FirebaseTokenService {
     private static final String SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
     private final AtomicReference<String> cachedToken = new AtomicReference<>();
     private long tokenExpirationTime = 0;
-    private final String adminSdkKey;
+    private final GoogleCredentials credentials;
+    private final String projectId;
 
+    public FirebaseTokenService(@Value("${firebase.credentials-file:}") String credentialsFile,
+                                @Value("${firebase.credentials-json:}") String credentialsJson) {
+        ServiceAccountCredentials serviceAccount = load(credentialsFile, credentialsJson);
+        if (serviceAccount.getProjectId() == null || serviceAccount.getProjectId().isBlank()) {
+            throw new IllegalStateException("The Firebase credentials do not contain a project_id");
+        }
+        this.projectId = serviceAccount.getProjectId();
+        this.credentials = serviceAccount.createScoped(Collections.singletonList(SCOPE));
+        log.info("FIREBASE.CREDENTIALS.LOADED project={}", projectId);
+    }
 
     @PostConstruct
     public void init() {
@@ -29,20 +51,9 @@ public class FirebaseTokenService {
         refreshToken();
     }
 
-    public FirebaseTokenService() {
-        this.adminSdkKey = "{\n" +
-                "  \"type\": \"service_account\",\n" +
-                "  \"project_id\": \"feedzmore\",\n" +
-                "  \"private_key_id\": \"b9731d99a46340d8ab29d1d4dc990a86dd677dec\",\n" +
-                "  \"private_key\": \"-----BEGIN PRIVATE KEY-----\\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCovQbX9rVuAiEn\\nSdaJIDA6PRrw3+ofE5ddRqnz0mqoNmnT47/5C6QbxQSx7qBzm5yOssdKCDMfQHiF\\nOzVzRZTRK/XOhuzmoDVQI+k6tsgecxMIPsU3gUS4BORHPwBzEPe8TL7vxyRzRiBq\\nU9O6vcIpXhqfla2UKmyTC6nO9abN1BmwIA1HjWujBXorvJUR6In8VismeW1+0eUI\\ncZkD24YkPbF+nED8cwvdorX49SwVX9PGmOdz4NjIq/GaB/2uRhvoPmLOqel8DNq3\\nkTgiZsy96Y+ExnYkRLcV3Ft+1et9sUzrYVu0RIcBIlllbHhl2GTmT6rF/eh6cAM+\\nuZKw09WDAgMBAAECggEABSoX6gc5K/9GWtNQjMzeklcUGoLilwXnUD8H7O2n6bMU\\npRwSNZdMyV7L0yhTDTFvkWcuYKPZ8LRtRo1L3asnsAk7kjvLR2RoN/uJZAx7w9bQ\\nzSP4BEgMEuJvcYYfnOX24cgANgrZy5S+DD25kWcaaLVidOJEuEVeIlgCiqeLwz6U\\nZAmmT2pmGJlG1h+NJOefJ11OQJ7GoTXlXYBcVoLFLmehcqrJ6DIuzn0yDuJcCXo2\\nAL1/9Bau9zhcIKYUcVxKD8vrxwOgfMYqQdlwXSM5hZKb8bZRAJ5J9BVFKluzDVCT\\nNnyi1w37tJsM0AaD9GDsf+2HzxROUhkg5in8q24OLQKBgQDX6jFi1H1/jNhHyvo6\\ngOFPCQReCdf7+Hj+p7yMA40Ivr96EH+TZBcREYlVtfx7+HdPzeG6bT921X2BxXIp\\n4i+ueSilax1Ac+10EquRIW8JGCxjOLoLJ0baSWBNc6zxIxB3FgyZ9Yp8GTFGc0u6\\nQzQCLlQXxbISOJa/CDo2SYEj5QKBgQDIEKyovUspSNGGmpFPgtPfuDuqBg7lF+y5\\nyPNEv5Xk8axvwtOffoZERIQAw7yxEdY5hzubhNuoteZYuotD3Ku9mC7qYsvAMAIV\\nykRYoW1aVnyXW2T21YR6tj+yn90X61eH6J9FXmPsqw1KSLlYc2dJ6fzXcCsn3bsw\\nb4/IR+tNRwKBgBclwlmoEjREc0NvHVh8TKteehtizsbyonYaoXoZP1t6p6h8cFDq\\n4BYyXRjVQ9Y+kvv5RIPqBm3FAYmSE2UuHJKF5relPiOUyhYxkjci8HZ3IvsYL8nW\\nUiBA0ZQ8HIRVkARUVtGCo3Aee0vkPHAhmEfLk7Rgu3B8pJyiUytSwgeJAoGAEnvv\\n59stYZAXw67uNAFrX+UephPPNn1iYrvdNgHZcICfpOfEM501/IK0C3oKKfXy6/fB\\nmxnITasYsCP0D/4IZAj2dLNSDdyhpK++Zs3rU4hgFH/eMSwDBG9oLTG19KrKuITW\\niksxQkF/hdh4P2LSLTMQKDt10UYcMFpuV1vFsqsCgYAVjG1KXUa0eJgDN+2n2EE5\\nI4vCEiANDEehZoyInQfW7bhu7Gr7dIk+KYI13rNhNbsRfEB673DNZxfQW+CQ5Z8R\\n/NNdxUPvjcaFxbyhotAPojzKAnf75mdzP4CcK57r6dqyZYAGzhEN/AtJKn1/sD4P\\nMhE3r6LgqStydiBWl3e5CA==\\n-----END PRIVATE KEY-----\\n\",\n" +
-                "  \"client_email\": \"firebase-adminsdk-fbsvc@feedzmore.iam.gserviceaccount.com\",\n" +
-                "  \"client_id\": \"116312157794454004945\",\n" +
-                "  \"auth_uri\": \"https://accounts.google.com/o/oauth2/auth\",\n" +
-                "  \"token_uri\": \"https://oauth2.googleapis.com/token\",\n" +
-                "  \"auth_provider_x509_cert_url\": \"https://www.googleapis.com/oauth2/v1/certs\",\n" +
-                "  \"client_x509_cert_url\": \"https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40feedzmore.iam.gserviceaccount.com\",\n" +
-                "  \"universe_domain\": \"googleapis.com\"\n" +
-                "}\n";
+    /** Firebase project of the loaded key, used in the FCM send url. */
+    public String getProjectId() {
+        return projectId;
     }
 
     public Mono<String> getAccessToken() {
@@ -60,13 +71,8 @@ public class FirebaseTokenService {
 
     private synchronized void refreshToken() {
         try {
-            InputStream inputStream = new ByteArrayInputStream(adminSdkKey.getBytes(StandardCharsets.UTF_8));
-            GoogleCredentials googleCredentials = GoogleCredentials
-                    .fromStream(inputStream)
-                    .createScoped(Collections.singletonList(SCOPE));
-
-            googleCredentials.refreshIfExpired();
-            AccessToken token = googleCredentials.getAccessToken();
+            credentials.refresh();
+            AccessToken token = credentials.getAccessToken();
             cachedToken.set(token.getTokenValue());
             tokenExpirationTime = token.getExpirationTime().getTime();
         } catch (Exception e) {
@@ -74,5 +80,27 @@ public class FirebaseTokenService {
         }
     }
 
+    private static ServiceAccountCredentials load(String credentialsFile, String credentialsJson) {
+        try (InputStream stream = open(credentialsFile, credentialsJson)) {
+            GoogleCredentials loaded = GoogleCredentials.fromStream(stream);
+            if (loaded instanceof ServiceAccountCredentials serviceAccount) {
+                return serviceAccount;
+            }
+            throw new IllegalStateException("The Firebase credentials must be a service account key");
+        } catch (IOException e) {
+            throw new IllegalStateException("The Firebase credentials cannot be read: " + e.getMessage(), e);
+        }
+    }
+
+    private static InputStream open(String credentialsFile, String credentialsJson) throws IOException {
+        if (credentialsFile != null && !credentialsFile.isBlank()) {
+            return Files.newInputStream(Path.of(credentialsFile.trim()));
+        }
+        if (credentialsJson != null && !credentialsJson.isBlank()) {
+            return new ByteArrayInputStream(credentialsJson.getBytes(StandardCharsets.UTF_8));
+        }
+        throw new IllegalStateException(
+                "Firebase credentials are not configured: set FIREBASE_CREDENTIALS_FILE (or FIREBASE_CREDENTIALS_JSON)");
+    }
 
 }

@@ -26,6 +26,11 @@ spring:
 
 google:
   client-id: ${GOOGLE_CLIENT_ID}
+firebase:
+  # service account key of this environment's Firebase project. In Kubernetes: path of the mounted secret.
+  credentials-file: ${FIREBASE_CREDENTIALS_FILE:}
+  # alternative for local development: the key itself (single line JSON). The file wins when both are set
+  credentials-json: ${FIREBASE_CREDENTIALS_JSON:}
 app:
   cors:
     # comma separated origins. default is local development only, deployed envs set APP_CORS_ALLOWED_ORIGINS

@@ -46,7 +46,7 @@ public class FirebaseNotificationService {
             );
 
             return webClient.post()
-                    .uri("/projects/{projectId}/messages:send", "feedzmore")
+                    .uri("/projects/{projectId}/messages:send", tokenService.getProjectId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .bodyValue(requestBody)
@@ -71,7 +71,7 @@ public class FirebaseNotificationService {
 
 
             return webClient.post()
-                    .uri("/projects/{projectId}/messages:send", "feedzmore")
+                    .uri("/projects/{projectId}/messages:send", tokenService.getProjectId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .bodyValue(requestBody)
