@@ -86,6 +86,27 @@ Confirm that only key names are present; do not print secret values:
 kubectl -n feedzmore describe secret feedzmore-secrets
 ```
 
+## Firebase service account key
+
+The key is a multi-line JSON file, so it does not belong in `feedzmore-secrets` (which is built from an env file). It lives in its own Secret that is mounted as a file. Each environment has its own Firebase project and its own Secret: `feedzmore-firebase-dev` for dev, `feedzmore-firebase-prod` for prod. The backend reads the project id from the key, so a pod can only push into the project of the key it was given.
+
+```bash
+kubectl -n feedzmore create secret generic feedzmore-firebase-dev \
+  --from-file=credentials.json=/secure/path/feedzmore-firebase-adminsdk-<id>.json \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+The Secret key must stay `credentials.json`: the Deployment mounts the Secret at `/etc/feedzmore/firebase` and the ConfigMap sets `FIREBASE_CREDENTIALS_FILE=/etc/feedzmore/firebase/credentials.json`. Check it without printing the private key:
+
+```bash
+kubectl -n feedzmore get secret feedzmore-firebase-dev -o jsonpath='{.data.credentials\.json}' \
+  | base64 -d | jq '{project_id, client_email, private_key_id}'
+```
+
+Rotating the key: create a new key in the Firebase console, run the command above with the new file, restart the deployment (the key is read at startup), then delete the old key in the console. The application refuses to start when the key is missing or unreadable.
+
+For local development set `FIREBASE_CREDENTIALS_FILE` in `.env` to the path of the dev key. Never commit a key file.
+
 ## Updating credentials
 
 Whenever a credential changes:
