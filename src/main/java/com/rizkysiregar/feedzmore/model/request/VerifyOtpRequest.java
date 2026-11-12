@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Data
 @Builder
@@ -20,5 +21,6 @@ public class VerifyOtpRequest {
 
     @Size(min = 6 ,max = 6, message = "OTP must be exactly 6 digits")
     @NotBlank
+    @ToString.Exclude
     String otp;
 }

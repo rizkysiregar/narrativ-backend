@@ -14,6 +14,7 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
 import java.util.Map;
+import com.rizkysiregar.feedzmore.util.EmailMasking;
 
 @Service
 @Slf4j
@@ -32,7 +33,7 @@ public class EmailService implements IEmailService {
 
     @Override
     public void sendEmailTemplate(String to, String subject, String templateName, Map<String, Object> variables) {
-        log.info("SEND.TEMPLATE.EMAIL: to {} | subject: {} | templateName: {}", to, subject, templateName);
+        log.info("SEND.TEMPLATE.EMAIL: to {} | subject: {} | templateName: {}", EmailMasking.maskEmail(to), subject, templateName);
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -59,7 +60,7 @@ public class EmailService implements IEmailService {
     @Override
     public void sendEmail(String to, String subject, String body) {
         try {
-            log.info("SEND.EMAIL :{}, subject:{}, body:{}", to, subject, body);
+            log.info("SEND.EMAIL :{}, subject:{}", EmailMasking.maskEmail(to), subject);
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(to);
             message.setSubject(subject);
