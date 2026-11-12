@@ -16,6 +16,7 @@ import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.util.BanMessages;
+import com.rizkysiregar.feedzmore.util.EmailMasking;
 import com.rizkysiregar.feedzmore.util.Operation;
 import com.rizkysiregar.feedzmore.util.UsernameGenerator;
 import jakarta.persistence.criteria.Predicate;
@@ -31,6 +32,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -101,7 +104,6 @@ public class AuthService {
         entity.setEmail(registerUserRequest.getEmail());
         entity.setFirstName(registerUserRequest.getFirstName());
         entity.setLastName(registerUserRequest.getLastName());
-        entity.setPhoneNumber(registerUserRequest.getPhoneNumber());
         entity.setProfileImage(registerUserRequest.getProfileImage());
         entity.setRole(role);
 
@@ -274,26 +276,35 @@ public class AuthService {
     @Transactional
     public Operation confirmResetPassword(ResetPasswordRequest resetPasswordRequest) {
 
-        UserEntity user = userRepository.findByEmail(resetPasswordRequest.getEmail())
-                .orElseThrow(() -> new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND));
-
+        // The token is checked before the user is looked up, so an unknown email, a missing or expired token and a
+        // wrong token all get the same answer and the endpoint never tells which emails are registered.
         String resetTokenKey = "reset_token:".concat(resetPasswordRequest.getEmail());
         Object actualResetToken = redisUtil.get(resetTokenKey);
 
-        if (actualResetToken == null) {
-            log.info("## resetToken not found on redis");
+        if (actualResetToken == null || !MessageDigest.isEqual(
+                actualResetToken.toString().getBytes(StandardCharsets.UTF_8),
+                resetPasswordRequest.getResetToken().getBytes(StandardCharsets.UTF_8))) {
+            log.info("## resetToken invalid for {}", EmailMasking.maskEmail(resetPasswordRequest.getEmail()));
             throw new BusinessException(GlobalMessage.INVALID_RESET_TOKEN, HttpStatus.BAD_REQUEST);
         }
 
-        if (!actualResetToken.equals(resetPasswordRequest.getResetToken())) {
-            log.info("## resetToken not matched!");
+        UserEntity user = userRepository.findByEmail(resetPasswordRequest.getEmail())
+                .filter(found -> !found.isDeleted())
+                .orElse(null);
+
+        // one time use: burn the token before anything else, it never works twice
+        redisUtil.delete(resetTokenKey);
+
+        if (user == null) {
             throw new BusinessException(GlobalMessage.INVALID_RESET_TOKEN, HttpStatus.BAD_REQUEST);
         }
 
-        // All good, update password
-        log.info("Updating password for user: {}", user.getEmail());
+        log.info("Updating password for user: {}", EmailMasking.maskEmail(user.getEmail()));
         user.setPassword(encoder.encode(resetPasswordRequest.getNewPassword()));
         userRepository.save(user);
+
+        // whoever knew the old password (or stole a session) must not stay logged in after the reset
+        revokeRefreshTokens(user.getId());
 
         return Operation.UPDATED;
     }

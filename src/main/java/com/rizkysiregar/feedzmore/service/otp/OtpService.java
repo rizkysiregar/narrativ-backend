@@ -72,7 +72,7 @@ public class OtpService implements IOtpService {
         // sending otp via email
         boolean sendStatus = emailService.sendOtpEmail(email, otp);
         if (!sendStatus) {
-            log.error("## Failed to send OTP to email: {}", email);
+            log.error("## Failed to send OTP to email: {}", EmailMasking.maskEmail(email));
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
 

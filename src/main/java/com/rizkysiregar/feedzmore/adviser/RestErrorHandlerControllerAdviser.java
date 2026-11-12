@@ -3,6 +3,7 @@ package com.rizkysiregar.feedzmore.adviser;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.response.BaseResponse;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,12 +17,14 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.validation.method.ParameterErrors;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.stream.Collectors;
 
@@ -33,12 +36,49 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ExceptionHandler(Exception.class)
     @ResponseStatus(value = HttpStatus.INTERNAL_SERVER_ERROR)
     public ResponseEntity<?> exception(Exception e) {
+        // Spring MVC's own client errors (wrong method, unsupported media type, missing parameter, unknown path...)
+        // carry their status: they are the caller's mistake, not a server failure
+        if (e instanceof ErrorResponse errorResponse && errorResponse.getStatusCode().is4xxClientError()) {
+            HttpStatus status = HttpStatus.valueOf(errorResponse.getStatusCode().value());
+            log.warn("{} {}", e.getClass().getSimpleName(), e.getMessage());
+            return new ResponseEntity<>(BaseResponse.builder()
+                    .code(String.valueOf(status.value()))
+                    .message(clientErrorMessage(status))
+                    .build(), status);
+        }
         log.error("Exception = ", e);
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.INTERNAL_ERROR.getCode())
                 .message(GlobalMessage.INTERNAL_ERROR.getMessage())
                 .build(),
                 HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    private static String clientErrorMessage(HttpStatus status) {
+        return switch (status) {
+            case BAD_REQUEST -> GlobalMessage.BAD_REQUEST.getMessage();
+            case NOT_FOUND -> GlobalMessage.NOT_FOUND.getMessage();
+            default -> status.getReasonPhrase();
+        };
+    }
+
+    // services throw this when a row they were asked for does not exist
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<?> entityNotFound(EntityNotFoundException e) {
+        log.warn("EntityNotFoundException: {}", e.getMessage());
+        return new ResponseEntity<>(BaseResponse.builder()
+                .code(GlobalMessage.NOT_FOUND.getCode())
+                .message(GlobalMessage.NOT_FOUND.getMessage())
+                .build(), HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<?> uploadTooLarge(MaxUploadSizeExceededException e) {
+        log.warn("Upload rejected, too large");
+        return new ResponseEntity<>(BaseResponse.builder()
+                .code(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE.getCode())
+                .message(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE.getMessage())
+                .build(), HttpStatus.PAYLOAD_TOO_LARGE);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -53,7 +93,12 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ExceptionHandler(BusinessException.class)
     @ResponseStatus(value = HttpStatus.INTERNAL_SERVER_ERROR)
     public ResponseEntity<?> businessException(BusinessException e) {
-        log.error("BusinessException = ", e);
+        // 4xx is an expected outcome (validation, not found, forbidden): one line, no stack trace
+        if (e.getHttpStatus() != null && e.getHttpStatus().is5xxServerError()) {
+            log.error("BusinessException = ", e);
+        } else {
+            log.warn("BusinessException {} {}: {}", e.getHttpStatus(), e.getCode(), e.getMessage());
+        }
         return new ResponseEntity<>(
                 BaseResponse.builder()
                         .code(e.getCode())

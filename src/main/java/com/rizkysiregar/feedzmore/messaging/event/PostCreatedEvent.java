@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
+import lombok.ToString;
 
 @Data
 @Builder
@@ -20,6 +21,7 @@ public class PostCreatedEvent {
     private String caption;
     private int mediaCount;
     private LocalDateTime createdAt;
+    @ToString.Exclude // author email, the events are logged on publish and consume
     private String email;
     private Map<String, Object> emailProps;
 }

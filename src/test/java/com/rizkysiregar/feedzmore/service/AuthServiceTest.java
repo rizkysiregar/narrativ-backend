@@ -93,7 +93,6 @@ public class AuthServiceTest {
         request.setEmail("test@mail.com");
         request.setFirstName("John");
         request.setLastName("Doe");
-        request.setPhoneNumber("1234567890");
         request.setProfileImage("profile.png");
 
         when(userRepository.save(any(UserEntity.class)))
@@ -124,7 +123,6 @@ public class AuthServiceTest {
         request.setEmail("admin@mail.com");
         request.setFirstName("New");
         request.setLastName("Admin");
-        request.setPhoneNumber("1234567890");
 
         Operation result = authService.register(request, true);
 
@@ -174,16 +172,25 @@ public class AuthServiceTest {
     }
 
 
+    private static final String INVALID_RESET_TOKEN_MESSAGE =
+            "Tautan perubahan kata sandi sudah tidak valid atau pernah digunakan.";
+
+    private ResetPasswordRequest resetRequest(String email, String token) {
+        return ResetPasswordRequest.builder()
+                .email(email)
+                .resetToken(token)
+                .newPassword("newPass")
+                .build();
+    }
+
     @Test
     void testConfirmResetPassword_Success() {
         // Arrange
-        ResetPasswordRequest request = ResetPasswordRequest.builder()
-                .email("user@example.com")
-                .resetToken("token-123")
-                .newPassword("newPass")
-                .build();
+        ResetPasswordRequest request = resetRequest("user@example.com", "token-123");
 
+        UUID userId = UUID.randomUUID();
         UserEntity user = new UserEntity();
+        user.setId(userId);
         user.setEmail("user@example.com");
         user.setPassword("old");
 
@@ -195,64 +202,62 @@ public class AuthServiceTest {
 
         // Assert
         assertEquals(Operation.UPDATED, result);
+        assertNotEquals("old", user.getPassword());
         verify(userRepository).save(user);
+        // one time use
+        verify(redisUtil).delete("reset_token:user@example.com");
+        // every session of the account is logged out
+        verify(redisUtil).membersOfSet("user_refresh_tokens:" + userId);
+        verify(redisUtil).delete("user_refresh_tokens:" + userId);
     }
 
     @Test
-    void testConfirmResetPassword_UserNotFound() {
-        // Arrange
-        ResetPasswordRequest request = ResetPasswordRequest.builder()
-                .email("missing@example.com")
-                .resetToken("token-123")
-                .newPassword("newPass")
-                .build();
+    void testConfirmResetPassword_UnknownEmailLooksLikeABadToken() {
+        // no token was ever issued for this email, and nothing reveals whether the email is registered
+        ResetPasswordRequest request = resetRequest("missing@example.com", "token-123");
 
-        when(userRepository.findByEmail("missing@example.com")).thenReturn(Optional.empty());
-
-        // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.confirmResetPassword(request));
-        assertEquals("Ups, data yang Anda cari tidak ditemukan.", ex.getMessage());
+        assertEquals(INVALID_RESET_TOKEN_MESSAGE, ex.getMessage());
+        verify(userRepository, never()).findByEmail(any());
         verify(userRepository, never()).save(any());
     }
 
     @Test
     void testConfirmResetPassword_TokenMissing() {
-        // Arrange
-        ResetPasswordRequest request = ResetPasswordRequest.builder()
-                .email("user@example.com")
-                .resetToken("token-123")
-                .newPassword("newPass")
-                .build();
-
-        UserEntity user = new UserEntity();
-        user.setEmail("user@example.com");
-        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        ResetPasswordRequest request = resetRequest("user@example.com", "token-123");
         when(redisUtil.get("reset_token:".concat("user@example.com"))).thenReturn(null);
 
-        // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.confirmResetPassword(request));
-        assertEquals("Tautan perubahan kata sandi sudah tidak valid atau pernah digunakan.", ex.getMessage());
+        assertEquals(INVALID_RESET_TOKEN_MESSAGE, ex.getMessage());
         verify(userRepository, never()).save(any());
     }
 
     @Test
-    void testConfirmResetPassword_TokenMismatch() {
-        // Arrange
-        ResetPasswordRequest request = ResetPasswordRequest.builder()
-                .email("user@example.com")
-                .resetToken("token-ABC")
-                .newPassword("newPass")
-                .build();
-
-        UserEntity user = new UserEntity();
-        user.setEmail("user@example.com");
-        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+    void testConfirmResetPassword_TokenMismatchKeepsTheRealToken() {
+        ResetPasswordRequest request = resetRequest("user@example.com", "token-ABC");
         when(redisUtil.get("reset_token:".concat("user@example.com"))).thenReturn("token-123");
 
-        // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.confirmResetPassword(request));
-        assertEquals("Tautan perubahan kata sandi sudah tidak valid atau pernah digunakan.", ex.getMessage());
+        assertEquals(INVALID_RESET_TOKEN_MESSAGE, ex.getMessage());
         verify(userRepository, never()).save(any());
+        // a wrong guess must not burn the token of the real owner
+        verify(redisUtil, never()).delete("reset_token:user@example.com");
+    }
+
+    @Test
+    void testConfirmResetPassword_DeletedAccountCannotBeReset() {
+        ResetPasswordRequest request = resetRequest("gone@example.com", "token-123");
+        UserEntity user = new UserEntity();
+        user.setId(UUID.randomUUID());
+        user.setEmail("gone@example.com");
+        user.setDeleted(true);
+        when(redisUtil.get("reset_token:gone@example.com")).thenReturn("token-123");
+        when(userRepository.findByEmail("gone@example.com")).thenReturn(Optional.of(user));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.confirmResetPassword(request));
+        assertEquals(INVALID_RESET_TOKEN_MESSAGE, ex.getMessage());
+        verify(userRepository, never()).save(any());
+        verify(redisUtil).delete("reset_token:gone@example.com");
     }
 
     @Test
