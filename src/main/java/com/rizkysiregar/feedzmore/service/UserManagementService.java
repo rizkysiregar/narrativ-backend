@@ -44,7 +44,6 @@ import java.util.UUID;
 public class UserManagementService {
 
     private final UserRepository userRepository;
-    private final UserSearchService userSearchService;
     private final AuditLogService auditLogService;
     private final AuthService authService;
     private final PostCrudRepository postCrudRepository;
@@ -73,7 +72,6 @@ public class UserManagementService {
         );
 
         UserEntity savedUser = userRepository.save(user);
-        userSearchService.indexUser(savedUser);
 
         return toUserDetail(savedUser);
     }
@@ -84,7 +82,6 @@ public class UserManagementService {
 
         user.setDeleted(true);
         userRepository.save(user);
-        userSearchService.deleteUser(user.getId().toString());
 
         return Operation.DELETED;
     }
@@ -198,12 +195,6 @@ public class UserManagementService {
                         "previousRole", roleChanges ? previousRole : null,
                         "newRole", roleChanges ? savedUser.getRole() : null));
 
-        if (savedUser.isDeleted() || savedUser.getStatus() == UserStatus.BANNED) {
-            userSearchService.deleteUser(savedUser.getId().toString());
-        } else {
-            userSearchService.indexUser(savedUser);
-        }
-
         return toAdminDetail(AdminUserDetailDTO.from(savedUser), savedUser);
     }
 
@@ -237,7 +228,6 @@ public class UserManagementService {
 
         // refresh tokens are kept: refresh and every JWT request reject a banned user and tell them why.
         // They are revoked on unban, so a session from before the ban never silently comes back.
-        userSearchService.deleteUser(savedUser.getId().toString());
 
         return toAdminDetail(AdminUserDetailDTO.from(savedUser), savedUser);
     }
@@ -262,10 +252,6 @@ public class UserManagementService {
                 reason, null);
 
         authService.revokeRefreshTokens(savedUser.getId());
-        // a user that deleted the account while banned must not come back into search
-        if (!savedUser.isDeleted()) {
-            userSearchService.indexUser(savedUser);
-        }
 
         return toAdminDetail(AdminUserDetailDTO.from(savedUser), savedUser);
     }

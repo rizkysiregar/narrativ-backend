@@ -57,9 +57,6 @@ public class AuthServiceTest {
     private RedisUtil redisUtil;
 
     @Mock
-    private UserSearchService userSearchService;
-
-    @Mock
     private GoogleTokenVerifierService googleTokenVerifierService;
 
     @Mock
@@ -375,7 +372,6 @@ public class AuthServiceTest {
         assertEquals("mock-jwt-token", result.getToken());
         assertEquals("testuser", result.getUsername());
         verify(userRepository).save(any(UserEntity.class));
-        verify(userSearchService).indexUser(existingUser);
     }
 
     @Test
@@ -416,7 +412,6 @@ public class AuthServiceTest {
         assertEquals("mock-jwt-token", result.getToken());
         assertEquals("newuser", result.getUsername());
         verify(userRepository).save(any(UserEntity.class));
-        verify(userSearchService).indexUser(any(UserEntity.class));
     }
 
     @Test
@@ -548,6 +543,6 @@ public class AuthServiceTest {
         assertThrows(BusinessException.class, () -> authService.googleLogin(request));
 
         verify(userRepository, never()).save(any());
-        verifyNoInteractions(userSearchService, jwtService);
+        verifyNoInteractions(jwtService);
     }
 }

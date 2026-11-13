@@ -54,8 +54,6 @@ class UserManagementServiceTest {
     @Mock
     private UserRepository userRepository;
     @Mock
-    private UserSearchService userSearchService;
-    @Mock
     private AuditLogService auditLogService;
     @Mock
     private AuthService authService;
@@ -154,23 +152,6 @@ class UserManagementServiceTest {
     }
 
     @Test
-    void updateUserForAdmin_bannedUserStaysOutOfTheSearchIndex() {
-        UUID id = UUID.randomUUID();
-        UserEntity banned = user(id, Role.USER);
-        banned.setStatus(UserStatus.BANNED);
-        when(userRepository.findById(id)).thenReturn(Optional.of(banned));
-        when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        userManagementService.updateUserForAdmin(id.toString(),
-                new AdminUpdateUserRequest(null, null, "Jane", null, null, null, null), adminId);
-
-        verify(userSearchService).deleteUser(id.toString());
-        verify(userSearchService, never()).indexUser(any());
-    }
-
-    // ------------------------------------------------------------------- ban
-
-    @Test
     void banUser_marksBannedAuditsAndRemovesTheUserFromSearchButKeepsTheSessionsSoTheAppCanShowTheReason() {
         UUID id = UUID.randomUUID();
         UserEntity target = user(id, Role.USER);
@@ -188,12 +169,11 @@ class UserManagementServiceTest {
         assertEquals("spam account", result.banReason());
         assertEquals(adminId.toString(), result.bannedBy());
 
-        InOrder order = inOrder(userRepository, reportClosingService, auditLogService, userSearchService);
+        InOrder order = inOrder(userRepository, reportClosingService, auditLogService);
         order.verify(userRepository).save(target);
         order.verify(reportClosingService).closeOpenReports(ReportTargetType.USER, id, adminId, ReportAction.BAN);
         order.verify(auditLogService).record(AdminAuditAction.USER_BAN, AuditTargetType.USER, id.toString(),
                 "spam account", null);
-        order.verify(userSearchService).deleteUser(id.toString());
         verifyNoInteractions(authService);
     }
 
@@ -228,7 +208,7 @@ class UserManagementServiceTest {
                 userManagementService.banUserForAdmin(bannedId.toString(), new BanUserRequest("some reason"), adminId));
 
         verify(userRepository, never()).save(any());
-        verifyNoInteractions(auditLogService, authService, userSearchService, reportClosingService);
+        verifyNoInteractions(auditLogService, authService, reportClosingService);
     }
 
     @Test
@@ -264,7 +244,6 @@ class UserManagementServiceTest {
         assertEquals(UserStatus.ACTIVE, result.status());
         verify(auditLogService).record(AdminAuditAction.USER_UNBAN, AuditTargetType.USER, id.toString(),
                 "appeal accepted", null);
-        verify(userSearchService).indexUser(target);
         // sessions from before the ban must not silently come back
         verify(authService).revokeRefreshTokens(id);
     }
@@ -284,22 +263,6 @@ class UserManagementServiceTest {
         assertFails(GlobalMessage.USER_NOT_BANNED, HttpStatus.CONFLICT, () ->
                 userManagementService.unbanUserForAdmin(id.toString(), null));
     }
-
-    @Test
-    void unbanUser_whoDeletedTheAccountWhileBannedIsNotReindexed() {
-        UUID id = UUID.randomUUID();
-        UserEntity target = user(id, Role.USER);
-        target.setStatus(UserStatus.BANNED);
-        target.setDeleted(true);
-        when(userRepository.findById(id)).thenReturn(Optional.of(target));
-        when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        userManagementService.unbanUserForAdmin(id.toString(), null);
-
-        verify(userSearchService, never()).indexUser(any());
-    }
-
-    // ---------------------------------------------------------- force logout
 
     @Test
     void forceLogout_revokesRefreshTokensAndAudits() {

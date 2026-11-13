@@ -52,7 +52,6 @@ public class AuthService {
     final AuthenticationManager authManager;
     final JWTService jwtService;
     private final RedisUtil redisUtil;
-    private final UserSearchService userSearchService;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
     private final GoogleTokenVerifierService googleTokenVerifierService;
     private final UsernameGenerator usernameGenerator;
@@ -65,7 +64,6 @@ public class AuthService {
                        RedisUtil redisUtil,
                        GoogleTokenVerifierService googleTokenVerifierService,
                        UsernameGenerator usernameGenerator,
-                       UserSearchService userSearchService,
                        AuditLogService auditLogService,
                        ProfileImageUrlResolver profileImageUrlResolver
     ) {
@@ -75,7 +73,6 @@ public class AuthService {
         this.redisUtil = redisUtil;
         this.googleTokenVerifierService = googleTokenVerifierService;
         this.usernameGenerator = usernameGenerator;
-        this.userSearchService = userSearchService;
         this.auditLogService = auditLogService;
         this.profileImageUrlResolver = profileImageUrlResolver;
     }
@@ -108,7 +105,6 @@ public class AuthService {
         entity.setRole(role);
 
         UserEntity saved = userRepository.save(entity);
-        userSearchService.indexUser(entity); // dual write into ES
 
         if (isAdmin) {
             auditLogService.record(AdminAuditAction.ADMIN_REGISTER, AuditTargetType.USER,
@@ -180,7 +176,6 @@ public class AuthService {
 
         assertNotBanned(user);
         userRepository.save(user);
-        userSearchService.indexUser(user);
         // Generate JWT - same as regular login
         String token = jwtService.generateToken(user.getUsername(), user.getId(), user.getRole());
         return LoginResponse.builder()
