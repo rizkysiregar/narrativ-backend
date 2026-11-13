@@ -71,7 +71,7 @@ public class AuthController {
         return authService.refreshToken(request.getRefreshToken());
     }
 
-    @io.swagger.v3.oas.annotations.Operation(summary = "User validation and OTP Request", description = "Use this for sending otp into user registered email")
+    @io.swagger.v3.oas.annotations.Operation(summary = "User validation and OTP Request", description = "Sends an OTP to the email when it has an account. The answer is the same for every email, registered or not, so it does not reveal which emails have an account")
     @PostMapping("auth/forgot-password")
     public SentOtpDTO forgotPassword(@RequestBody @Valid ForgotPasswordRequest request) {
         return otpService.sendOtp(request.getEmail());

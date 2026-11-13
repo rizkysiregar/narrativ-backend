@@ -17,7 +17,7 @@ class RegisterUserRequestTest {
     @Test
     void registersWithoutAPhoneNumber() throws Exception {
         RegisterUserRequest request = objectMapper.readValue("""
-                {"username":"rizky","password":"secret1","email":"rizky@example.com","firstName":"Rizky","lastName":"Siregar"}
+                {"username":"rizky","password":"secret123","email":"rizky@example.com","firstName":"Rizky","lastName":"Siregar"}
                 """, RegisterUserRequest.class);
 
         assertTrue(validator.validate(request).isEmpty());
@@ -26,7 +26,7 @@ class RegisterUserRequestTest {
     @Test
     void appsThatStillSendAPhoneNumberAreNotRejected() throws Exception {
         RegisterUserRequest request = objectMapper.readValue("""
-                {"username":"rizky","password":"secret1","email":"rizky@example.com","firstName":"Rizky","lastName":"Siregar","phoneNumber":"081234567890"}
+                {"username":"rizky","password":"secret123","email":"rizky@example.com","firstName":"Rizky","lastName":"Siregar","phoneNumber":"081234567890"}
                 """, RegisterUserRequest.class);
 
         assertEquals("rizky", request.getUsername());

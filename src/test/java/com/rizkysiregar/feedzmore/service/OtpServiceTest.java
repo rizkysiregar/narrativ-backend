@@ -6,7 +6,6 @@ import com.rizkysiregar.feedzmore.util.RedisUtil;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.model.dto.ResetTokenDTO;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
-import com.rizkysiregar.feedzmore.repository.OtpCodeRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.email.IEmailService;
 import com.rizkysiregar.feedzmore.service.otp.OtpService;
@@ -18,12 +17,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
 import com.rizkysiregar.feedzmore.exception.BusinessException;
-import com.rizkysiregar.feedzmore.model.OtpCode;
 import com.rizkysiregar.feedzmore.model.dto.SentOtpDTO;
 import org.springframework.http.HttpStatus;
 
@@ -34,8 +31,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 public class OtpServiceTest {
 
-    @Mock
-    private OtpCodeRepository otpCodeRepository;
     @Mock
     private IEmailService emailService;
     @Mock
@@ -65,11 +60,7 @@ public class OtpServiceTest {
         when(redisUtil.hasKey("otp:" + email)).thenReturn(false);
         when(emailService.sendOtpEmail(eq(email), anyString())).thenReturn(true);
 
-        // set @Value field
-        ReflectionTestUtils.setField(otpService, "otpRetryTimeInSeconds", "60");
-
         ArgumentCaptor<String> otpCaptor = ArgumentCaptor.forClass(String.class);
-        java.time.LocalDateTime beforeCall = java.time.LocalDateTime.now();
 
         // Act
         SentOtpDTO result = otpService.sendOtp(email);
@@ -80,26 +71,52 @@ public class OtpServiceTest {
         Assertions.assertNotNull(generatedOtp);
         Assertions.assertTrue(generatedOtp.matches("\\d{6}"), "Generated OTP should be 6 digits");
 
-        // Verify repository save with same OTP and email
-        ArgumentCaptor<OtpCode> otpCodeCaptor = ArgumentCaptor.forClass(OtpCode.class);
-        verify(otpCodeRepository, times(1)).save(otpCodeCaptor.capture());
-        OtpCode saved = otpCodeCaptor.getValue();
-        Assertions.assertEquals(email, saved.getEmail());
-        Assertions.assertEquals(generatedOtp, saved.getOtp());
-        Assertions.assertNotNull(saved.getExpirationTime());
-        // expiration should be roughly now + 60 seconds (allow generous window to avoid flakiness)
-        java.time.LocalDateTime lowerBound = beforeCall.plusSeconds(45);
-        java.time.LocalDateTime upperBound = beforeCall.plusSeconds(90);
-        Assertions.assertTrue(!saved.getExpirationTime().isBefore(lowerBound)
-                        && !saved.getExpirationTime().isAfter(upperBound),
-                "Expiration time should be within 45-90 seconds from before-call timestamp");
-
-        // Verify Redis set with ttl 60
+        // The OTP only lives in Redis, with a ttl of 60 seconds: it is never written to the database
         verify(redisUtil, times(1)).set("otp:" + email, generatedOtp, 60);
 
         // Verify DTO response
         Assertions.assertEquals("t****t@mail.com", result.getOtpSendToEmailAddress());
         Assertions.assertEquals("1", result.getExpirationTimeInMinute());
+    }
+
+    @Test
+    void sendOtp_UnknownEmail_AnswersLikeARegisteredOneButSendsNothing() {
+        String email = "notfound@mail.com";
+        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+
+        SentOtpDTO result = otpService.sendOtp(email);
+
+        // same answer as for a registered email, so the endpoint does not tell which emails have an account
+        Assertions.assertEquals("n****d@mail.com", result.getOtpSendToEmailAddress());
+        Assertions.assertEquals("1", result.getExpirationTimeInMinute());
+        verify(emailService, never()).sendOtpEmail(anyString(), anyString());
+        // and the OTP is kept like a real one, so everything that follows behaves the same
+        verify(redisUtil).set(eq("otp:" + email), argThat(otp -> otp.toString().matches("\\d{6}")), eq(60L));
+    }
+
+    @Test
+    void sendOtp_DeletedAccount_IsTreatedAsUnknown() {
+        String email = "gone@mail.com";
+        UserEntity deleted = new UserEntity();
+        deleted.setEmail(email);
+        deleted.setDeleted(true);
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(deleted));
+
+        otpService.sendOtp(email);
+
+        verify(emailService, never()).sendOtpEmail(anyString(), anyString());
+    }
+
+    @Test
+    void sendOtp_UnknownEmail_SecondRequestIsRateLimitedLikeForARegisteredEmail() {
+        String email = "notfound@mail.com";
+        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+        when(redisUtil.hasKey("otp:" + email)).thenReturn(false, true);
+
+        otpService.sendOtp(email);
+        BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.sendOtp(email));
+
+        Assertions.assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getHttpStatus());
     }
 
 
@@ -119,27 +136,16 @@ public class OtpServiceTest {
     }
 
     @Test
-    void sendOtp_UserNotFound_ThrowsNotFound() {
-        String email = "notfound@mail.com";
-        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
-
-        BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.sendOtp(email));
-        Assertions.assertEquals(HttpStatus.NOT_FOUND, ex.getHttpStatus());
-    }
-
-    @Test
     void sendOtp_TooManyRequests_WhenRedisHasKey() {
         String email = "test@mail.com";
-        UserEntity userEntity = new UserEntity();
-        userEntity.setEmail(email);
-        when(userRepository.findByEmail(email)).thenReturn(Optional.of(userEntity));
         when(redisUtil.hasKey("otp:" + email)).thenReturn(true);
 
         BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.sendOtp(email));
-        Assertions.assertEquals(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE, ex.getHttpStatus());
+        Assertions.assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getHttpStatus());
         verify(emailService, never()).sendOtpEmail(anyString(), anyString());
-        verify(otpCodeRepository, never()).save(any());
         verify(redisUtil, never()).set(anyString(), any(), anyInt());
+        // decided before the user is looked up, so it is the same for every email
+        verifyNoInteractions(userRepository);
     }
 
     @Test
@@ -150,11 +156,9 @@ public class OtpServiceTest {
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(userEntity));
         when(redisUtil.hasKey("otp:" + email)).thenReturn(false);
         when(emailService.sendOtpEmail(eq(email), anyString())).thenReturn(false);
-        ReflectionTestUtils.setField(otpService, "otpRetryTimeInSeconds", "60");
 
         BusinessException ex = Assertions.assertThrows(BusinessException.class, () -> otpService.sendOtp(email));
         Assertions.assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getHttpStatus());
-        verify(otpCodeRepository, never()).save(any());
         verify(redisUtil, never()).set(anyString(), any(), anyInt());
     }
 
@@ -342,7 +346,6 @@ public class OtpServiceTest {
 
         Assertions.assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getHttpStatus());
         verify(emailService, never()).sendOtpEmail(anyString(), anyString());
-        verify(otpCodeRepository, never()).save(any());
     }
 
 }
