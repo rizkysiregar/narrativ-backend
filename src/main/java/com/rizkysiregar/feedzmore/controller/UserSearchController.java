@@ -1,11 +1,9 @@
 package com.rizkysiregar.feedzmore.controller;
 
-import com.rizkysiregar.feedzmore.model.document.UserDocument;
 import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
 import com.rizkysiregar.feedzmore.model.request.UserSearchRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.service.AuthService;
-import com.rizkysiregar.feedzmore.service.UserSearchService;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -22,7 +20,6 @@ import java.util.List;
 public class UserSearchController {
 
     final AuthService authService;
-    final UserSearchService userSearchService;
 
     @Operation(summary = "Get all active users or filter active users by username")
     @GetMapping()
@@ -52,12 +49,5 @@ public class UserSearchController {
         );
     }
 
-    @Operation(summary = "Get user by name or username with fuzziness by elastic search")
-    @GetMapping("search-elastic-search")
-    public List<UserDocument> searchUsersViaES(
-            @RequestParam String query
-    ) {
-        return userSearchService.searchUsers(query);
-    }
 
 }

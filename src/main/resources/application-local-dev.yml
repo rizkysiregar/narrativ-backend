@@ -26,8 +26,6 @@ spring:
       host: ${DEV_INFRA_HOST}
       port: ${REDIS_PORT}
       timeout: ${REDIS_TIMEOUT}
-  elasticsearch:
-    uris: http://${DEV_INFRA_HOST}:${ELASTICSEARCH_PORT}
   rabbitmq:
     host: ${DEV_INFRA_HOST}
     port: ${RABBITMQ_PORT}

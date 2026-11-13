@@ -40,7 +40,7 @@ Client
   → Feedzmore Pod on port 9091
 ```
 
-Application dependencies remain outside Kubernetes on the development infrastructure VM `192.168.1.50`: PostgreSQL, Redis, RabbitMQ, Elasticsearch, Zipkin, and MinIO.
+Application dependencies remain outside Kubernetes on the development infrastructure VM `192.168.1.50`: PostgreSQL, Redis, RabbitMQ, Zipkin, and MinIO.
 
 ## 2. Why the application is not exposed on port 9091
 
@@ -97,7 +97,6 @@ POSTGRES_PORT=5433
 POSTGRES_DATABASE=feedzmore
 REDIS_PORT=6379
 RABBITMQ_PORT=5672
-ELASTICSEARCH_PORT=9200
 ZIPKIN_PORT=9411
 ```
 
@@ -137,7 +136,7 @@ Complete these before creating the Argo CD application:
 
    A `404` response before the Feedzmore Ingress exists is acceptable; it proves the controller is reachable.
 
-3. Confirm the worker node can reach `192.168.1.50` on all dependency ports: PostgreSQL `5433`, Redis `6379`, RabbitMQ `5672`, Elasticsearch `9200`, and Zipkin `9411`.
+3. Confirm the worker node can reach `192.168.1.50` on all dependency ports: PostgreSQL `5433`, Redis `6379`, RabbitMQ `5672`, and Zipkin `9411`.
 4. Ensure the GHCR package `ghcr.io/rizkysiregar/feedzmore-service` is available to the cluster. If it becomes private, create an `imagePullSecret` and reference it in the Deployment.
 5. Store Docker Hub and GitHub PAT credentials in Jenkins, following the existing portfolio convention.
 6. Revoke any token that has been committed in documentation or source history, and store replacement credentials only in Jenkins or the private environment file.
@@ -590,7 +589,6 @@ SERVER_SERVLET_CONTEXT_PATH=/api/v1
 POSTGRES_PORT=5433
 POSTGRES_DATABASE=feedzmore
 REDIS_PORT=6379
-ELASTICSEARCH_PORT=9200
 RABBITMQ_PORT=5672
 ZIPKIN_PORT=9411
 ```

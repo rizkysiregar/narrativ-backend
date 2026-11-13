@@ -7,6 +7,7 @@ import com.rizkysiregar.feedzmore.model.request.AddCommentRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.service.CommentService;
 import com.rizkysiregar.feedzmore.util.Operation;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,7 +25,7 @@ public class CommentController {
     @PostMapping("/posts/{postId}/comments")
     @PreAuthorize("hasRole('USER')")
     public Operation addComment(
-            @RequestBody AddCommentRequest request,
+            @Valid @RequestBody AddCommentRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable UUID postId) {
         UUID userId = userPrincipal.getUserId();
@@ -45,7 +46,7 @@ public class CommentController {
     @GetMapping("/posts/{postId}/comments")
     public PaginatedResponse<CommentResponse> getComments(
             @PathVariable UUID postId,
-            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {

@@ -774,4 +774,17 @@ public class PostServiceTest {
         assertEquals("hello", item.getCaption());
         assertEquals("signed-img", item.getMedia().get(0).url());
     }
+
+    @Test
+    void feedsRejectAPageOrSizeOutsideTheLimitsWithoutTouchingTheDatabase() {
+        UUID userId = UUID.randomUUID();
+
+        assertThrows(BusinessException.class, () -> postService.getExplorePosts(-1, 10, userId, false));
+        assertThrows(BusinessException.class, () -> postService.getExplorePosts(0, 0, userId, false));
+        assertThrows(BusinessException.class, () -> postService.getExplorePosts(0, 51, userId, false));
+        assertThrows(BusinessException.class, () -> postService.getFollowingPosts(0, 51, userId));
+        assertThrows(BusinessException.class, () -> postService.getAllPostByUserId(-1, 10, "someone", userId, false));
+        assertThrows(BusinessException.class, () -> postService.getAllPostByUserId(0, 100000, "someone", userId, false));
+        verifyNoInteractions(postPaginationRepository, userRepository);
+    }
 }

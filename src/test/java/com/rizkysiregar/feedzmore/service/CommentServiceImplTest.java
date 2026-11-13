@@ -292,4 +292,52 @@ class CommentServiceImplTest {
 
         assertThrows(EntityNotFoundException.class, () -> commentService.deleteComment(id, UUID.randomUUID()));
     }
+
+    @Test
+    void getComment_rejectsAPageOrSizeOutsideTheLimitsWithoutTouchingTheDatabase() {
+        UUID postId = UUID.randomUUID();
+        UUID viewerId = UUID.randomUUID();
+
+        assertBadRequest(() -> commentService.getComment(postId, -1, 10, viewerId));
+        assertBadRequest(() -> commentService.getComment(postId, 0, 0, viewerId));
+        assertBadRequest(() -> commentService.getComment(postId, 0, 51, viewerId));
+        verifyNoInteractions(postCrudRepository, commentRepository);
+    }
+
+    @Test
+    void getRepliesPage_rejectsAPageOrSizeOutsideTheLimitsWithoutTouchingTheDatabase() {
+        UUID commentId = UUID.randomUUID();
+        UUID viewerId = UUID.randomUUID();
+
+        assertBadRequest(() -> commentService.getRepliesPage(commentId, -1, 10, viewerId));
+        assertBadRequest(() -> commentService.getRepliesPage(commentId, 0, 51, viewerId));
+        verifyNoInteractions(commentRepository);
+    }
+
+    @Test
+    void addComment_rejectsABlankOrMissingText() {
+        UUID postId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        assertBadRequest(() -> commentService.addComment(postId, userId, null, null));
+        assertBadRequest(() -> commentService.addComment(postId, userId, "   ", null));
+        verifyNoInteractions(commentRepository);
+    }
+
+    @Test
+    void addComment_savesTheTextWithoutSurroundingSpaces() {
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).build();
+        UserEntity ani = user("ani");
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+        when(userRepository.findById(ani.getId())).thenReturn(Optional.of(ani));
+
+        commentService.addComment(post.getId(), ani.getId(), "  halo  ", null);
+
+        assertEquals("halo", savedComment().getContent());
+    }
+
+    private void assertBadRequest(org.junit.jupiter.api.function.Executable call) {
+        BusinessException error = assertThrows(BusinessException.class, call);
+        assertEquals(HttpStatus.BAD_REQUEST, error.getHttpStatus());
+    }
 }
