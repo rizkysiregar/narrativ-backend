@@ -9,7 +9,7 @@ import com.rizkysiregar.feedzmore.model.request.*;
 import com.rizkysiregar.feedzmore.service.auth.GoogleTokenVerifierService;
 import com.rizkysiregar.feedzmore.util.RedisUtil;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
-import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
+import com.rizkysiregar.feedzmore.model.dto.PublicUserDTO;
 import com.rizkysiregar.feedzmore.model.response.LoginResponse;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
@@ -17,6 +17,7 @@ import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.util.BanMessages;
 import com.rizkysiregar.feedzmore.util.EmailMasking;
+import com.rizkysiregar.feedzmore.util.LikePatterns;
 import com.rizkysiregar.feedzmore.util.Operation;
 import com.rizkysiregar.feedzmore.util.UsernameGenerator;
 import jakarta.persistence.criteria.Predicate;
@@ -304,11 +305,11 @@ public class AuthService {
         return Operation.UPDATED;
     }
 
-    public UserDetailDTO getUserById(String userId) {
+    public PublicUserDTO getUserById(String userId) {
         log.info("Getting user by userId: {}", userId);
         try {
             return userRepository.findActiveById(UUID.fromString(userId))
-                    .map(this::toUserDetail)
+                    .map(this::toPublicUser)
                     .orElseThrow(() ->
                             new BusinessException(
                                     GlobalMessage.NOT_FOUND,
@@ -326,7 +327,7 @@ public class AuthService {
         }
     }
 
-    public PaginatedResponse<UserDetailDTO> search(UserSearchRequest request, Pageable pageable) {
+    public PaginatedResponse<PublicUserDTO> search(UserSearchRequest request, Pageable pageable) {
         log.info("## search users request: {}", request);
 
         Page<UserEntity> users = userRepository.findAll((root, query, cb) -> {
@@ -335,10 +336,12 @@ public class AuthService {
             predicates.add(cb.isFalse(root.get("isDeleted")));
             predicates.add(cb.equal(root.get("status"), UserStatus.ACTIVE));
 
-            if (request.username() != null) {
+            if (request.username() != null && !request.username().isBlank()) {
+                // % and _ typed by the user are matched literally, not as wildcards
                 predicates.add(cb.like(
                         cb.lower(root.get("username")),
-                        "%" + request.username().toLowerCase() + "%"
+                        LikePatterns.contains(request.username()),
+                        LikePatterns.ESCAPE
                 ));
             }
 
@@ -349,8 +352,8 @@ public class AuthService {
             throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
         }
 
-        List<UserDetailDTO> usersContent = users.getContent().stream()
-                .map(this::toUserDetail)
+        List<PublicUserDTO> usersContent = users.getContent().stream()
+                .map(this::toPublicUser)
                 .toList();
 
         return new PaginatedResponse<>(
@@ -363,37 +366,8 @@ public class AuthService {
         );
     }
 
-    // return classic List - untuk ica belajar
-    public List<UserDetailDTO> searchList(UserSearchRequest request) {
-        log.info("## search users list request: {}", request);
-
-        List<UserEntity> users = userRepository.findAll((root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-
-            predicates.add(cb.isFalse(root.get("isDeleted")));
-            predicates.add(cb.equal(root.get("status"), UserStatus.ACTIVE));
-
-            if (request.username() != null) {
-                predicates.add(cb.like(
-                        cb.lower(root.get("username")),
-                        "%" + request.username().toLowerCase() + "%"
-                ));
-            }
-
-            return cb.and(predicates.toArray(new Predicate[0]));
-        });
-
-        if (users.isEmpty()) {
-            throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
-        }
-
-        return users.stream()
-                .map(this::toUserDetail)
-                .toList();
-    }
-
-    private UserDetailDTO toUserDetail(UserEntity user) {
-        return UserDetailDTO.from(user).withProfileImageUrl(profileImageUrlResolver.resolve(user.getProfileImage()));
+    private PublicUserDTO toPublicUser(UserEntity user) {
+        return PublicUserDTO.from(user).withProfileImageUrl(profileImageUrlResolver.resolve(user.getProfileImage()));
     }
 
 }
