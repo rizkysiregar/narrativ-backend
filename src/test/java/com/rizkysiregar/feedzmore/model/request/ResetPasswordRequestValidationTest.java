@@ -21,13 +21,13 @@ class ResetPasswordRequestValidationTest {
 
     @Test
     void acceptsAPasswordWithinTheLimits() {
-        assertTrue(validator.validate(withPassword("abcdef")).isEmpty());
+        assertTrue(validator.validate(withPassword("abcdefgh")).isEmpty());
         assertTrue(validator.validate(withPassword("a".repeat(64))).isEmpty());
     }
 
     @Test
     void rejectsATooShortPassword() {
-        assertEquals(1, validator.validate(withPassword("abc")).size());
+        assertEquals(1, validator.validate(withPassword("abcdefg")).size());
     }
 
     @Test

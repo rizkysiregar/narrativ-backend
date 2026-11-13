@@ -22,8 +22,13 @@ public class GoogleTokenVerifierService {
     private final RestClient restClient = RestClient.create();
 
     public GoogleUserInfo verifyToken(String idToken) {
-        Map<String, Object> payload = fetchTokenInfo(idToken);
+        return toVerifiedUser(fetchTokenInfo(idToken));
+    }
+
+    // the checks on what Google answered, apart from the call itself
+    GoogleUserInfo toVerifiedUser(Map<String, Object> payload) {
         validateAudience(payload);
+        validateEmail(payload);
         return mapToGoogleInfo(payload);
     }
 
@@ -59,6 +64,18 @@ public class GoogleTokenVerifierService {
         }
     }
 
+
+    // An account is matched by email, so the email must be one Google vouches for: anybody can put an address
+    // they do not own on a Google account, and Google then answers email_verified=false (as the string "false").
+    private void validateEmail(Map<String, Object> payload) {
+        Object email = payload.get("email");
+        if (!(email instanceof String address) || address.isBlank()) {
+            throw new BusinessException(GlobalMessage.GOOGLE_UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
+        }
+        if (!"true".equalsIgnoreCase(String.valueOf(payload.get("email_verified")))) {
+            throw new BusinessException(GlobalMessage.GOOGLE_EMAIL_NOT_VERIFIED, HttpStatus.UNAUTHORIZED);
+        }
+    }
 
     private GoogleUserInfo mapToGoogleInfo(Map<String, Object> payload) {
         return GoogleUserInfo.builder()

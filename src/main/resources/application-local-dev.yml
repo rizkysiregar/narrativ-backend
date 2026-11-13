@@ -60,9 +60,6 @@ logging:
   file:
     path: ${LOGGING_FILE_PATH}
 
-otp:
-  retry-time-in-seconds: ${OTP_RETRY_TIME_IN_SECONDS}
-
 management:
   tracing:
     export:

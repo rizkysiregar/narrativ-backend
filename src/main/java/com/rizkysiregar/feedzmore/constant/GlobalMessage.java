@@ -19,6 +19,7 @@ public enum GlobalMessage {
     GOOGLE_UNAUTHORIZED("401", "Invalid Google Token"),
     GOOGLE_TOKEN_MISS_MATCH("401", "Token client miss match"),
     GOOGLE_TOKEN_FAILED_TO_VERIFY("401", "Failed to verify Google token"),
+    GOOGLE_EMAIL_NOT_VERIFIED("401", "Email akun Google Anda belum terverifikasi."),
     BAD_CREDENTIALS("401", "Email atau kata sandi yang Anda masukkan salah. Silakan coba lagi."),
     USER_DISABLED("401", "Akun Anda sudah dinonaktifkan. Silakan hubungi admin untuk mengaktifkan kembali akun Anda."),
     PARAMETER_NOT_FOUND("404", "Data pendukung tidak ditemukan. Mohon ulangi proses dari awal."),

@@ -3,29 +3,22 @@ package com.rizkysiregar.feedzmore.service.otp;
 import com.rizkysiregar.feedzmore.util.RedisUtil;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
-import com.rizkysiregar.feedzmore.model.OtpCode;
 import com.rizkysiregar.feedzmore.model.dto.ResetTokenDTO;
 import com.rizkysiregar.feedzmore.model.dto.SentOtpDTO;
-import com.rizkysiregar.feedzmore.model.entity.UserEntity;
-import com.rizkysiregar.feedzmore.repository.OtpCodeRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.email.IEmailService;
 import com.rizkysiregar.feedzmore.util.EmailMasking;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
-import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
 @Service
 public class OtpService implements IOtpService {
 
-    private final OtpCodeRepository otpCodeRepository;
     private final IEmailService emailService;
     private final UserRepository userRepository;
     private final RedisUtil redisUtil;
@@ -40,11 +33,7 @@ public class OtpService implements IOtpService {
     private static final long MAX_VERIFY_ATTEMPTS = 5;
     private static final long LOCK_SECONDS = 5 * 60;
 
-    @Value("${otp.retry-time-in-seconds}")
-    String otpRetryTimeInSeconds;
-
-    public OtpService(OtpCodeRepository otpCodeRepository, IEmailService emailService, UserRepository userRepository, RedisUtil redisUtil) {
-        this.otpCodeRepository = otpCodeRepository;
+    public OtpService(IEmailService emailService, UserRepository userRepository, RedisUtil redisUtil) {
         this.emailService = emailService;
         this.userRepository = userRepository;
         this.redisUtil = redisUtil;
@@ -56,32 +45,26 @@ public class OtpService implements IOtpService {
             throw new BusinessException(GlobalMessage.TOO_MANY_REQUEST_OTP, HttpStatus.TOO_MANY_REQUESTS);
         }
 
-        Optional<UserEntity> user = userRepository.findByEmail(email);
-
-        if (user.isEmpty()) {
-            throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
-        }
-
         if (redisUtil.hasKey(OTP_KEY_PREFIX + email)) {
-            throw new BusinessException(GlobalMessage.TOO_MANY_REQUEST_OTP, HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
+            throw new BusinessException(GlobalMessage.TOO_MANY_REQUEST_OTP, HttpStatus.TOO_MANY_REQUESTS);
         }
 
         String otp = generateOtp();
-        LocalDateTime expirationTime = LocalDateTime.now().plusSeconds(Long.parseLong(otpRetryTimeInSeconds));
 
-        // sending otp via email
-        boolean sendStatus = emailService.sendOtpEmail(email, otp);
-        if (!sendStatus) {
-            log.error("## Failed to send OTP to email: {}", EmailMasking.maskEmail(email));
-            throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        // The answer is the same whether or not the email is registered, otherwise this endpoint tells anybody which
+        // emails have an account. An unknown email gets an OTP that nobody receives: it is kept like a real one, so
+        // asking again or guessing it behaves exactly the same (too many requests, wrong code, lock after 5 guesses).
+        boolean registered = userRepository.findByEmail(email).filter(user -> !user.isDeleted()).isPresent();
+        if (registered) {
+            boolean sendStatus = emailService.sendOtpEmail(email, otp);
+            if (!sendStatus) {
+                log.error("## Failed to send OTP to email: {}", EmailMasking.maskEmail(email));
+                throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        } else {
+            log.info("## OTP requested for an email without an account: {}", EmailMasking.maskEmail(email));
         }
 
-        OtpCode otpCode = OtpCode.builder()
-                .email(email)
-                .otp(otp)
-                .expirationTime(expirationTime)
-                .build();
-        otpCodeRepository.save(otpCode);
         redisUtil.set(OTP_KEY_PREFIX + email, otp, OTP_TTL_SECONDS);
         redisUtil.delete(OTP_ATTEMPTS_KEY_PREFIX + email); // a fresh OTP starts with a fresh attempt budget
 

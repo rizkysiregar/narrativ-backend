@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.model.request;
 
+import com.rizkysiregar.feedzmore.model.request.constraint.MaxUtf8Bytes;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -24,7 +25,8 @@ public class ResetPasswordRequest {
     String resetToken;
 
     @NotBlank
-    @Size(min = 6, max = 64, message = "The length of the password should be between 6 and 64")
+    @Size(min = 8, max = 64, message = "The length of the password should be between 8 and 64")
+    @MaxUtf8Bytes(value = 72, message = "The password is too long, use fewer characters")
     @ToString.Exclude
     String newPassword;
 }
