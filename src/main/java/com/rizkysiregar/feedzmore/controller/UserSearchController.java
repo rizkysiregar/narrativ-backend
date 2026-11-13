@@ -1,6 +1,6 @@
 package com.rizkysiregar.feedzmore.controller;
 
-import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
+import com.rizkysiregar.feedzmore.model.dto.PublicUserDTO;
 import com.rizkysiregar.feedzmore.model.request.UserSearchRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.service.AuthService;
@@ -12,8 +12,6 @@ import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @AllArgsConstructor
 @RequestMapping("/users")
@@ -23,7 +21,7 @@ public class UserSearchController {
 
     @Operation(summary = "Get all active users or filter active users by username")
     @GetMapping()
-    public PaginatedResponse<UserDetailDTO> searchUsers(
+    public PaginatedResponse<PublicUserDTO> searchUsers(
             @RequestParam(required = false) String username,
             @Parameter(hidden = true) Pageable pageable
     ) {
@@ -35,19 +33,8 @@ public class UserSearchController {
 
     @Operation(summary = "Get active user details by userId")
     @GetMapping("{userId}")
-    public UserDetailDTO getUserById(@PathVariable @NotBlank String userId) {
+    public PublicUserDTO getUserById(@PathVariable @NotBlank String userId) {
         return authService.getUserById(userId);
     }
-
-    @Operation(summary = "Search active users by username but return it as List not pagination")
-    @GetMapping("usersList")
-    public List<UserDetailDTO> searchUsersList(
-            @RequestParam(required = false) @NotBlank String username
-    ) {
-        return authService.searchList(
-                new UserSearchRequest(username)
-        );
-    }
-
 
 }

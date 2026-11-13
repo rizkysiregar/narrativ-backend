@@ -40,6 +40,13 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import com.rizkysiregar.feedzmore.model.dto.PublicUserDTO;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Root;
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 
 @ExtendWith(MockitoExtension.class)
 public class AuthServiceTest {
@@ -271,16 +278,17 @@ public class AuthServiceTest {
         user.setProfileImage("img.png");
 
         when(userRepository.findActiveById(id)).thenReturn(Optional.of(user));
+        when(profileImageUrlResolver.resolve("img.png")).thenReturn("https://cdn/img.png");
 
         // Act
-        UserDetailDTO dto = authService.getUserById(id.toString());
+        PublicUserDTO dto = authService.getUserById(id.toString());
 
         // Assert
         assertNotNull(dto);
         assertEquals(id.toString(), dto.id());
         assertEquals("john", dto.username());
-        assertEquals("john@example.com", dto.email());
         assertEquals("John Doe", dto.fullName());
+        assertEquals("https://cdn/img.png", dto.profileImageUrl());
     }
 
     @Test
@@ -318,7 +326,7 @@ public class AuthServiceTest {
         when(userRepository.findAll((org.springframework.data.jpa.domain.Specification<UserEntity>) any(), eq(pageable))).thenReturn(page);
 
         // Act
-        PaginatedResponse<UserDetailDTO> result = authService.search(request, pageable);
+        PaginatedResponse<PublicUserDTO> result = authService.search(request, pageable);
 
         // Assert
         assertNotNull(result);
@@ -336,6 +344,42 @@ public class AuthServiceTest {
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.search(request, pageable));
         assertEquals("Ups, data yang Anda cari tidak ditemukan.", ex.getMessage());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void testSearch_matchesPercentAndUnderscoreLiterally() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(userRepository.findAll((org.springframework.data.jpa.domain.Specification<UserEntity>) any(), eq(pageable)))
+                .thenReturn(Page.empty(pageable));
+        assertThrows(BusinessException.class, () -> authService.search(new UserSearchRequest("50%_Off"), pageable));
+
+        ArgumentCaptor<org.springframework.data.jpa.domain.Specification<UserEntity>> captor =
+                ArgumentCaptor.forClass(org.springframework.data.jpa.domain.Specification.class);
+        verify(userRepository).findAll(captor.capture(), eq(pageable));
+        CriteriaBuilder cb = mock(CriteriaBuilder.class, RETURNS_DEEP_STUBS);
+        Root<UserEntity> root = mock(Root.class, RETURNS_DEEP_STUBS);
+        captor.getValue().toPredicate(root, mock(CriteriaQuery.class), cb);
+
+        verify(cb).like(ArgumentMatchers.<Expression<String>>any(), eq("%50\\%\\_off%"), eq('\\'));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void testSearch_withoutAUsernameDoesNotFilterOnIt() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(userRepository.findAll((org.springframework.data.jpa.domain.Specification<UserEntity>) any(), eq(pageable)))
+                .thenReturn(Page.empty(pageable));
+        assertThrows(BusinessException.class, () -> authService.search(new UserSearchRequest("  "), pageable));
+
+        ArgumentCaptor<org.springframework.data.jpa.domain.Specification<UserEntity>> captor =
+                ArgumentCaptor.forClass(org.springframework.data.jpa.domain.Specification.class);
+        verify(userRepository).findAll(captor.capture(), eq(pageable));
+        CriteriaBuilder cb = mock(CriteriaBuilder.class, RETURNS_DEEP_STUBS);
+        Root<UserEntity> root = mock(Root.class, RETURNS_DEEP_STUBS);
+        captor.getValue().toPredicate(root, mock(CriteriaQuery.class), cb);
+
+        verify(cb, never()).like(ArgumentMatchers.<Expression<String>>any(), anyString(), anyChar());
     }
 
     @Test
