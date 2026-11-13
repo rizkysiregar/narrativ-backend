@@ -35,12 +35,15 @@ pipeline {
         stage('Test') {
             steps {
                 sh '''
+                    # the build container is thrown away (--rm), so a repository inside it is downloaded again on every
+                    # build. JENKINS_HOME is shared with it through --volumes-from, so the cache lives there and stays.
+                    MAVEN_REPO="${JENKINS_HOME:-/tmp}/.m2/repository"
                     docker run --rm \\
                       --user "$(id -u):$(id -g)" \\
                       --volumes-from "${JENKINS_CONTAINER_ID:-$HOSTNAME}" \\
                       --workdir "$WORKSPACE" \\
                       "$MAVEN_IMAGE" \\
-                      mvn -B -Dmaven.repo.local=/tmp/.m2 clean test
+                      mvn -B -ntp -Dmaven.repo.local="$MAVEN_REPO" clean test
                 '''
             }
         }
@@ -48,12 +51,13 @@ pipeline {
         stage('Package') {
             steps {
                 sh '''
+                    MAVEN_REPO="${JENKINS_HOME:-/tmp}/.m2/repository"
                     docker run --rm \\
                       --user "$(id -u):$(id -g)" \\
                       --volumes-from "${JENKINS_CONTAINER_ID:-$HOSTNAME}" \\
                       --workdir "$WORKSPACE" \\
                       "$MAVEN_IMAGE" \\
-                      mvn -B -Dmaven.repo.local=/tmp/.m2 package -DskipTests
+                      mvn -B -ntp -Dmaven.repo.local="$MAVEN_REPO" package -DskipTests
                 '''
             }
         }
