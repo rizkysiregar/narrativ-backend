@@ -10,6 +10,7 @@ import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.FollowService;
 import com.rizkysiregar.feedzmore.service.ProfileImageUrlResolver;
 import com.rizkysiregar.feedzmore.util.Operation;
+import com.rizkysiregar.feedzmore.util.Paging;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,9 @@ public class FollowServiceImpl implements FollowService {
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
     private final ProfileImageUrlResolver profileImageUrlResolver;
+
+    // follower lists are cheap rows, so they may be paged wider than the feeds
+    private static final int MAX_PAGE_SIZE = 100;
 
     @Override
     @Transactional
@@ -78,10 +82,7 @@ public class FollowServiceImpl implements FollowService {
     }
 
     private PageRequest pageable(int page, int size) {
-        if (page < 0 || size < 1 || size > 100) {
-            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-        }
-        return PageRequest.of(page, size);
+        return Paging.of(page, size, MAX_PAGE_SIZE);
     }
 
     private PaginatedResponse<FollowUserResponse> toResponse(Page<FollowUserResponse> results) {

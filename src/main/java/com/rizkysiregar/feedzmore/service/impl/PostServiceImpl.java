@@ -26,10 +26,10 @@ import com.rizkysiregar.feedzmore.service.FileStorageService;
 import com.rizkysiregar.feedzmore.service.PostService;
 import com.rizkysiregar.feedzmore.util.AfterCommit;
 import com.rizkysiregar.feedzmore.util.Operation;
+import com.rizkysiregar.feedzmore.util.Paging;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -79,17 +79,14 @@ public class PostServiceImpl implements PostService {
     @Override
     public PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, UUID userId, boolean mediaOnly) {
         log.info("FETCH.EXPLORE.FEED: {}, size= {} ,userId={}, mediaOnly={}", page, size, userId, mediaOnly);
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = Paging.of(page, size);
         Page<PostEntity> postPage = postPaginationRepository.findAllActivePosts(pageable, mediaOnly);
         return buildPaginatedResponse(postPage, userId);
     }
 
     @Override
     public PaginatedResponse<PostFeedResponse> getFollowingPosts(int page, int size, UUID viewerId) {
-        if (page < 0 || size < 1 || size > 100) {
-            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-        }
-        Page<PostEntity> postPage = postPaginationRepository.findFollowingPosts(PageRequest.of(page, size), viewerId);
+        Page<PostEntity> postPage = postPaginationRepository.findFollowingPosts(Paging.of(page, size), viewerId);
         return buildPaginatedResponse(postPage, viewerId);
     }
 
@@ -97,10 +94,11 @@ public class PostServiceImpl implements PostService {
     public PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String username, UUID viewerId, boolean mediaOnly) {
         log.info("FETCH.FEED.BY.USERNAME =  {}, size= {} , username= {}, mediaOnly= {}", page, size, username, mediaOnly);
 
+        Pageable pageable = Paging.of(page, size);
+
         UserEntity user = userRepository.findActiveByUsername(username)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
 
-        Pageable pageable = PageRequest.of(page, size);
         Page<PostEntity> postPage = postPaginationRepository.findAllActivePostsByUserId(pageable, user.getId(), mediaOnly);
         return buildPaginatedResponse(postPage, viewerId);
     }

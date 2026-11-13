@@ -17,11 +17,11 @@ import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.util.AfterCommit;
 import com.rizkysiregar.feedzmore.util.Operation;
+import com.rizkysiregar.feedzmore.util.Paging;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -44,7 +44,13 @@ public class CommentServiceImpl implements CommentService {
     private static final int NOTIFICATION_PREVIEW_LENGTH = 100;
 
     @Override
-    public Operation addComment(UUID postId, UUID userId, String content, UUID parentId) {
+    public Operation addComment(UUID postId, UUID userId, String rawContent, UUID parentId) {
+        // the controller validates the request; this keeps a blank comment out for any other caller too
+        if (rawContent == null || rawContent.isBlank()) {
+            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        }
+        String content = rawContent.trim();
+
         // add new comment
         PostEntity post = postCrudRepository.findInteractableById(postId)
                 .orElseThrow(() -> new EntityNotFoundException("Post Not Found"));
@@ -92,10 +98,10 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public PaginatedResponse<CommentResponse> getComment(UUID postId, int page, int size, UUID viewerId) {
+        Pageable pageable = Paging.of(page, size);
         UUID postOwnerId = postCrudRepository.findInteractableById(postId)
                 .orElseThrow(() -> new EntityNotFoundException("Post Not Found"))
                 .getUser().getId();
-        Pageable pageable = PageRequest.of(page, size);
         Page<CommentResponse> commentPage = commentRepository.findTopLevelCommentResponses(postId, pageable);
 
         return new PaginatedResponse<>(
@@ -118,8 +124,9 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public PaginatedResponse<CommentResponse> getRepliesPage(UUID commentId, int page, int size, UUID viewerId) {
+        Pageable pageable = Paging.of(page, size);
         UUID postOwnerId = commentRepository.findPostOwnerId(commentId).orElse(null);
-        Page<CommentResponse> replyPage = commentRepository.findReplyResponsePage(commentId, PageRequest.of(page, size));
+        Page<CommentResponse> replyPage = commentRepository.findReplyResponsePage(commentId, pageable);
         return new PaginatedResponse<>(
                 replyPage.getContent().stream().map(reply -> prepare(reply, viewerId, postOwnerId)).toList(),
                 replyPage.getNumber(),

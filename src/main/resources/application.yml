@@ -18,6 +18,11 @@ spring:
     name: ${SPRING_APPLICATION_NAME}
   profiles:
     active: ${SPRING_PROFILES_ACTIVE}
+  data:
+    web:
+      pageable:
+        # endpoints that take a Pageable (users, admin lists) can ask for 2000 rows by default
+        max-page-size: 100
   flyway:
     enabled: ${SPRING_FLYWAY_ENABLED}
     locations: ${SPRING_FLYWAY_LOCATIONS}
