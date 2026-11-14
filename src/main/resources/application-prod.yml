@@ -83,5 +83,5 @@ springdoc:
 
 app:
   legal:
-    # no default on purpose: a privacy policy without a contact address must not go live
+    # no default on purpose: a privacy policy without a contact address must not go live. Set in the ConfigMap (homelabs-gitops)
     contact-email: ${LEGAL_CONTACT_EMAIL}
