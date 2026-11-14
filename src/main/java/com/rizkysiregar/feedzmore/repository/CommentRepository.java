@@ -23,21 +23,21 @@ public interface CommentRepository extends JpaRepository<CommentEntity, UUID>, J
                 c.id, c.user.id, c.user.username, c.user.profileImage, c.content,
                 c.moderationStatus, c.moderationReason, c.moderatedAt,
                 c.parent.id, rt.id, ru.username, c.createdAt,
-                (SELECT COUNT(r) FROM CommentEntity r WHERE r.parent.id = c.id AND r.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE))
+                (SELECT COUNT(r) FROM CommentEntity r WHERE r.parent.id = c.id AND r.user.isDeleted = false AND r.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = r.user.id) OR (b.blockerId = r.user.id AND b.blockedId = :viewerId))))
             FROM CommentEntity c LEFT JOIN c.replyTo rt LEFT JOIN rt.user ru
-            WHERE c.post.id = :postId AND c.parent IS NULL AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+            WHERE c.post.id = :postId AND c.parent IS NULL AND c.user.isDeleted = false AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = c.user.id) OR (b.blockerId = c.user.id AND b.blockedId = :viewerId))
             ORDER BY c.createdAt ASC, c.id ASC
             """, countQuery = """
             SELECT COUNT(c) FROM CommentEntity c
-            WHERE c.post.id = :postId AND c.parent IS NULL AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+            WHERE c.post.id = :postId AND c.parent IS NULL AND c.user.isDeleted = false AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = c.user.id) OR (b.blockerId = c.user.id AND b.blockedId = :viewerId))
             """)
-    Page<CommentResponse> findTopLevelCommentResponses(@Param("postId") UUID postId, Pageable pageable);
+    Page<CommentResponse> findTopLevelCommentResponses(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable pageable);
 
     @Query("""
             SELECT new com.rizkysiregar.feedzmore.model.dto.PostCountDTO(c.post.id, COUNT(c))
-            FROM CommentEntity c WHERE c.post.id IN :postIds AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE GROUP BY c.post.id
+            FROM CommentEntity c WHERE c.post.id IN :postIds AND c.user.isDeleted = false AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = c.user.id) OR (b.blockerId = c.user.id AND b.blockedId = :viewerId)) GROUP BY c.post.id
             """)
-    List<PostCountDTO> countByPostIds(@Param("postIds") List<UUID> postIds);
+    List<PostCountDTO> countByPostIds(@Param("postIds") List<UUID> postIds, @Param("viewerId") UUID viewerId);
 
     // replies of a comment: hidden when the author is banned or the post is gone, banned or taken down
     @Query("""
@@ -46,12 +46,12 @@ public interface CommentRepository extends JpaRepository<CommentEntity, UUID>, J
                 c.moderationStatus, c.moderationReason, c.moderatedAt,
                 c.parent.id, rt.id, ru.username, c.createdAt, 0L)
             FROM CommentEntity c LEFT JOIN c.replyTo rt LEFT JOIN rt.user ru
-            WHERE c.parent.id = :parentId AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+            WHERE c.parent.id = :parentId AND c.user.isDeleted = false AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = c.user.id) OR (b.blockerId = c.user.id AND b.blockedId = :viewerId))
               AND c.post.isDeleted = false AND c.post.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
               AND c.post.moderationStatus = com.rizkysiregar.feedzmore.model.enums.ModerationStatus.ACTIVE
             ORDER BY c.createdAt ASC
             """)
-    List<CommentResponse> findReplyResponses(@Param("parentId") UUID parentId);
+    List<CommentResponse> findReplyResponses(@Param("parentId") UUID parentId, @Param("viewerId") UUID viewerId);
 
     // same visibility rules as findReplyResponses, paged
     @Query(value = """
@@ -60,17 +60,17 @@ public interface CommentRepository extends JpaRepository<CommentEntity, UUID>, J
                 c.moderationStatus, c.moderationReason, c.moderatedAt,
                 c.parent.id, rt.id, ru.username, c.createdAt, 0L)
             FROM CommentEntity c LEFT JOIN c.replyTo rt LEFT JOIN rt.user ru
-            WHERE c.parent.id = :parentId AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+            WHERE c.parent.id = :parentId AND c.user.isDeleted = false AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = c.user.id) OR (b.blockerId = c.user.id AND b.blockedId = :viewerId))
               AND c.post.isDeleted = false AND c.post.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
               AND c.post.moderationStatus = com.rizkysiregar.feedzmore.model.enums.ModerationStatus.ACTIVE
             ORDER BY c.createdAt ASC, c.id ASC
             """, countQuery = """
             SELECT COUNT(c) FROM CommentEntity c
-            WHERE c.parent.id = :parentId AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+            WHERE c.parent.id = :parentId AND c.user.isDeleted = false AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = c.user.id) OR (b.blockerId = c.user.id AND b.blockedId = :viewerId))
               AND c.post.isDeleted = false AND c.post.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
               AND c.post.moderationStatus = com.rizkysiregar.feedzmore.model.enums.ModerationStatus.ACTIVE
             """)
-    Page<CommentResponse> findReplyResponsePage(@Param("parentId") UUID parentId, Pageable pageable);
+    Page<CommentResponse> findReplyResponsePage(@Param("parentId") UUID parentId, @Param("viewerId") UUID viewerId, Pageable pageable);
 
     // the author of the post a comment belongs to, used to decide who may delete it
     @Query("SELECT c.post.user.id FROM CommentEntity c WHERE c.id = :commentId")
@@ -94,10 +94,15 @@ public interface CommentRepository extends JpaRepository<CommentEntity, UUID>, J
     int deleteAllByPostId(@Param("postId") UUID postId);
 
     // JPQL Refer to the entity name not the table name
-    @Query("SELECT COUNT(c) FROM CommentEntity c WHERE c.post.id = :postId AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE")
-    long contByPostId(@Param("postId") UUID postId);
+    @Query("SELECT COUNT(c) FROM CommentEntity c WHERE c.post.id = :postId AND c.user.isDeleted = false AND c.user.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = c.user.id) OR (b.blockerId = c.user.id AND b.blockedId = :viewerId))")
+    long contByPostId(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId);
 
     Optional<CommentEntity> findByPostId(UUID postId);
+
+    // a deleted account keeps no words behind; the rows stay so threads and reply counts do not break
+    @Modifying
+    @Query("UPDATE CommentEntity c SET c.content = :placeholder WHERE c.user.id = :userId")
+    int overwriteContentByUserId(@Param("userId") UUID userId, @Param("placeholder") String placeholder);
 
     long countByUserId(UUID userId);
 }

@@ -2,6 +2,7 @@ package com.rizkysiregar.feedzmore.controller;
 
 import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
+import com.rizkysiregar.feedzmore.model.request.DeleteAccountRequest;
 import com.rizkysiregar.feedzmore.model.request.UpdateMyUserRequest;
 import com.rizkysiregar.feedzmore.model.request.CreateProfileImageUploadUrlRequest;
 import com.rizkysiregar.feedzmore.model.request.SetProfileImageRequest;
@@ -66,12 +67,14 @@ public class UserAccountController {
         return profileImageService.deleteProfileImage(currentUser.getUserId());
     }
 
-    @Operation(summary = "Soft delete current logged-in user account")
-    @DeleteMapping
+    @Operation(summary = "Delete the logged-in user's account and personal data",
+            description = "Needs the current password, or a fresh Google id token for an account that signs in with Google. Cannot be undone")
+    @PostMapping("/deletion")
     public com.rizkysiregar.feedzmore.util.Operation deleteMyAccount(
-            @AuthenticationPrincipal UserPrincipal currentUser
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody DeleteAccountRequest request
     ) {
-        return userManagementService.deleteMyAccount(currentUser.getUserId());
+        return userManagementService.deleteMyAccount(currentUser.getUserId(), request);
     }
 
 

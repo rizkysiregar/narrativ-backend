@@ -10,6 +10,7 @@ public class Constants {
             "/auth/login",
             "/auth/google",
             "/auth/refresh",
+            "/auth/logout",
             "/auth/forgot-password",
             "/auth/verify-otp",
             "/auth/reset-password",

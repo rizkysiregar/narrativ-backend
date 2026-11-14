@@ -14,6 +14,8 @@ import java.util.UUID;
 @Setter
 public class PostFeedResponse {
     private UUID id;
+    // the author, so the client can report or block them
+    private UUID userId;
     private String username;
     private String caption;
     // empty for a caption-only post

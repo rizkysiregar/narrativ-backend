@@ -1,6 +1,7 @@
 package com.rizkysiregar.feedzmore.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rizkysiregar.feedzmore.constant.Constants;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.model.UserPrincipal;
 import com.rizkysiregar.feedzmore.model.response.BaseResponse;
@@ -46,7 +47,9 @@ public class JwtFilter extends OncePerRequestFilter {
         String uri = request.getRequestURI();
         String contextPath = request.getContextPath();
         String path = contextPath != null && uri.startsWith(contextPath) ? uri.substring(contextPath.length()) : uri;
-        return path.startsWith("/auth/") && !path.startsWith("/auth/register-admin");
+        // the public legal pages never look at a token either: a stale one must not turn a page into a 401
+        return Constants.LEGAL_PAGES.contains(path)
+                || (path.startsWith("/auth/") && !path.startsWith("/auth/register-admin"));
     }
 
     @Override

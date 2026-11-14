@@ -80,3 +80,8 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+app:
+  legal:
+    # no default on purpose: a privacy policy without a contact address must not go live
+    contact-email: ${LEGAL_CONTACT_EMAIL}

@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.service;
 
+import com.rizkysiregar.feedzmore.repository.UserBlockRepository;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
@@ -41,6 +42,8 @@ class FollowServiceTest {
 
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private UserBlockRepository userBlockRepository;
     @Mock
     private ProfileImageUrlResolver profileImageUrlResolver;
 
@@ -129,7 +132,7 @@ class FollowServiceTest {
         activeUsers();
         FollowUserResponse follower = new FollowUserResponse(UUID.randomUUID(), "alice", "Alice", "A", "image.jpg");
         PageRequest pageable = PageRequest.of(1, 2);
-        when(followRepository.findActiveFollowers(targetId, pageable))
+        when(followRepository.findActiveFollowers(targetId, requesterId, pageable))
                 .thenReturn(new PageImpl<>(List.of(follower), pageable, 3));
         when(profileImageUrlResolver.resolve("image.jpg")).thenReturn("https://signed/image.jpg");
 
@@ -141,21 +144,21 @@ class FollowServiceTest {
         assertEquals(3, result.getTotalElements());
         assertEquals(2, result.getTotalPages());
         assertTrue(result.isLast());
-        verify(followRepository).findActiveFollowers(targetId, pageable);
+        verify(followRepository).findActiveFollowers(targetId, requesterId, pageable);
     }
 
     @Test
     void followingIsZeroBasedAndPaginated() {
         activeUsers();
         PageRequest pageable = PageRequest.of(0, 20);
-        when(followRepository.findActiveFollowing(targetId, pageable))
+        when(followRepository.findActiveFollowing(targetId, requesterId, pageable))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
         PaginatedResponse<FollowUserResponse> result = followService.getFollowing(targetId, requesterId, 0, 20);
 
         assertEquals(0, result.getPageNumber());
         assertEquals(List.of(), result.getContent());
-        verify(followRepository).findActiveFollowing(targetId, pageable);
+        verify(followRepository).findActiveFollowing(targetId, requesterId, pageable);
     }
 
     @Test

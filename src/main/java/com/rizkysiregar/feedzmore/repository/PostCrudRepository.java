@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
 
@@ -15,6 +16,9 @@ public interface PostCrudRepository extends JpaRepository<PostEntity, UUID>, Jpa
     Optional<PostEntity> findByIdAndIsDeletedFalse(UUID id);
 
     boolean existsByIdAndIsDeletedFalse(UUID id);
+
+    @Query("SELECT p FROM PostEntity p WHERE p.user.id = :userId AND p.isDeleted = false")
+    List<PostEntity> findLiveByUserId(@Param("userId") UUID userId);
 
     long countByUserIdAndIsDeletedFalse(UUID userId);
 

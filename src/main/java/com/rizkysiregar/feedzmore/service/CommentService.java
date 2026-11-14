@@ -14,5 +14,5 @@ public interface CommentService {
     List<CommentResponse> getReplies(UUID commentId, UUID viewerId);
     PaginatedResponse<CommentResponse> getRepliesPage(UUID commentId, int page, int size, UUID viewerId);
     Operation deleteComment(UUID commentId, UUID requesterId);
-    long getCountByPostId(UUID postId);
+    long getCountByPostId(UUID postId, UUID viewerId);
 }

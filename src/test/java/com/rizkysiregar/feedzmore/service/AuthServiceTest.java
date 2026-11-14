@@ -1,7 +1,9 @@
 package com.rizkysiregar.feedzmore.service;
 
 
+import com.rizkysiregar.feedzmore.repository.UserBlockRepository;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
+import org.springframework.http.HttpStatus;
 import com.rizkysiregar.feedzmore.model.dto.GoogleUserInfo;
 import com.rizkysiregar.feedzmore.model.dto.UserDetailDTO;
 import com.rizkysiregar.feedzmore.model.response.LoginResponse;
@@ -36,6 +38,9 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.junit.jupiter.api.Assertions.*;
@@ -71,6 +76,8 @@ public class AuthServiceTest {
 
     @Mock
     private AuditLogService auditLogService;
+    @Mock
+    private UserBlockRepository userBlockRepository;
     @Mock
     private ProfileImageUrlResolver profileImageUrlResolver;
 
@@ -281,7 +288,7 @@ public class AuthServiceTest {
         when(profileImageUrlResolver.resolve("img.png")).thenReturn("https://cdn/img.png");
 
         // Act
-        PublicUserDTO dto = authService.getUserById(id.toString());
+        PublicUserDTO dto = authService.getUserById(id.toString(), UUID.randomUUID());
 
         // Assert
         assertNotNull(dto);
@@ -298,14 +305,14 @@ public class AuthServiceTest {
         when(userRepository.findActiveById(id)).thenReturn(Optional.empty());
 
         // Act & Assert
-        BusinessException ex = assertThrows(BusinessException.class, () -> authService.getUserById(id.toString()));
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.getUserById(id.toString(), UUID.randomUUID()));
         assertEquals("Ups, data yang Anda cari tidak ditemukan.", ex.getMessage());
     }
 
     @Test
     void testGetUserById_InvalidUUID() {
         // Act & Assert
-        BusinessException ex = assertThrows(BusinessException.class, () -> authService.getUserById("invalid-uuid"));
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.getUserById("invalid-uuid", UUID.randomUUID()));
         assertEquals("Maaf, ada kendala saat memproses data Anda. Periksa kembali input Anda.", ex.getMessage());
     }
 
@@ -326,7 +333,7 @@ public class AuthServiceTest {
         when(userRepository.findAll((org.springframework.data.jpa.domain.Specification<UserEntity>) any(), eq(pageable))).thenReturn(page);
 
         // Act
-        PaginatedResponse<PublicUserDTO> result = authService.search(request, pageable);
+        PaginatedResponse<PublicUserDTO> result = authService.search(request, UUID.randomUUID(), pageable);
 
         // Assert
         assertNotNull(result);
@@ -342,7 +349,7 @@ public class AuthServiceTest {
         when(userRepository.findAll((org.springframework.data.jpa.domain.Specification<UserEntity>) any(), eq(pageable))).thenReturn(Page.empty(pageable));
 
         // Act & Assert
-        BusinessException ex = assertThrows(BusinessException.class, () -> authService.search(request, pageable));
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.search(request, UUID.randomUUID(), pageable));
         assertEquals("Ups, data yang Anda cari tidak ditemukan.", ex.getMessage());
     }
 
@@ -352,7 +359,7 @@ public class AuthServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
         when(userRepository.findAll((org.springframework.data.jpa.domain.Specification<UserEntity>) any(), eq(pageable)))
                 .thenReturn(Page.empty(pageable));
-        assertThrows(BusinessException.class, () -> authService.search(new UserSearchRequest("50%_Off"), pageable));
+        assertThrows(BusinessException.class, () -> authService.search(new UserSearchRequest("50%_Off"), UUID.randomUUID(), pageable));
 
         ArgumentCaptor<org.springframework.data.jpa.domain.Specification<UserEntity>> captor =
                 ArgumentCaptor.forClass(org.springframework.data.jpa.domain.Specification.class);
@@ -370,7 +377,7 @@ public class AuthServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
         when(userRepository.findAll((org.springframework.data.jpa.domain.Specification<UserEntity>) any(), eq(pageable)))
                 .thenReturn(Page.empty(pageable));
-        assertThrows(BusinessException.class, () -> authService.search(new UserSearchRequest("  "), pageable));
+        assertThrows(BusinessException.class, () -> authService.search(new UserSearchRequest("  "), UUID.randomUUID(), pageable));
 
         ArgumentCaptor<org.springframework.data.jpa.domain.Specification<UserEntity>> captor =
                 ArgumentCaptor.forClass(org.springframework.data.jpa.domain.Specification.class);
@@ -480,6 +487,59 @@ public class AuthServiceTest {
         verify(redisUtil).removeFromSet("user_refresh_tokens:" + userId, "old-token");
         verify(redisUtil).set(eq("refresh_token:" + result.getRefreshToken()), eq(userId.toString()), anyLong());
         verify(redisUtil).addToSet(eq("user_refresh_tokens:" + userId), eq(result.getRefreshToken()), anyLong());
+    }
+
+    @Test
+    void logoutRevokesOnlyTheGivenRefreshToken() {
+        UUID userId = UUID.randomUUID();
+        when(redisUtil.get("refresh_token:tok")).thenReturn(userId.toString());
+
+        authService.logout("tok");
+
+        verify(redisUtil).delete("refresh_token:tok");
+        verify(redisUtil).removeFromSet("user_refresh_tokens:" + userId, "tok");
+    }
+
+    @Test
+    void logoutWithAnUnknownTokenIsANoOp() {
+        when(redisUtil.get("refresh_token:gone")).thenReturn(null);
+
+        authService.logout("gone");
+
+        verify(redisUtil).delete("refresh_token:gone");
+        verify(redisUtil, never()).removeFromSet(anyString(), anyString());
+    }
+
+    @Test
+    void confirmsIdentityWithThePassword() {
+        UserEntity user = new UserEntity();
+        user.setPassword(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(4).encode("secret"));
+
+        assertTrue(authService.confirmsIdentity(user, "secret", null));
+        assertFalse(authService.confirmsIdentity(user, "wrong", null));
+        assertFalse(authService.confirmsIdentity(user, null, null));
+        assertFalse(authService.confirmsIdentity(user, " ", " "));
+    }
+
+    @Test
+    void confirmsIdentityWithTheLinkedGoogleAccountOnly() {
+        UserEntity user = new UserEntity();
+        user.setPassword("not-a-hash");
+        user.setGoogleId("g-1");
+        GoogleUserInfo mine = GoogleUserInfo.builder().googleId("g-1").build();
+        GoogleUserInfo other = GoogleUserInfo.builder().googleId("g-2").build();
+        when(googleTokenVerifierService.verifyToken("mine")).thenReturn(mine);
+        when(googleTokenVerifierService.verifyToken("other")).thenReturn(other);
+        when(googleTokenVerifierService.verifyToken("bad"))
+                .thenThrow(new BusinessException(GlobalMessage.GOOGLE_UNAUTHORIZED, HttpStatus.UNAUTHORIZED));
+
+        assertTrue(authService.confirmsIdentity(user, null, "mine"));
+        assertFalse(authService.confirmsIdentity(user, null, "other"));
+        assertFalse(authService.confirmsIdentity(user, null, "bad"));
+
+        UserEntity noGoogle = new UserEntity();
+        noGoogle.setPassword("not-a-hash");
+        assertFalse(authService.confirmsIdentity(noGoogle, null, "mine"));
     }
 
     @Test

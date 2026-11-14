@@ -14,6 +14,7 @@ import com.rizkysiregar.feedzmore.model.response.LoginResponse;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
+import com.rizkysiregar.feedzmore.repository.UserBlockRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.util.BanMessages;
 import com.rizkysiregar.feedzmore.util.EmailMasking;
@@ -58,6 +59,7 @@ public class AuthService {
     private final UsernameGenerator usernameGenerator;
     private final AuditLogService auditLogService;
     private final ProfileImageUrlResolver profileImageUrlResolver;
+    private final UserBlockRepository userBlockRepository;
 
     public AuthService(UserRepository userRepository,
                        AuthenticationManager authManager,
@@ -66,7 +68,8 @@ public class AuthService {
                        GoogleTokenVerifierService googleTokenVerifierService,
                        UsernameGenerator usernameGenerator,
                        AuditLogService auditLogService,
-                       ProfileImageUrlResolver profileImageUrlResolver
+                       ProfileImageUrlResolver profileImageUrlResolver,
+                       UserBlockRepository userBlockRepository
     ) {
         this.userRepository = userRepository;
         this.authManager = authManager;
@@ -76,6 +79,7 @@ public class AuthService {
         this.usernameGenerator = usernameGenerator;
         this.auditLogService = auditLogService;
         this.profileImageUrlResolver = profileImageUrlResolver;
+        this.userBlockRepository = userBlockRepository;
     }
 
     @Transactional
@@ -228,6 +232,42 @@ public class AuthService {
                 .build();
     }
 
+    /**
+     * Ends one session: the refresh token stops working at once. Unknown or already used tokens are ignored, so
+     * a retry (or a logout after the session already expired) never fails.
+     */
+    public void logout(String refreshToken) {
+        String key = REFRESH_TOKEN_PREFIX.concat(refreshToken);
+        Object storedUserId = redisUtil.get(key);
+        redisUtil.delete(key);
+        if (storedUserId != null) {
+            redisUtil.removeFromSet(USER_REFRESH_TOKENS_PREFIX.concat(storedUserId.toString()), refreshToken);
+        }
+    }
+
+    /**
+     * Whether the caller proved they own the account, for destructive actions a stolen access token must not be
+     * enough for: the current password, or a fresh Google id token of the Google account linked to the user.
+     */
+    public boolean confirmsIdentity(UserEntity user, String password, String idToken) {
+        if (password != null && !password.isBlank() && encoder.matches(password, user.getPassword())) {
+            return true;
+        }
+        if (idToken != null && !idToken.isBlank() && user.getGoogleId() != null) {
+            try {
+                return user.getGoogleId().equals(googleTokenVerifierService.verifyToken(idToken).getGoogleId());
+            } catch (BusinessException e) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /** A password nobody knows, for accounts that no longer sign in. */
+    public String unusablePasswordHash() {
+        return encoder.encode(UUID.randomUUID().toString());
+    }
+
     private String issueRefreshToken(UUID userId) {
         String refreshToken = UUID.randomUUID().toString();
         redisUtil.set(REFRESH_TOKEN_PREFIX.concat(refreshToken), userId.toString(), REFRESH_TOKEN_TTL_SECONDS);
@@ -305,10 +345,14 @@ public class AuthService {
         return Operation.UPDATED;
     }
 
-    public PublicUserDTO getUserById(String userId) {
+    public PublicUserDTO getUserById(String userId, UUID viewerId) {
         log.info("Getting user by userId: {}", userId);
         try {
-            return userRepository.findActiveById(UUID.fromString(userId))
+            UUID id = UUID.fromString(userId);
+            if (userBlockRepository.existsBetween(viewerId, id)) {
+                throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
+            }
+            return userRepository.findActiveById(id)
                     .map(this::toPublicUser)
                     .orElseThrow(() ->
                             new BusinessException(
@@ -327,14 +371,20 @@ public class AuthService {
         }
     }
 
-    public PaginatedResponse<PublicUserDTO> search(UserSearchRequest request, Pageable pageable) {
+    public PaginatedResponse<PublicUserDTO> search(UserSearchRequest request, UUID viewerId, Pageable pageable) {
         log.info("## search users request: {}", request);
+
+        // the people the viewer blocked or was blocked by never show up
+        List<UUID> hiddenUserIds = userBlockRepository.findRelatedUserIds(viewerId);
 
         Page<UserEntity> users = userRepository.findAll((root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
             predicates.add(cb.isFalse(root.get("isDeleted")));
             predicates.add(cb.equal(root.get("status"), UserStatus.ACTIVE));
+            if (!hiddenUserIds.isEmpty()) {
+                predicates.add(cb.not(root.get("id").in(hiddenUserIds)));
+            }
 
             if (request.username() != null && !request.username().isBlank()) {
                 // % and _ typed by the user are matched literally, not as wildcards

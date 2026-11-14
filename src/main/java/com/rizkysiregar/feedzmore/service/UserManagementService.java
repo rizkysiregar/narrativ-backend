@@ -17,7 +17,13 @@ import com.rizkysiregar.feedzmore.model.request.BanUserRequest;
 import com.rizkysiregar.feedzmore.model.request.UnbanUserRequest;
 import com.rizkysiregar.feedzmore.model.request.UpdateMyUserRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
+import com.rizkysiregar.feedzmore.model.entity.PostEntity;
+import com.rizkysiregar.feedzmore.model.entity.PostMediaEntity;
+import com.rizkysiregar.feedzmore.model.request.DeleteAccountRequest;
 import com.rizkysiregar.feedzmore.repository.CommentRepository;
+import com.rizkysiregar.feedzmore.repository.LikeRepository;
+import com.rizkysiregar.feedzmore.repository.PostMediaRepository;
+import com.rizkysiregar.feedzmore.repository.UserBlockRepository;
 import com.rizkysiregar.feedzmore.repository.FollowRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
@@ -51,6 +57,14 @@ public class UserManagementService {
     private final FollowRepository followRepository;
     private final ReportClosingService reportClosingService;
     private final ProfileImageUrlResolver profileImageUrlResolver;
+    private final UserDeviceService userDeviceService;
+    private final ProfileImageService profileImageService;
+    private final LikeRepository likeRepository;
+    private final UserBlockRepository userBlockRepository;
+    private final PostMediaRepository postMediaRepository;
+    private final FileStorageService fileStorageService;
+
+    private static final String DELETED_COMMENT_TEXT = "[deleted]";
 
     public UserDetailDTO getMyProfile(UUID currentUserId) {
         UserEntity user = findActiveUserOrThrow(currentUserId);
@@ -76,14 +90,61 @@ public class UserManagementService {
         return toUserDetail(savedUser);
     }
 
+    /**
+     * Deletes the account for good from the user's side: nothing that identifies them stays. The row is kept (posts,
+     * reports and audit entries point at it) but its email, username, name, phone, password and Google link are
+     * replaced, so the email and username can be registered again. Sessions and devices are cut, the posts are
+     * deleted together with their media, comments lose their text, likes and follows are removed.
+     */
     @Transactional
-    public Operation deleteMyAccount(UUID currentUserId) {
+    public Operation deleteMyAccount(UUID currentUserId, DeleteAccountRequest request) {
         UserEntity user = findActiveUserOrThrow(currentUserId);
 
+        if (user.getRole() == Role.ADMIN) {
+            throw new BusinessException(GlobalMessage.CANNOT_DELETE_ADMIN, HttpStatus.FORBIDDEN);
+        }
+        if (!authService.confirmsIdentity(user, request.password(), request.idToken())) {
+            throw new BusinessException(GlobalMessage.CONFIRMATION_FAILED, HttpStatus.FORBIDDEN);
+        }
+
+        // cut the sessions first: whatever fails later, nobody can keep using the account
+        authService.revokeRefreshTokens(currentUserId);
+        userDeviceService.removeAllDevices(currentUserId);
+
+        profileImageService.deleteProfileImage(currentUserId);
+        deleteOwnPosts(currentUserId);
+        commentRepository.overwriteContentByUserId(currentUserId, DELETED_COMMENT_TEXT);
+        likeRepository.deleteAllByUserId(currentUserId);
+        followRepository.deleteAllByUserId(currentUserId);
+        userBlockRepository.deleteAllByUserId(currentUserId);
+
+        String tag = currentUserId.toString().replace("-", "");
+        user.setUsername("del_" + tag.substring(0, 12));
+        user.setEmail("deleted-" + tag + "@deleted.invalid");
+        user.setFirstName("Deleted");
+        user.setLastName("User");
+        user.setPhoneNumber(null);
+        user.setGoogleId(null);
+        user.setProfileImage(null);
+        user.setPassword(authService.unusablePasswordHash());
         user.setDeleted(true);
         userRepository.save(user);
 
+        log.info("USER.ACCOUNT.DELETED: userId={}", currentUserId);
         return Operation.DELETED;
+    }
+
+    private void deleteOwnPosts(UUID userId) {
+        for (PostEntity post : postCrudRepository.findLiveByUserId(userId)) {
+            post.setDeleted(true);
+            postCrudRepository.save(post);
+            for (PostMediaEntity item : postMediaRepository.findByPostIdOrderByPositionAsc(post.getId())) {
+                fileStorageService.deleteObject(item.getMediaKey());
+                if (item.getThumbnailKey() != null) {
+                    fileStorageService.deleteObject(item.getThumbnailKey());
+                }
+            }
+        }
     }
 
 
