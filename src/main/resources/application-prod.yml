@@ -1,0 +1,82 @@
+# Run in Kubernetes against production infrastructure.
+# Differences with application-dev.yml: INFRA_HOST instead of DEV_INFRA_HOST, no Swagger / OpenAPI.
+
+server:
+  forward-headers-strategy: framework
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${INFRA_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    hikari:
+      connection-timeout: ${POSTGRES_CONNECTION_TIMEOUT}
+      minimum-idle: ${POSTGRES_MINIMUM_IDLE}
+      maximum-pool-size: ${POSTGRES_MAXIMUM_POOL_SIZE}
+      idle-timeout: ${POSTGRES_IDLE_TIMEOUT}
+      max-lifetime: ${POSTGRES_MAX_LIFETIME}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    generate-ddl: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+  data:
+    redis:
+      host: ${INFRA_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT}
+  rabbitmq:
+    host: ${INFRA_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_FEEDZMORE_PASSWORD}
+    virtual-host: ${RABBITMQ_VIRTUAL_HOST}
+    connection-timeout: 5s
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      retry:
+        enabled: false
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+
+secret:
+  key: ${SECRET_KEY}
+
+logging:
+  file:
+    path: ${LOGGING_FILE_PATH}
+
+management:
+  tracing:
+    export:
+      zipkin:
+        endpoint: http://${INFRA_HOST}:${ZIPKIN_PORT}/api/v2/spans
+
+minio:
+  endpoint: ${MINIO_ENDPOINT}
+  bucket: ${MINIO_BUCKET}
+  access-key: ${MINIO_ACCESS_KEY}
+  secret-key: ${MINIO_SECRET_KEY}
+
+# the API documentation is for development only
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
