@@ -21,6 +21,13 @@ public class Constants {
     );
 
     // API documentation; SecurityConfig only opens these where springdoc is switched on (not in prod)
+    // public pages for people without an account and for the Play Console; GET only, listed one by one (never a wildcard)
+    public static final List<String> LEGAL_PAGES = List.of(
+            "/legal/privacy-policy",
+            "/legal/terms",
+            "/legal/delete-account"
+    );
+
     public static final List<String> SWAGGER_WHITELIST = List.of(
             "/v3/api-docs/**",
             "/swagger-ui/**",
