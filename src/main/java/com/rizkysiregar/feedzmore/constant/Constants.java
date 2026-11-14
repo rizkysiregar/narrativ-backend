@@ -13,14 +13,17 @@ public class Constants {
             "/auth/forgot-password",
             "/auth/verify-otp",
             "/auth/reset-password",
-            "/hello",
             "/res/photo",
-            "/v3/api-docs/**",
-            "/swagger-ui/**",
-            "/swagger-ui.html",
             "/forgot-password",
             "/actuator/health/**",
             "/actuator/info"
+    );
+
+    // API documentation; SecurityConfig only opens these where springdoc is switched on (not in prod)
+    public static final List<String> SWAGGER_WHITELIST = List.of(
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html"
     );
 
     public static final List<String> METHOD_LIST = List.of(

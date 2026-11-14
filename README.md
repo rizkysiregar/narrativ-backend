@@ -24,7 +24,7 @@ Before running the application, ensure you have the following installed:
 
 - **JDK 21**
 - **Maven 3.9+**
-- **Docker & Docker Compose**
+- **Docker** (only to build the image)
 
 ## 🏗️ Getting Started
 
@@ -39,10 +39,7 @@ cd feedzmore
 
 
 ### 2. Environment Setup
-The project uses Docker Compose for infrastructure (Database, etc.).
-```shell script
-docker-compose up -d
-```
+Copy `.env.example` to `.env` and fill in the values. Infrastructure (PostgreSQL, Redis, RabbitMQ, MinIO) is the shared development infrastructure; the app is deployed to Kubernetes through GitOps.
 
 ### 3. Running the App
 
@@ -101,7 +98,6 @@ This project includes a `Jenkinsfile` for automated pipelines. The pipeline hand
 ## 📄 Project Structure
 
 - `src/`: Application source code.
-- `docker-compose.yml`: Infrastructure dependencies.
 - `Makefile`: Useful shortcuts for common tasks.
 - `Jenkinsfile`: Pipeline definitions.
 

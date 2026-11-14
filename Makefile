@@ -5,7 +5,7 @@ PLATFORM ?= linux/amd64
 IMAGE := $(DOCKER_REPO)/$(APP_NAME):$(TAG)
 MAVEN ?= ./mvnw
 
-.PHONY: package image-build image-push build push update-latest run stop clean sonar-verify
+.PHONY: package image-build image-push build push update-latest clean sonar-verify
 
 # Builds the executable JAR expected by the Dockerfile.
 package:
@@ -25,12 +25,6 @@ image-push: package
 build: image-build
 push: image-push
 update-latest: image-push
-
-run:
-	docker compose up -d
-
-stop:
-	docker compose down
 
 clean:
 	docker system prune -f

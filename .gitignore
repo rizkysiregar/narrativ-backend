@@ -34,4 +34,4 @@ build/
 /log/
 logs/
 .env
-deploy/feedzmore-dev.secrets.env
+deploy/*.secrets.env
