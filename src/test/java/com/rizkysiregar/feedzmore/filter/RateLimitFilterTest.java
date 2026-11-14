@@ -182,4 +182,15 @@ class RateLimitFilterTest {
         verify(rateLimiterService).resolveBucket("rizky", "post-upload");
         verify(rateLimiterService).resolveBucket("rizky", "post-create");
     }
+
+    @Test
+    void accountDeletion_UsesTheStrictBucketNotTheDefaultOne() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("rizky", null, AuthorityUtils.createAuthorityList("ROLE_USER")));
+
+        call(request("/users/me/deletion", null), new MockHttpServletResponse());
+
+        verify(rateLimiterService).resolveBucket("rizky", "sensitive");
+        verify(rateLimiterService, never()).resolveBucket("rizky", "default");
+    }
 }

@@ -5,6 +5,7 @@ import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.dto.PostLikeCountDTO;
 import com.rizkysiregar.feedzmore.model.entity.LikeEntity;
 import com.rizkysiregar.feedzmore.repository.LikeRepository;
+import com.rizkysiregar.feedzmore.repository.UserBlockRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.LikeDislikeService;
@@ -27,6 +28,7 @@ public class LikeDislikeServiceImpl implements LikeDislikeService {
     private final LikeRepository likeRepository;
     private final UserRepository userRepository;
     private final PostCrudRepository postCrudRepository;
+    private final UserBlockRepository userBlockRepository;
 
     @Override
     public Operation likePost(UUID postId, UUID userId) {
@@ -36,7 +38,11 @@ public class LikeDislikeServiceImpl implements LikeDislikeService {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
-        if (!postCrudRepository.existsInteractableById(postId)) {
+        // a post of someone on either side of a block answers like a post that is gone
+        boolean likeable = postCrudRepository.findInteractableById(postId)
+                .map(post -> !userBlockRepository.existsBetween(userId, post.getUser().getId()))
+                .orElse(false);
+        if (!likeable) {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 

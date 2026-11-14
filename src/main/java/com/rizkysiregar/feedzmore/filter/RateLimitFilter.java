@@ -103,6 +103,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String uri = request.getRequestURI();
         String method = request.getMethod();
 
+        // account deletion asks for the password, so it gets the strict bucket
+        if (uri.endsWith("/users/me/deletion") && "POST".equals(method)) return RateLimiterService.SENSITIVE;
         // the presigned upload urls have their own, higher bucket: every media of a post needs one
         if (uri.endsWith("/posts/upload-url") && "POST".equals(method)) return "post-upload";
         if (uri.contains("/posts") && "GET".equals(method)) return "feed";

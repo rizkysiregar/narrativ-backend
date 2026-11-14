@@ -3,6 +3,7 @@ package com.rizkysiregar.feedzmore.repository;
 import com.rizkysiregar.feedzmore.model.entity.PostEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -17,8 +18,9 @@ public interface PostCrudRepository extends JpaRepository<PostEntity, UUID>, Jpa
 
     boolean existsByIdAndIsDeletedFalse(UUID id);
 
-    @Query("SELECT p FROM PostEntity p WHERE p.user.id = :userId AND p.isDeleted = false")
-    List<PostEntity> findLiveByUserId(@Param("userId") UUID userId);
+    @Modifying
+    @Query("UPDATE PostEntity p SET p.isDeleted = true WHERE p.user.id = :userId AND p.isDeleted = false")
+    int softDeleteAllByUserId(@Param("userId") UUID userId);
 
     long countByUserIdAndIsDeletedFalse(UUID userId);
 

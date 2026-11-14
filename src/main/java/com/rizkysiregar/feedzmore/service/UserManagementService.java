@@ -17,8 +17,6 @@ import com.rizkysiregar.feedzmore.model.request.BanUserRequest;
 import com.rizkysiregar.feedzmore.model.request.UnbanUserRequest;
 import com.rizkysiregar.feedzmore.model.request.UpdateMyUserRequest;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
-import com.rizkysiregar.feedzmore.model.entity.PostEntity;
-import com.rizkysiregar.feedzmore.model.entity.PostMediaEntity;
 import com.rizkysiregar.feedzmore.model.request.DeleteAccountRequest;
 import com.rizkysiregar.feedzmore.repository.CommentRepository;
 import com.rizkysiregar.feedzmore.repository.LikeRepository;
@@ -28,6 +26,7 @@ import com.rizkysiregar.feedzmore.repository.FollowRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.util.AdminDates;
+import com.rizkysiregar.feedzmore.util.AfterCommit;
 import com.rizkysiregar.feedzmore.util.Operation;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -62,7 +61,7 @@ public class UserManagementService {
     private final LikeRepository likeRepository;
     private final UserBlockRepository userBlockRepository;
     private final PostMediaRepository postMediaRepository;
-    private final FileStorageService fileStorageService;
+    private final MediaCleanupService mediaCleanupService;
 
     private static final String DELETED_COMMENT_TEXT = "[deleted]";
 
@@ -134,19 +133,22 @@ public class UserManagementService {
         return Operation.DELETED;
     }
 
+    /**
+     * Every post of the user is deleted in a few statements, however many there are. The files go afterwards in
+     * the background: the rows that point at them are already gone, so a file that is not removed is an orphan
+     * that the cleanup job finds, never a leftover that stays linked to the account.
+     */
     private void deleteOwnPosts(UUID userId) {
-        for (PostEntity post : postCrudRepository.findLiveByUserId(userId)) {
-            post.setDeleted(true);
-            postCrudRepository.save(post);
-            for (PostMediaEntity item : postMediaRepository.findByPostIdOrderByPositionAsc(post.getId())) {
-                fileStorageService.deleteObject(item.getMediaKey());
-                if (item.getThumbnailKey() != null) {
-                    fileStorageService.deleteObject(item.getThumbnailKey());
-                }
-            }
+        List<String> keys = new ArrayList<>(postMediaRepository.findMediaKeysOfLivePosts(userId));
+        keys.addAll(postMediaRepository.findThumbnailKeysOfLivePosts(userId));
+
+        postMediaRepository.deleteAllOfLivePosts(userId);
+        postCrudRepository.softDeleteAllByUserId(userId);
+
+        if (!keys.isEmpty()) {
+            AfterCommit.run("delete media of account " + userId, () -> mediaCleanupService.deleteObjects(keys));
         }
     }
-
 
     public PaginatedResponse<AdminUserDetailDTO> searchUsersForAdmin(AdminUserSearchRequest request, Pageable pageable) {
         log.info("Admin search users request: {}", request);
