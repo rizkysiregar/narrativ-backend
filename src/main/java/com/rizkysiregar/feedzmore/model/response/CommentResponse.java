@@ -1,6 +1,6 @@
 package com.rizkysiregar.feedzmore.model.response;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
 import lombok.Data;
 
@@ -12,7 +12,8 @@ import java.util.UUID;
 @Data
 public class CommentResponse {
     private UUID id;
-    @JsonIgnore
+    // lets the client report or block the author
+    @JsonProperty("userId")
     private UUID authorId;
     private String username;
     private String profileImageUrl;

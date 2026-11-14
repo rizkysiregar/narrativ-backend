@@ -37,6 +37,9 @@ firebase:
   # alternative for local development: the key itself (single line JSON). The file wins when both are set
   credentials-json: ${FIREBASE_CREDENTIALS_JSON:}
 app:
+  legal:
+    # shown on the public privacy policy, terms and account deletion pages; prod refuses to start without it
+    contact-email: ${LEGAL_CONTACT_EMAIL:}
   cors:
     # comma separated origins. default is local development only, deployed envs set APP_CORS_ALLOWED_ORIGINS
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8083,http://localhost:53375}

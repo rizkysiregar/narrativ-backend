@@ -52,6 +52,7 @@ import java.util.stream.Collectors;
 public class PostServiceImpl implements PostService {
 
     private final PostPaginationRepository postPaginationRepository;
+    private final UserBlockRepository userBlockRepository;
     private final PostCrudRepository postCrudRepository;
     private final PostMediaRepository postMediaRepository;
     private final LikeRepository likeRepository;
@@ -80,7 +81,7 @@ public class PostServiceImpl implements PostService {
     public PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, UUID userId, boolean mediaOnly) {
         log.info("FETCH.EXPLORE.FEED: {}, size= {} ,userId={}, mediaOnly={}", page, size, userId, mediaOnly);
         Pageable pageable = Paging.of(page, size);
-        Page<PostEntity> postPage = postPaginationRepository.findAllActivePosts(pageable, mediaOnly);
+        Page<PostEntity> postPage = postPaginationRepository.findAllActivePosts(pageable, mediaOnly, userId);
         return buildPaginatedResponse(postPage, userId);
     }
 
@@ -99,7 +100,11 @@ public class PostServiceImpl implements PostService {
         UserEntity user = userRepository.findActiveByUsername(username)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
 
-        Page<PostEntity> postPage = postPaginationRepository.findAllActivePostsByUserId(pageable, user.getId(), mediaOnly);
+        if (userBlockRepository.existsBetween(viewerId, user.getId())) {
+            throw new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+        }
+
+        Page<PostEntity> postPage = postPaginationRepository.findAllActivePostsByUserId(pageable, user.getId(), mediaOnly, viewerId);
         return buildPaginatedResponse(postPage, viewerId);
     }
 
@@ -130,7 +135,7 @@ public class PostServiceImpl implements PostService {
             List<UUID> postIds = posts.stream().map(PostEntity::getId).toList();
             Map<UUID, Long> likeCounts = likeRepository.countByPostIds(postIds).stream()
                     .collect(Collectors.toMap(PostCountDTO::postId, PostCountDTO::count));
-            Map<UUID, Long> commentCounts = commentRepository.countByPostIds(postIds).stream()
+            Map<UUID, Long> commentCounts = commentRepository.countByPostIds(postIds, statusUserId).stream()
                     .collect(Collectors.toMap(PostCountDTO::postId, PostCountDTO::count));
             Set<UUID> likedPostIds = new HashSet<>(likeRepository.findLikedPostIds(statusUserId, postIds));
             Map<UUID, List<PostMediaResponse>> mediaByPost = postMediaRepository
@@ -151,6 +156,7 @@ public class PostServiceImpl implements PostService {
                         commentCounts.getOrDefault(post.getId(), 0L),
                         likedPostIds.contains(post.getId())
                 );
+                response.setUserId(post.getUser().getId());
                 applyModeration(response, post, statusUserId);
                 response.setMedia(response.getMedia().stream().map(this::presign).toList());
                 return response;

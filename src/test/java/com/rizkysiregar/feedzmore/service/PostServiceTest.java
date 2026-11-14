@@ -1,6 +1,7 @@
 package com.rizkysiregar.feedzmore.service;
 
 
+import com.rizkysiregar.feedzmore.repository.UserBlockRepository;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
@@ -49,6 +50,8 @@ public class PostServiceTest {
     @Mock
     private PostPaginationRepository postPaginationRepository;
     @Mock
+    private UserBlockRepository userBlockRepository;
+    @Mock
     private PostCrudRepository postCrudRepository;
     @Mock
     private PostMediaRepository postMediaRepository;
@@ -92,7 +95,7 @@ public class PostServiceTest {
         List<PostEntity> posts = List.of(p1, p2);
         Page<PostEntity> postPage = new PageImpl<>(posts, PageRequest.of(page, size), posts.size());
 
-        when(postPaginationRepository.findAllActivePosts(any(Pageable.class), eq(false)))
+        when(postPaginationRepository.findAllActivePosts(any(Pageable.class), eq(false), any()))
                 .thenReturn(postPage);
 
         when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any())).thenReturn(List.of(
@@ -121,7 +124,7 @@ public class PostServiceTest {
         assertEquals("img2.jpg", response.getContent().get(1).getMedia().get(0).url());
 
         verify(postPaginationRepository, times(1))
-                .findAllActivePosts(any(Pageable.class), eq(false));
+                .findAllActivePosts(any(Pageable.class), eq(false), any());
         verify(postPaginationRepository, never()).findFollowingPosts(any(Pageable.class), any(UUID.class));
     }
 
@@ -136,7 +139,7 @@ public class PostServiceTest {
 
         assertTrue(response.getContent().isEmpty());
         assertEquals(0, response.getTotalElements());
-        verify(postPaginationRepository, never()).findAllActivePosts(any(Pageable.class), anyBoolean());
+        verify(postPaginationRepository, never()).findAllActivePosts(any(Pageable.class), anyBoolean(), any());
         verifyNoInteractions(likeRepository, commentRepository, fileStorageService);
     }
 
@@ -459,7 +462,7 @@ public class PostServiceTest {
         Page<PostEntity> postPage = new PageImpl<>(posts, PageRequest.of(page, size), posts.size());
 
         when(userRepository.findActiveByUsername(username)).thenReturn(Optional.of(user));
-        when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(userId), eq(false)))
+        when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(userId), eq(false), any()))
                 .thenReturn(postPage);
         when(likeRepository.findLikedPostIds(viewerId, List.of(p1.getId())))
                 .thenReturn(List.of(p1.getId()));
@@ -472,7 +475,7 @@ public class PostServiceTest {
         assertEquals(username, response.getContent().get(0).getUsername());
         assertTrue(response.getContent().get(0).isLiked());
         verify(userRepository).findActiveByUsername(username);
-        verify(postPaginationRepository).findAllActivePostsByUserId(any(Pageable.class), eq(userId), eq(false));
+        verify(postPaginationRepository).findAllActivePostsByUserId(any(Pageable.class), eq(userId), eq(false), any());
     }
 
     @Test
@@ -494,16 +497,16 @@ public class PostServiceTest {
         user.setId(UUID.randomUUID());
         user.setUsername("author");
         when(userRepository.findActiveByUsername("author")).thenReturn(Optional.of(user));
-        when(postPaginationRepository.findAllActivePosts(any(Pageable.class), eq(true)))
+        when(postPaginationRepository.findAllActivePosts(any(Pageable.class), eq(true), any()))
                 .thenReturn(Page.empty(PageRequest.of(0, 10)));
-        when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(user.getId()), eq(true)))
+        when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(user.getId()), eq(true), any()))
                 .thenReturn(Page.empty(PageRequest.of(0, 10)));
 
         postService.getExplorePosts(0, 10, viewerId, true);
         postService.getAllPostByUserId(0, 10, "author", viewerId, true);
 
-        verify(postPaginationRepository).findAllActivePosts(any(Pageable.class), eq(true));
-        verify(postPaginationRepository).findAllActivePostsByUserId(any(Pageable.class), eq(user.getId()), eq(true));
+        verify(postPaginationRepository).findAllActivePosts(any(Pageable.class), eq(true), any());
+        verify(postPaginationRepository).findAllActivePostsByUserId(any(Pageable.class), eq(user.getId()), eq(true), any());
     }
 
     @Test
@@ -688,7 +691,7 @@ public class PostServiceTest {
         author.setUsername("author");
         PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("hello")
                 .createdAt(LocalDateTime.now()).build();
-        when(postPaginationRepository.findAllActivePosts(any(Pageable.class), eq(false)))
+        when(postPaginationRepository.findAllActivePosts(any(Pageable.class), eq(false), any()))
                 .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
 
         PostFeedResponse item = postService.getExplorePosts(0, 10, UUID.randomUUID(), false).getContent().get(0);
@@ -717,7 +720,7 @@ public class PostServiceTest {
         PostEntity post = takenDownPost(author);
         when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
                 .thenReturn(List.of(media(post.getId(), 0, "media.jpg", MediaType.VIDEO, "thumb.jpg")));
-        when(postPaginationRepository.findAllActivePosts(any(Pageable.class), eq(false)))
+        when(postPaginationRepository.findAllActivePosts(any(Pageable.class), eq(false), any()))
                 .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
 
         PostFeedResponse item = postService.getExplorePosts(0, 10, viewerId, false).getContent().get(0);
@@ -738,7 +741,7 @@ public class PostServiceTest {
         PostEntity post = takenDownPost(author);
         when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
                 .thenReturn(List.of(media(post.getId(), 0, "media.jpg", MediaType.VIDEO, "thumb.jpg")));
-        when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(author.getId()), eq(false)))
+        when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(author.getId()), eq(false), any()))
                 .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
         when(userRepository.findActiveByUsername("author")).thenReturn(Optional.of(author));
         when(fileStorageService.getPresignUrl("media.jpg")).thenReturn("signed-media");
@@ -760,7 +763,7 @@ public class PostServiceTest {
         author.setUsername("author");
         PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("hello")
                 .createdAt(LocalDateTime.now()).build();
-        when(postPaginationRepository.findAllActivePosts(any(Pageable.class), eq(false)))
+        when(postPaginationRepository.findAllActivePosts(any(Pageable.class), eq(false), any()))
                 .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
         when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
                 .thenReturn(List.of(media(post.getId(), 0, "img.jpg", MediaType.IMAGE, null)));

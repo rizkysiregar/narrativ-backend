@@ -19,6 +19,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
@@ -71,6 +72,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(request -> {
                     request.requestMatchers(Constants.JWT_WHITELIST.toArray(String[]::new)).permitAll();
+                    request.requestMatchers(HttpMethod.GET, Constants.LEGAL_PAGES.toArray(String[]::new)).permitAll();
                     if (swaggerUiEnabled) {
                         request.requestMatchers(Constants.SWAGGER_WHITELIST.toArray(String[]::new)).permitAll();
                     }

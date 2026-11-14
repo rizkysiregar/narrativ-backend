@@ -71,6 +71,13 @@ public class AuthController {
         return authService.refreshToken(request.getRefreshToken());
     }
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "Logout", description = "Revokes the given refresh token. Always succeeds, also for an unknown or expired token")
+    @PostMapping("auth/logout")
+    public Operation logout(@Valid @RequestBody RefreshTokenRequest request) {
+        authService.logout(request.getRefreshToken());
+        return Operation.DELETED;
+    }
+
     @io.swagger.v3.oas.annotations.Operation(summary = "User validation and OTP Request", description = "Sends an OTP to the email when it has an account. The answer is the same for every email, registered or not, so it does not reveal which emails have an account")
     @PostMapping("auth/forgot-password")
     public SentOtpDTO forgotPassword(@RequestBody @Valid ForgotPasswordRequest request) {

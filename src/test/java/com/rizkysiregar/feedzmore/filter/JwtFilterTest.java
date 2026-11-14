@@ -68,6 +68,19 @@ class JwtFilterTest {
     }
 
     @Test
+    void legalPagesIgnoreAnAuthorizationHeader() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/legal/privacy-policy");
+        request.addHeader("Authorization", "Bearer stale.token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter().doFilter(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        verifyNoInteractions(jwtService);
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
     void bannedUser_gets401UserBannedAndTheRequestNeverReachesTheController() throws Exception {
         UserPrincipal banned = principal(UserStatus.BANNED, false);
         when(jwtService.extractUsername("some.jwt.token")).thenReturn("someone");

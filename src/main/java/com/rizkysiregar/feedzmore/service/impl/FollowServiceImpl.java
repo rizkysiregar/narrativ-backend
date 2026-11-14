@@ -6,6 +6,7 @@ import com.rizkysiregar.feedzmore.model.response.FollowStatusResponse;
 import com.rizkysiregar.feedzmore.model.response.FollowUserResponse;
 import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.repository.FollowRepository;
+import com.rizkysiregar.feedzmore.repository.UserBlockRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.FollowService;
 import com.rizkysiregar.feedzmore.service.ProfileImageUrlResolver;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class FollowServiceImpl implements FollowService {
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
+    private final UserBlockRepository userBlockRepository;
     private final ProfileImageUrlResolver profileImageUrlResolver;
 
     // follower lists are cheap rows, so they may be paged wider than the feeds
@@ -53,14 +55,14 @@ public class FollowServiceImpl implements FollowService {
     @Transactional(readOnly = true)
     public PaginatedResponse<FollowUserResponse> getFollowers(UUID userId, UUID requesterId, int page, int size) {
         requireActiveUsers(userId, requesterId);
-        return toResponse(followRepository.findActiveFollowers(userId, pageable(page, size)));
+        return toResponse(followRepository.findActiveFollowers(userId, requesterId, pageable(page, size)));
     }
 
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<FollowUserResponse> getFollowing(UUID userId, UUID requesterId, int page, int size) {
         requireActiveUsers(userId, requesterId);
-        return toResponse(followRepository.findActiveFollowing(userId, pageable(page, size)));
+        return toResponse(followRepository.findActiveFollowing(userId, requesterId, pageable(page, size)));
     }
 
     @Override
@@ -79,6 +81,10 @@ public class FollowServiceImpl implements FollowService {
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
         userRepository.findActiveById(userId)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
+        // a user on either side of a block does not exist for the other
+        if (userBlockRepository.existsBetween(requesterId, userId)) {
+            throw new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+        }
     }
 
     private PageRequest pageable(int page, int size) {

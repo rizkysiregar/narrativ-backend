@@ -49,6 +49,9 @@ public enum GlobalMessage {
     TEMPLATE_CODE_EXISTS("409", "Template dengan code ini sudah ada."),
     NOTHING_TO_UPDATE("400", "Tidak ada data yang diubah. Isi minimal satu field."),
     BROADCAST_FAILED("502", "Notifikasi gagal dikirim ke Firebase. Coba lagi nanti."),
+    CANNOT_DELETE_ADMIN("403", "Akun admin tidak dapat dihapus dari aplikasi."),
+    CONFIRMATION_FAILED("403", "Konfirmasi gagal. Periksa kembali kata sandi atau akun Google Anda."),
+    CANNOT_BLOCK_SELF("400", "Anda tidak dapat memblokir diri sendiri."),
     EMAIL_ALREADY_TAKEN("400", "Email ini sudah terdaftar. Silakan gunakan email lain atau masuk ke akun Anda."),
     ;
 

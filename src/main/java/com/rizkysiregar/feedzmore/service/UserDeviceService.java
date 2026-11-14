@@ -49,6 +49,23 @@ public class UserDeviceService {
                 });
     }
 
+    /** Stops push for this token, but only when it belongs to the caller. */
+    @Transactional
+    public void deactivateDevice(UUID userId, String pushToken) {
+        userDeviceRepository.findByPushToken(pushToken)
+                .filter(device -> userId.equals(device.getUserId()))
+                .ifPresent(device -> {
+                    device.setActive(false);
+                    device.setUpdateAt(LocalDateTime.now());
+                    userDeviceRepository.save(device);
+                });
+    }
+
+    @Transactional
+    public void removeAllDevices(UUID userId) {
+        userDeviceRepository.deleteByUserId(userId);
+    }
+
     public List<UserDeviceEntity> getActiveDevice(UUID userId) {
         return userDeviceRepository.findByUserIdAndIsActiveTrue(userId);
     }

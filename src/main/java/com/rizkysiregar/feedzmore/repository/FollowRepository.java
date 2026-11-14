@@ -33,6 +33,11 @@ public interface FollowRepository extends JpaRepository<FollowEntity, UUID> {
     int deleteByFollowerIdAndFollowedId(@Param("followerId") UUID followerId,
                                         @Param("followedId") UUID followedId);
 
+    // both directions: a deleted account neither follows nor is followed
+    @Modifying
+    @Query("DELETE FROM FollowEntity f WHERE f.follower.id = :userId OR f.followed.id = :userId")
+    int deleteAllByUserId(@Param("userId") UUID userId);
+
     @Query("""
             SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END FROM FollowEntity f
             WHERE f.follower.id = :followerId AND f.followed.id = :followedId
@@ -59,24 +64,28 @@ public interface FollowRepository extends JpaRepository<FollowEntity, UUID> {
                 follower.id, follower.username, follower.firstName, follower.lastName, follower.profileImage)
             FROM FollowEntity f JOIN f.follower follower JOIN f.followed followed
             WHERE followed.id = :followedId AND follower.isDeleted = false AND follower.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND followed.isDeleted = false AND followed.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+              AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = follower.id) OR (b.blockerId = follower.id AND b.blockedId = :viewerId))
             ORDER BY follower.id ASC
             """, countQuery = """
             SELECT COUNT(f) FROM FollowEntity f JOIN f.follower follower JOIN f.followed followed
             WHERE followed.id = :followedId AND follower.isDeleted = false AND follower.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND followed.isDeleted = false AND followed.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+              AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = follower.id) OR (b.blockerId = follower.id AND b.blockedId = :viewerId))
             """)
-    Page<FollowUserResponse> findActiveFollowers(@Param("followedId") UUID followedId, Pageable pageable);
+    Page<FollowUserResponse> findActiveFollowers(@Param("followedId") UUID followedId, @Param("viewerId") UUID viewerId, Pageable pageable);
 
     @Query(value = """
             SELECT new com.rizkysiregar.feedzmore.model.response.FollowUserResponse(
                 followed.id, followed.username, followed.firstName, followed.lastName, followed.profileImage)
             FROM FollowEntity f JOIN f.follower follower JOIN f.followed followed
             WHERE follower.id = :followerId AND follower.isDeleted = false AND follower.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND followed.isDeleted = false AND followed.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+              AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = followed.id) OR (b.blockerId = followed.id AND b.blockedId = :viewerId))
             ORDER BY followed.id ASC
             """, countQuery = """
             SELECT COUNT(f) FROM FollowEntity f JOIN f.follower follower JOIN f.followed followed
             WHERE follower.id = :followerId AND follower.isDeleted = false AND follower.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE AND followed.isDeleted = false AND followed.status = com.rizkysiregar.feedzmore.model.enums.UserStatus.ACTIVE
+              AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = followed.id) OR (b.blockerId = followed.id AND b.blockedId = :viewerId))
             """)
-    Page<FollowUserResponse> findActiveFollowing(@Param("followerId") UUID followerId, Pageable pageable);
+    Page<FollowUserResponse> findActiveFollowing(@Param("followerId") UUID followerId, @Param("viewerId") UUID viewerId, Pageable pageable);
 
     @Query("""
             SELECT follower.id FROM FollowEntity f JOIN f.follower follower JOIN f.followed followed

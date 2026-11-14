@@ -9,6 +9,7 @@ import com.rizkysiregar.feedzmore.model.response.PaginatedResponse;
 import com.rizkysiregar.feedzmore.messaging.event.CommentRepliedEvent;
 import com.rizkysiregar.feedzmore.messaging.publisher.CommentEventPublisher;
 import com.rizkysiregar.feedzmore.repository.CommentRepository;
+import com.rizkysiregar.feedzmore.repository.UserBlockRepository;
 import com.rizkysiregar.feedzmore.repository.PostCrudRepository;
 import com.rizkysiregar.feedzmore.repository.UserRepository;
 import com.rizkysiregar.feedzmore.service.CommentService;
@@ -36,6 +37,7 @@ import java.util.UUID;
 public class CommentServiceImpl implements CommentService {
 
     private final CommentRepository commentRepository;
+    private final UserBlockRepository userBlockRepository;
     private final PostCrudRepository postCrudRepository;
     private final UserRepository userRepository;
     private final CommentEventPublisher commentEventPublisher;
@@ -102,7 +104,10 @@ public class CommentServiceImpl implements CommentService {
         UUID postOwnerId = postCrudRepository.findInteractableById(postId)
                 .orElseThrow(() -> new EntityNotFoundException("Post Not Found"))
                 .getUser().getId();
-        Page<CommentResponse> commentPage = commentRepository.findTopLevelCommentResponses(postId, pageable);
+        if (userBlockRepository.existsBetween(viewerId, postOwnerId)) {
+            throw new EntityNotFoundException("Post Not Found");
+        }
+        Page<CommentResponse> commentPage = commentRepository.findTopLevelCommentResponses(postId, viewerId, pageable);
 
         return new PaginatedResponse<>(
                 commentPage.getContent().stream().map(comment -> prepare(comment, viewerId, postOwnerId)).toList(),
@@ -117,7 +122,7 @@ public class CommentServiceImpl implements CommentService {
     @Override
     public List<CommentResponse> getReplies(UUID commentId, UUID viewerId) {
         UUID postOwnerId = commentRepository.findPostOwnerId(commentId).orElse(null);
-        return commentRepository.findReplyResponses(commentId).stream()
+        return commentRepository.findReplyResponses(commentId, viewerId).stream()
                 .map(reply -> prepare(reply, viewerId, postOwnerId))
                 .toList();
     }
@@ -126,7 +131,7 @@ public class CommentServiceImpl implements CommentService {
     public PaginatedResponse<CommentResponse> getRepliesPage(UUID commentId, int page, int size, UUID viewerId) {
         Pageable pageable = Paging.of(page, size);
         UUID postOwnerId = commentRepository.findPostOwnerId(commentId).orElse(null);
-        Page<CommentResponse> replyPage = commentRepository.findReplyResponsePage(commentId, pageable);
+        Page<CommentResponse> replyPage = commentRepository.findReplyResponsePage(commentId, viewerId, pageable);
         return new PaginatedResponse<>(
                 replyPage.getContent().stream().map(reply -> prepare(reply, viewerId, postOwnerId)).toList(),
                 replyPage.getNumber(),
@@ -165,8 +170,8 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
-    public long getCountByPostId(UUID postId) {
-        return commentRepository.contByPostId(postId);
+    public long getCountByPostId(UUID postId, UUID viewerId) {
+        return commentRepository.contByPostId(postId, viewerId);
     }
 
     private CommentResponse prepare(CommentResponse comment, UUID viewerId, UUID postOwnerId) {

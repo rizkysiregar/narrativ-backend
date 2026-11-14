@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.service;
 
+import com.rizkysiregar.feedzmore.repository.UserBlockRepository;
 import com.rizkysiregar.feedzmore.model.entity.CommentEntity;
 import com.rizkysiregar.feedzmore.messaging.event.CommentRepliedEvent;
 import com.rizkysiregar.feedzmore.messaging.publisher.CommentEventPublisher;
@@ -36,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
@@ -46,6 +48,8 @@ class CommentServiceImplTest {
 
     @Mock
     private CommentRepository commentRepository;
+    @Mock
+    private UserBlockRepository userBlockRepository;
     @Mock
     private PostCrudRepository postCrudRepository;
     @Mock
@@ -70,7 +74,7 @@ class CommentServiceImplTest {
         UUID authorId = UUID.randomUUID();
         when(postCrudRepository.findInteractableById(postId)).thenReturn(Optional.of(PostEntity.builder()
                 .id(postId).user(user("owner")).build()));
-        when(commentRepository.findTopLevelCommentResponses(any(), any(Pageable.class))).thenAnswer(invocation ->
+        when(commentRepository.findTopLevelCommentResponses(any(), any(), any(Pageable.class))).thenAnswer(invocation ->
                 new PageImpl<>(List.of(takenDownComment(authorId)), PageRequest.of(0, 10), 1));
 
         PaginatedResponse<CommentResponse> asStranger = commentService.getComment(postId, 0, 10, UUID.randomUUID());
@@ -94,7 +98,7 @@ class CommentServiceImplTest {
     void getReplies_returnsProjectionsNotEntitiesAndAppliesTheSameRule() {
         UUID parentId = UUID.randomUUID();
         UUID authorId = UUID.randomUUID();
-        when(commentRepository.findReplyResponses(parentId)).thenAnswer(invocation -> List.of(takenDownComment(authorId)));
+        when(commentRepository.findReplyResponses(eq(parentId), any())).thenAnswer(invocation -> List.of(takenDownComment(authorId)));
 
         List<CommentResponse> asStranger = commentService.getReplies(parentId, UUID.randomUUID());
 
@@ -232,7 +236,7 @@ class CommentServiceImplTest {
         postOwner.setId(postOwnerId);
         when(postCrudRepository.findInteractableById(postId)).thenReturn(Optional.of(PostEntity.builder()
                 .id(postId).user(postOwner).build()));
-        when(commentRepository.findTopLevelCommentResponses(any(), any(Pageable.class))).thenAnswer(invocation ->
+        when(commentRepository.findTopLevelCommentResponses(any(), any(), any(Pageable.class))).thenAnswer(invocation ->
                 new PageImpl<>(List.of(takenDownComment(authorId)), PageRequest.of(0, 10), 1));
 
         assertEquals(true, commentService.getComment(postId, 0, 10, authorId).getContent().get(0).isCanDelete());

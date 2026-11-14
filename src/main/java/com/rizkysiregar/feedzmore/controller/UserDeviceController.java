@@ -1,6 +1,7 @@
 package com.rizkysiregar.feedzmore.controller;
 
 import com.rizkysiregar.feedzmore.model.UserPrincipal;
+import com.rizkysiregar.feedzmore.model.request.DeactivateDeviceRequest;
 import com.rizkysiregar.feedzmore.model.request.RegisterDeviceRequest;
 import com.rizkysiregar.feedzmore.service.UserDeviceService;
 import com.rizkysiregar.feedzmore.util.Operation;
@@ -34,6 +35,19 @@ public class UserDeviceController {
         log.info("Registering device for user {}", userPrincipal.getUsername());
         userDeviceService.registerOrUpdatedDevice(userPrincipal.getUserId(), request);
         return Operation.CREATED;
+    }
+
+    @io.swagger.v3.oas.annotations.Operation(
+            summary = "Stop push notifications to this device (logout)",
+            description = "Only a token that belongs to the caller is deactivated; an unknown token is ignored"
+    )
+    @PostMapping("/deactivate")
+    public Operation deactivateDevice(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestBody @Valid DeactivateDeviceRequest request
+    ) {
+        userDeviceService.deactivateDevice(userPrincipal.getUserId(), request.getPushToken());
+        return Operation.DELETED;
     }
 
 }
