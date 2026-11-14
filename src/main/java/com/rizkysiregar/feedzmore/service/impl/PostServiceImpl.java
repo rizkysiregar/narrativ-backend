@@ -24,6 +24,7 @@ import com.rizkysiregar.feedzmore.model.enums.ModerationStatus;
 import com.rizkysiregar.feedzmore.repository.*;
 import com.rizkysiregar.feedzmore.service.FileStorageService;
 import com.rizkysiregar.feedzmore.service.PostService;
+import com.rizkysiregar.feedzmore.service.MediaCleanupService;
 import com.rizkysiregar.feedzmore.util.AfterCommit;
 import com.rizkysiregar.feedzmore.util.Operation;
 import com.rizkysiregar.feedzmore.util.Paging;
@@ -53,6 +54,7 @@ public class PostServiceImpl implements PostService {
 
     private final PostPaginationRepository postPaginationRepository;
     private final UserBlockRepository userBlockRepository;
+    private final MediaCleanupService mediaCleanupService;
     private final PostCrudRepository postCrudRepository;
     private final PostMediaRepository postMediaRepository;
     private final LikeRepository likeRepository;
@@ -382,11 +384,18 @@ public class PostServiceImpl implements PostService {
         post.setDeleted(true);
         postCrudRepository.save(post);
 
+        // the rows go with the post: a file that cannot be deleted right now is then an orphan for the cleanup job,
+        // not a file that stays linked to a deleted post forever
+        List<String> objectKeys = new ArrayList<>();
         for (PostMediaEntity item : postMediaRepository.findByPostIdOrderByPositionAsc(post.getId())) {
-            fileStorageService.deleteObject(item.getMediaKey());
+            objectKeys.add(item.getMediaKey());
             if (item.getThumbnailKey() != null) {
-                fileStorageService.deleteObject(item.getThumbnailKey());
+                objectKeys.add(item.getThumbnailKey());
             }
+        }
+        postMediaRepository.deleteAllByPostId(post.getId());
+        if (!objectKeys.isEmpty()) {
+            AfterCommit.run("delete media of post " + post.getId(), () -> mediaCleanupService.deleteObjects(objectKeys));
         }
 
         return Operation.DELETED;

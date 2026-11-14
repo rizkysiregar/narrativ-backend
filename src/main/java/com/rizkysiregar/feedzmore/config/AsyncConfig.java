@@ -11,6 +11,22 @@ import java.util.concurrent.Executor;
 @EnableAsync
 public class AsyncConfig {
 
+    /**
+     * Deletes object storage files after the request that asked for it (account deletion can mean hundreds of
+     * files). A file that is not removed, because the queue is full or the app stops, no longer belongs to any
+     * post_media row, so the orphan cleanup finds it later.
+     */
+    @Bean(name = "mediaCleanupExecutor")
+    public Executor mediaCleanupExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(50);
+        executor.setThreadNamePrefix("media-cleanup-");
+        executor.initialize();
+        return executor;
+    }
+
     @Bean(name = "postEventExecutor")
     public Executor postEventExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();

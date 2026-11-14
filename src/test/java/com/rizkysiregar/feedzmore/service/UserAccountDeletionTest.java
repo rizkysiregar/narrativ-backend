@@ -2,8 +2,6 @@ package com.rizkysiregar.feedzmore.service;
 
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
-import com.rizkysiregar.feedzmore.model.entity.PostEntity;
-import com.rizkysiregar.feedzmore.model.entity.PostMediaEntity;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
 import com.rizkysiregar.feedzmore.model.enums.Role;
 import com.rizkysiregar.feedzmore.model.request.DeleteAccountRequest;
@@ -59,7 +57,7 @@ class UserAccountDeletionTest {
     @Mock
     private PostMediaRepository postMediaRepository;
     @Mock
-    private FileStorageService fileStorageService;
+    private MediaCleanupService mediaCleanupService;
     @Mock
     private UserDeviceService userDeviceService;
     @Mock
@@ -103,7 +101,7 @@ class UserAccountDeletionTest {
         assertEquals(HttpStatus.FORBIDDEN, e.getHttpStatus());
         assertFalse(user.isDeleted());
         verify(userRepository, never()).save(user);
-        verifyNoInteractions(userDeviceService, profileImageService, fileStorageService);
+        verifyNoInteractions(userDeviceService, profileImageService, mediaCleanupService);
         verify(authService, never()).revokeRefreshTokens(userId);
     }
 
@@ -126,10 +124,8 @@ class UserAccountDeletionTest {
         when(authService.confirmsIdentity(user, "pw", null)).thenReturn(true);
         when(authService.unusablePasswordHash()).thenReturn("random-hash");
 
-        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(user).build();
-        PostMediaEntity media = PostMediaEntity.builder().mediaKey("u/POST_FEED/p.mp4").thumbnailKey("u/POST_FEED/t.jpg").build();
-        when(postCrudRepository.findLiveByUserId(userId)).thenReturn(List.of(post));
-        when(postMediaRepository.findByPostIdOrderByPositionAsc(post.getId())).thenReturn(List.of(media));
+        when(postMediaRepository.findMediaKeysOfLivePosts(userId)).thenReturn(List.of("u/POST_FEED/p.mp4"));
+        when(postMediaRepository.findThumbnailKeysOfLivePosts(userId)).thenReturn(List.of("u/POST_FEED/t.jpg"));
 
         assertEquals(Operation.DELETED, service.deleteMyAccount(userId, new DeleteAccountRequest("pw", null)));
 
@@ -139,10 +135,11 @@ class UserAccountDeletionTest {
         order.verify(profileImageService).deleteProfileImage(userId);
         order.verify(userRepository).save(user);
 
-        assertTrue(post.isDeleted());
-        verify(postCrudRepository).save(post);
-        verify(fileStorageService).deleteObject("u/POST_FEED/p.mp4");
-        verify(fileStorageService).deleteObject("u/POST_FEED/t.jpg");
+        // rows first, then the files in the background: a file left behind is an orphan, not a linked leftover
+        InOrder posts = inOrder(postMediaRepository, postCrudRepository, mediaCleanupService);
+        posts.verify(postMediaRepository).deleteAllOfLivePosts(userId);
+        posts.verify(postCrudRepository).softDeleteAllByUserId(userId);
+        posts.verify(mediaCleanupService).deleteObjects(List.of("u/POST_FEED/p.mp4", "u/POST_FEED/t.jpg"));
         verify(commentRepository).overwriteContentByUserId(userId, "[deleted]");
         verify(likeRepository).deleteAllByUserId(userId);
         verify(followRepository).deleteAllByUserId(userId);
@@ -157,6 +154,18 @@ class UserAccountDeletionTest {
         assertNull(user.getProfileImage());
         assertEquals("random-hash", user.getPassword());
         assertFalse(oldPassword != null && oldPassword.equals(user.getPassword()));
+    }
+
+    @Test
+    void anAccountWithoutPostsStartsNoCleanup() {
+        UserEntity user = user(Role.USER);
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
+        when(authService.confirmsIdentity(user, "pw", null)).thenReturn(true);
+
+        service.deleteMyAccount(userId, new DeleteAccountRequest("pw", null));
+
+        verifyNoInteractions(mediaCleanupService);
+        verify(postCrudRepository).softDeleteAllByUserId(userId);
     }
 
     @Test

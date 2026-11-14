@@ -52,6 +52,8 @@ public class PostServiceTest {
     @Mock
     private UserBlockRepository userBlockRepository;
     @Mock
+    private MediaCleanupService mediaCleanupService;
+    @Mock
     private PostCrudRepository postCrudRepository;
     @Mock
     private PostMediaRepository postMediaRepository;
@@ -659,9 +661,10 @@ public class PostServiceTest {
         assertEquals(Operation.DELETED, result);
         assertTrue(post.isDeleted());
         verify(postCrudRepository).save(post);
-        verify(fileStorageService).deleteObject("object/a.jpg");
-        verify(fileStorageService).deleteObject("object/b.mp4");
-        verify(fileStorageService).deleteObject("object/b_thumb.jpg");
+        // the rows go with the post, the files follow in the background
+        verify(postMediaRepository).deleteAllByPostId(postId);
+        verify(mediaCleanupService).deleteObjects(List.of("object/a.jpg", "object/b.mp4", "object/b_thumb.jpg"));
+        verifyNoInteractions(fileStorageService);
     }
 
     @Test

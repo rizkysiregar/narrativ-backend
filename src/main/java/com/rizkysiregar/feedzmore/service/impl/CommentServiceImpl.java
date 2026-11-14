@@ -56,6 +56,10 @@ public class CommentServiceImpl implements CommentService {
         // add new comment
         PostEntity post = postCrudRepository.findInteractableById(postId)
                 .orElseThrow(() -> new EntityNotFoundException("Post Not Found"));
+        // a block hides the post for both sides, so it answers like a post that is gone
+        if (userBlockRepository.existsBetween(userId, post.getUser().getId())) {
+            throw new EntityNotFoundException("Post Not Found");
+        }
 
         // replies are one level deep: parent is always the top-level comment, replyTo is the comment answered
         CommentEntity replyTo = null;
@@ -65,6 +69,10 @@ public class CommentServiceImpl implements CommentService {
                     .orElseThrow(() -> new EntityNotFoundException("Parent comment not found"));
             if (replyTo.getModerationStatus() == ModerationStatus.TAKEN_DOWN
                     || !post.getId().equals(replyTo.getPost().getId())) {
+                throw new EntityNotFoundException("Parent comment not found");
+            }
+            // no reply, and so no notification, to someone on either side of a block
+            if (userBlockRepository.existsBetween(userId, replyTo.getUser().getId())) {
                 throw new EntityNotFoundException("Parent comment not found");
             }
             parentComment = replyTo.getParent() != null ? replyTo.getParent() : replyTo;

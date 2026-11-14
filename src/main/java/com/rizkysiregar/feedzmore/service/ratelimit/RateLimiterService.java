@@ -32,6 +32,14 @@ public class RateLimiterService {
     @Value("${app.rate-limit.auth}")
     private int authLimit;
 
+    // endpoints that prove ownership with a password (account deletion): few tries, slowly refilled, so a stolen
+    // access token cannot be used to guess the password
+    @Value("${app.rate-limit.sensitive:5}")
+    private int sensitiveLimit;
+
+    public static final String SENSITIVE = "sensitive";
+    private static final Duration SENSITIVE_WINDOW = Duration.ofMinutes(15);
+
     private final ProxyManager<String> proxyManager;
 
     public RateLimiterService(@Lazy ProxyManager<String> proxyManager) {
@@ -60,13 +68,15 @@ public class RateLimiterService {
             case "post-upload" -> postUploadLimit;
             case "interaction" -> interactionLimit;
             case "auth" -> authLimit;
+            case SENSITIVE -> sensitiveLimit;
             default -> defaultLimit;
         };
+        Duration window = SENSITIVE.equals(endpointType) ? SENSITIVE_WINDOW : Duration.ofMinutes(1);
 
         return BucketConfiguration.builder()
                 .addLimit(limit -> limit
                         .capacity(capacity)
-                        .refillGreedy(capacity, Duration.ofMinutes(1)))
+                        .refillGreedy(capacity, window))
                 .build();
     }
 }

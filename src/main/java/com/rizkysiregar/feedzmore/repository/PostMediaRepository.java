@@ -26,6 +26,17 @@ public interface PostMediaRepository extends JpaRepository<PostMediaEntity, UUID
     @Query("SELECT m.thumbnailKey FROM PostMediaEntity m WHERE m.thumbnailKey IN :keys")
     List<String> findReferencedThumbnailKeys(@Param("keys") Collection<String> keys);
 
+    /** Object keys of the media and thumbnails of every post of the user that is not deleted yet. */
+    @Query("SELECT m.mediaKey FROM PostMediaEntity m WHERE m.postId IN (SELECT p.id FROM PostEntity p WHERE p.user.id = :userId AND p.isDeleted = false)")
+    List<String> findMediaKeysOfLivePosts(@Param("userId") UUID userId);
+
+    @Query("SELECT m.thumbnailKey FROM PostMediaEntity m WHERE m.thumbnailKey IS NOT NULL AND m.postId IN (SELECT p.id FROM PostEntity p WHERE p.user.id = :userId AND p.isDeleted = false)")
+    List<String> findThumbnailKeysOfLivePosts(@Param("userId") UUID userId);
+
+    @Modifying
+    @Query("DELETE FROM PostMediaEntity m WHERE m.postId IN (SELECT p.id FROM PostEntity p WHERE p.user.id = :userId AND p.isDeleted = false)")
+    int deleteAllOfLivePosts(@Param("userId") UUID userId);
+
     @Modifying
     @Query("DELETE FROM PostMediaEntity m WHERE m.postId = :postId")
     int deleteAllByPostId(@Param("postId") UUID postId);

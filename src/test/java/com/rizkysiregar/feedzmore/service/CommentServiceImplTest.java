@@ -110,7 +110,7 @@ class CommentServiceImplTest {
     void addComment_cannotReplyToATakenDownComment() {
         UUID postId = UUID.randomUUID();
         UUID parentId = UUID.randomUUID();
-        when(postCrudRepository.findInteractableById(postId)).thenReturn(Optional.of(PostEntity.builder().id(postId).build()));
+        when(postCrudRepository.findInteractableById(postId)).thenReturn(Optional.of(PostEntity.builder().id(postId).user(user("owner")).build()));
         when(commentRepository.findById(parentId)).thenReturn(Optional.of(
                 CommentEntity.builder().id(parentId).moderationStatus(ModerationStatus.TAKEN_DOWN).build()));
 
@@ -148,7 +148,7 @@ class CommentServiceImplTest {
 
     @Test
     void addComment_replyToATopLevelCommentPointsParentAndReplyToAtIt() {
-        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).build();
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(user("owner")).build();
         UserEntity author = user("ani");
         UserEntity replier = user("budi");
         CommentEntity root = comment(post, author, null);
@@ -165,7 +165,7 @@ class CommentServiceImplTest {
 
     @Test
     void addComment_replyToAReplyStaysOneLevelDeepAndTagsTheAnsweredComment() {
-        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).build();
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(user("owner")).build();
         UserEntity ani = user("ani");
         UserEntity budi = user("budi");
         UserEntity citra = user("citra");
@@ -189,7 +189,7 @@ class CommentServiceImplTest {
 
     @Test
     void addComment_replyingToYourOwnCommentDoesNotNotifyAnyone() {
-        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).build();
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(user("owner")).build();
         UserEntity ani = user("ani");
         CommentEntity root = comment(post, ani, null);
         when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
@@ -203,7 +203,7 @@ class CommentServiceImplTest {
 
     @Test
     void addComment_topLevelCommentDoesNotNotifyAnyone() {
-        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).build();
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(user("owner")).build();
         UserEntity ani = user("ani");
         when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
         when(userRepository.findById(ani.getId())).thenReturn(Optional.of(ani));
@@ -215,8 +215,8 @@ class CommentServiceImplTest {
 
     @Test
     void addComment_cannotReplyToACommentOfAnotherPost() {
-        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).build();
-        PostEntity otherPost = PostEntity.builder().id(UUID.randomUUID()).build();
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(user("owner")).build();
+        PostEntity otherPost = PostEntity.builder().id(UUID.randomUUID()).user(user("owner")).build();
         CommentEntity foreign = comment(otherPost, user("ani"), null);
         when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
         when(commentRepository.findById(foreign.getId())).thenReturn(Optional.of(foreign));
@@ -330,7 +330,7 @@ class CommentServiceImplTest {
 
     @Test
     void addComment_savesTheTextWithoutSurroundingSpaces() {
-        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).build();
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(user("owner")).build();
         UserEntity ani = user("ani");
         when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
         when(userRepository.findById(ani.getId())).thenReturn(Optional.of(ani));
@@ -343,5 +343,38 @@ class CommentServiceImplTest {
     private void assertBadRequest(org.junit.jupiter.api.function.Executable call) {
         BusinessException error = assertThrows(BusinessException.class, call);
         assertEquals(HttpStatus.BAD_REQUEST, error.getHttpStatus());
+    }
+
+    @Test
+    void addComment_onThePostOfSomeoneBlockedIsNotFound() {
+        UserEntity owner = user("owner");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(owner).build();
+        UUID commenter = UUID.randomUUID();
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+        when(userBlockRepository.existsBetween(commenter, owner.getId())).thenReturn(true);
+
+        assertThrows(EntityNotFoundException.class, () -> commentService.addComment(post.getId(), commenter, "hi", null));
+
+        verify(commentRepository, never()).save(any());
+        verifyNoInteractions(commentEventPublisher);
+    }
+
+    @Test
+    void addComment_replyToSomeoneBlockedIsNotFoundAndNobodyIsNotified() {
+        UserEntity owner = user("owner");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(owner).build();
+        UserEntity blockedAuthor = user("ani");
+        CommentEntity root = comment(post, blockedAuthor, null);
+        UUID replier = UUID.randomUUID();
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+        when(commentRepository.findById(root.getId())).thenReturn(Optional.of(root));
+        when(userBlockRepository.existsBetween(replier, owner.getId())).thenReturn(false);
+        when(userBlockRepository.existsBetween(replier, blockedAuthor.getId())).thenReturn(true);
+
+        assertThrows(EntityNotFoundException.class,
+                () -> commentService.addComment(post.getId(), replier, "setuju", root.getId()));
+
+        verify(commentRepository, never()).save(any());
+        verifyNoInteractions(commentEventPublisher);
     }
 }
