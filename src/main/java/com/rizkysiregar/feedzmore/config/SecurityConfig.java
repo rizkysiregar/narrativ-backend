@@ -11,7 +11,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -20,7 +19,9 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
@@ -43,6 +44,10 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins}")
     String[] corsAllowedOrigins;
 
+    // false in prod (application-prod.yml): the API documentation is not served there, so its paths are not opened either
+    @Value("${springdoc.swagger-ui.enabled:true}")
+    private boolean swaggerUiEnabled;
+
     @Autowired
     private UserDetailsService userDetailsService;
 
@@ -64,15 +69,22 @@ public class SecurityConfig {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(request -> request
-                        .requestMatchers(Constants.JWT_WHITELIST.toArray(String[]::new)).permitAll()
+                .authorizeHttpRequests(request -> {
+                    request.requestMatchers(Constants.JWT_WHITELIST.toArray(String[]::new)).permitAll();
+                    if (swaggerUiEnabled) {
+                        request.requestMatchers(Constants.SWAGGER_WHITELIST.toArray(String[]::new)).permitAll();
+                    }
+                    request
                         // dedicated management port is not routed by the Service/Ingress, so probes and Prometheus need no login there
                         .requestMatchers(managementPortProbesAndMetrics()).permitAll()
                         // only health and info are public (kubernetes probes); metrics/prometheus/etc. need an admin
                         .requestMatchers("/actuator/**", "/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated())
-                .httpBasic(Customizer.withDefaults())
-                .exceptionHandling(exceptions -> exceptions.accessDeniedHandler(accessDeniedHandler))
+                        .anyRequest().authenticated();
+                })
+                .exceptionHandling(exceptions -> exceptions
+                        // without httpBasic the default for a missing login would be 403; clients rely on 401 to refresh their token
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        .accessDeniedHandler(accessDeniedHandler))
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
