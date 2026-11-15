@@ -76,6 +76,7 @@ class ApiLanguageIntegrationTest {
     }
 
     @Value("${local.server.port}") int port;
+    @org.springframework.beans.factory.annotation.Autowired org.thymeleaf.TemplateEngine templateEngine;
 
     private final HttpClient client = HttpClient.newHttpClient();
 
@@ -127,5 +128,29 @@ class ApiLanguageIntegrationTest {
                 .contains("username: Username wajib diisi");
         assertThat(call("POST", "/validate", "en", "{\"username\":\"\"}").body())
                 .contains("username: Username is required");
+    }
+
+    private String render(String template, java.util.Locale locale, java.util.Map<String, Object> variables) {
+        org.thymeleaf.context.Context context = new org.thymeleaf.context.Context(locale);
+        context.setVariables(variables);
+        return templateEngine.process("email/" + template, context);
+    }
+
+    @Test
+    void emailTemplatesAreWrittenInTheRecipientsLanguage() {
+        java.util.Locale id = java.util.Locale.of("id");
+
+        assertThat(render("otp-email.html", java.util.Locale.ENGLISH, java.util.Map.of("otp", "123456")))
+                .contains("Do not share this code with anyone.").contains("123456").doesNotContain("??");
+        assertThat(render("otp-email.html", id, java.util.Map.of("otp", "123456")))
+                .contains("Jangan bagikan kode ini kepada siapa pun.").doesNotContain("??");
+
+        var reply = java.util.Map.<String, Object>of("username", "ani", "replierUsername", "budi", "commentPreview", "hi");
+        assertThat(render("comment-reply", java.util.Locale.ENGLISH, reply)).contains("replied to your comment:").doesNotContain("??");
+        assertThat(render("comment-reply", id, reply)).contains("membalas komentar Anda:").doesNotContain("??");
+
+        var status = java.util.Map.<String, Object>of("username", "ani", "isSuccess", true, "postTitle", "t", "actionUrl", "https://x");
+        assertThat(render("post-status", java.util.Locale.ENGLISH, status)).contains("Post Published!").doesNotContain("??");
+        assertThat(render("post-status", id, status)).contains("Postingan Terbit!").doesNotContain("??");
     }
 }

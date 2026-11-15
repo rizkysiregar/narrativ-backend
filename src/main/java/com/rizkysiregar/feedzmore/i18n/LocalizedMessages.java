@@ -2,6 +2,7 @@ package com.rizkysiregar.feedzmore.i18n;
 
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContext;
 import org.springframework.context.i18n.LocaleContextHolder;
 
 import java.text.MessageFormat;
@@ -36,6 +37,38 @@ public final class LocalizedMessages {
             return english(message, args);
         }
         return source.getMessage("GlobalMessage." + message.name(), args, english(message, args), locale);
+    }
+
+    /** Free text (emails) by key; {@code defaultText} is the English text and is used when the bundle has no entry. */
+    public static String text(String key, Locale locale, String defaultText, Object... args) {
+        MessageSource source = messageSource;
+        if (source == null) {
+            return args == null || args.length == 0 ? defaultText : MessageFormat.format(defaultText, args);
+        }
+        return source.getMessage(key, args, defaultText, locale);
+    }
+
+    /**
+     * The supported language for a stored language tag such as "id-ID", "in_ID" (old Android code for Indonesian) or
+     * "en-US". Anything else, or nothing, is English.
+     */
+    public static Locale supportedLocale(String languageTag) {
+        if (languageTag == null || languageTag.isBlank()) {
+            return I18nConfig.ENGLISH;
+        }
+        String language = languageTag.trim().toLowerCase(Locale.ROOT).split("[-_]")[0];
+        return language.equals("id") || language.equals("in") ? I18nConfig.INDONESIAN : I18nConfig.ENGLISH;
+    }
+
+    /** Runs {@code action} with {@code locale} as the current language (consumers have no request to take it from). */
+    public static void withLocale(Locale locale, Runnable action) {
+        LocaleContext previous = LocaleContextHolder.getLocaleContext();
+        LocaleContextHolder.setLocale(locale);
+        try {
+            action.run();
+        } finally {
+            LocaleContextHolder.setLocaleContext(previous);
+        }
     }
 
     /** The default (English) text, with the args filled in. */

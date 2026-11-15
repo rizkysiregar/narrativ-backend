@@ -1,6 +1,8 @@
 package com.rizkysiregar.feedzmore.service.impl;
 
 
+import com.rizkysiregar.feedzmore.i18n.LocalizedMessages;
+import org.springframework.context.i18n.LocaleContextHolder;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.constant.ObjectStorageTypeGroup;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
@@ -262,7 +264,8 @@ public class PostServiceImpl implements PostService {
         emailProps.put("username", user.getUsername());
         emailProps.put("isSuccess", true);
         // the email shows this as the post title; a media-only post has no caption
-        emailProps.put("postTitle", caption != null ? caption : "Untitled post (" + mediaKeys.size() + " media)");
+        emailProps.put("postTitle", caption != null ? caption : LocalizedMessages.text(
+                "email.post.untitled", LocaleContextHolder.getLocale(), "Untitled post ({0} media)", mediaKeys.size()));
 
         PostEntity postEntity = postCrudRepository.save(
                 PostEntity.builder()
@@ -296,6 +299,7 @@ public class PostServiceImpl implements PostService {
                 .createdAt(postEntity.getCreatedAt())
                 .email(user.getEmail())
                 .emailProps(emailProps)
+                .locale(LocaleContextHolder.getLocale().getLanguage())
                 .build();
 
         // Only once the post and its media are committed: the consumers and the media worker look them up by id.

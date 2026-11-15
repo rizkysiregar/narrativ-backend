@@ -24,4 +24,6 @@ public class PostCreatedEvent {
     @ToString.Exclude // author email, the events are logged on publish and consume
     private String email;
     private Map<String, Object> emailProps;
+    /** Language of the request that created the post ("en" or "id"), so the status email reads in it. Null on old events. */
+    private String locale;
 }

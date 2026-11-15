@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Post Status Update</title>
+    <title th:text="#{email.post.subject}">Your post status</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f7;">
 <table border="0" cellpadding="0" cellspacing="0" width="100%">
@@ -15,7 +15,7 @@
                 <tr>
                     <td th:style="'padding: 20px; text-align: center; color: white; background-color: ' + (${isSuccess} ? '#22c55e' : '#ef4444')">
                         <h2 style="margin: 0; text-transform: uppercase; letter-spacing: 1px;"
-                            th:text="${isSuccess} ? 'Post Published!' : 'Post Failed'">
+                            th:text="${isSuccess} ? #{email.post.published} : #{email.post.failed}">
                             Status Notification
                         </h2>
                     </td>
@@ -24,23 +24,23 @@
                 <tr>
                     <td style="padding: 40px 30px;">
                         <p style="font-size: 16px; color: #374151; line-height: 1.6;">
-                            Hi <strong th:text="${username}">User</strong>,
+                            <span th:text="#{email.greeting}">Hi</span> <strong th:text="${username}">User</strong>,
                         </p>
 
                         <p style="font-size: 16px; color: #374151; line-height: 1.6;"
-                           th:text="${isSuccess} ? 'Great news! Your post has been successfully uploaded to the feed.' : 'We encountered an issue while trying to upload your post.'">
+                           th:text="${isSuccess} ? #{email.post.successBody} : #{email.post.failBody}">
                             Status message goes here.
                         </p>
 
                         <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 20px; margin: 25px 0;">
-                            <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b7280;"><strong>Post Title:</strong>
+                            <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b7280;"><strong th:text="#{email.post.titleLabel}">Post Title:</strong>
                             </p>
                             <p style="margin: 0; font-size: 18px; color: #111827; font-weight: 600;"
                                th:text="${postTitle}">The title of your post</p>
 
                             <div th:if="${!isSuccess}"
                                  style="margin-top: 15px; border-top: 1px dashed #ef4444; padding-top: 10px;">
-                                <p style="margin: 0; font-size: 14px; color: #ef4444;"><strong>Error Detail:</strong>
+                                <p style="margin: 0; font-size: 14px; color: #ef4444;"><strong th:text="#{email.post.errorDetail}">Error Detail:</strong>
                                 </p>
                                 <p style="margin: 0; font-size: 14px; color: #b91c1c;" th:text="${errorMessage}">Unknown
                                     error occurred.</p>
@@ -50,7 +50,7 @@
                         <div align="center" style="margin-top: 30px;">
                             <a th:href="${actionUrl}"
                                th:style="'display: inline-block; padding: 12px 24px; border-radius: 5px; color: #ffffff; text-decoration: none; font-weight: bold; background-color: ' + (${isSuccess} ? '#16a34a' : '#1f2937')">
-                                <span th:text="${isSuccess} ? 'View My Feed' : 'Try Again'">Action</span>
+                                <span th:text="${isSuccess} ? #{email.post.viewFeed} : #{email.post.tryAgain}">Action</span>
                             </a>
                         </div>
                     </td>

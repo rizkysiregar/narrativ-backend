@@ -15,6 +15,8 @@ import java.util.UUID;
 public interface UserDeviceRepository extends JpaRepository<UserDeviceEntity, UUID> {
     Optional<UserDeviceEntity> findByPushToken(String pushToken);
     List<UserDeviceEntity> findByUserIdAndIsActiveTrue(UUID userId);
+    /** The device the user used last, active or not: the best hint of their language when no request is around. */
+    Optional<UserDeviceEntity> findFirstByUserIdOrderByUpdateAtDesc(UUID userId);
     void deleteByPushToken(String pushToken);
 
     @Modifying

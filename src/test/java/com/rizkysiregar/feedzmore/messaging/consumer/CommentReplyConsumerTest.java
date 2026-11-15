@@ -95,9 +95,24 @@ class CommentReplyConsumerTest {
 
         consumer.handleCommentReplied(event);
 
-        verify(emailService).sendEmailTemplate(eq("ani@mail.com"), eq("budi membalas komentar Anda"),
+        verify(emailService).sendEmailTemplate(eq("ani@mail.com"), eq("budi replied to your comment"),
                 eq("comment-reply"), any());
         verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void emailsInTheLanguageOfTheRecipientsLastDevice() {
+        reserve(true);
+        when(userRepository.findById(recipientId)).thenReturn(Optional.of(recipient));
+        when(userDeviceService.getActiveDevice(recipientId)).thenReturn(List.of());
+        when(userDeviceService.preferredLocale(recipientId)).thenReturn(java.util.Locale.of("id"));
+
+        consumer.handleCommentReplied(event);
+
+        // no MessageSource in a plain unit test, so the subject falls back to English; the language reaches the
+        // template through the locale context (covered end to end in ApiLanguageIntegrationTest)
+        verify(emailService).sendEmailTemplate(eq("ani@mail.com"), eq("budi replied to your comment"),
+                eq("comment-reply"), any());
     }
 
     @Test

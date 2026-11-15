@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Balasan komentar</title>
+    <title th:text="#{email.commentReply.title}">New reply</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f7;">
 <table border="0" cellpadding="0" cellspacing="0" width="100%">
@@ -13,22 +13,22 @@
                    style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                 <tr>
                     <td style="padding: 20px; text-align: center; color: white; background-color: #3b82f6;">
-                        <h2 style="margin: 0; letter-spacing: 1px;">Balasan baru</h2>
+                        <h2 style="margin: 0; letter-spacing: 1px;" th:text="#{email.commentReply.title}">New reply</h2>
                     </td>
                 </tr>
                 <tr>
                     <td style="padding: 40px 30px;">
                         <p style="font-size: 16px; color: #374151; line-height: 1.6;">
-                            Hai <strong th:text="${username}">User</strong>,
+                            <span th:text="#{email.greeting}">Hi</span> <strong th:text="${username}">User</strong>,
                         </p>
                         <p style="font-size: 16px; color: #374151; line-height: 1.6;">
-                            <strong th:text="${replierUsername}">someone</strong> membalas komentar Anda:
+                            <strong th:text="${replierUsername}">someone</strong> <span th:text="#{email.commentReply.repliedToYou}">replied to your comment:</span>
                         </p>
                         <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 20px; margin: 25px 0;">
                             <p style="margin: 0; font-size: 16px; color: #111827;" th:text="${commentPreview}">Reply</p>
                         </div>
                         <p style="font-size: 14px; color: #6b7280; line-height: 1.6;">
-                            Buka aplikasi Feedzmore untuk membalasnya.
+                            <span th:text="#{email.commentReply.openApp}">Open the Feedzmore app to reply.</span>
                         </p>
                     </td>
                 </tr>
