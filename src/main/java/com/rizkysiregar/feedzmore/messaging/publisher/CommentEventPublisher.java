@@ -22,7 +22,7 @@ public class CommentEventPublisher {
     @Async("postEventExecutor")
     public void publishCommentReplied(CommentRepliedEvent event) {
         String eventId = event.getCommentId().toString();
-        log.info("PUBLISHING EVENT id={} {}", eventId, event);
+        log.debug("EVENT.PUBLISH type=CommentReplied id={} commentId={}", eventId, event.getCommentId());
         try {
             rabbitTemplate.convertAndSend(
                     RabbitMQConfig.POST_EXCHANGE,
@@ -31,7 +31,7 @@ public class CommentEventPublisher {
                     new CorrelationData(eventId)
             );
         } catch (Exception e) {
-            log.error("Failed to publish CommentRepliedEvent id={} commentId={}: {}",
+            log.error("EVENT.PUBLISH.FAILED type=CommentReplied id={} commentId={} reason={}",
                     eventId, event.getCommentId(), e.getMessage());
         }
     }

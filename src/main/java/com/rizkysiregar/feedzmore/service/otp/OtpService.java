@@ -50,11 +50,11 @@ public class OtpService implements IOtpService {
         if (registered) {
             boolean sendStatus = emailService.sendOtpEmail(email, otp);
             if (!sendStatus) {
-                log.error("## Failed to send OTP to email: {}", EmailMasking.maskEmail(email));
+                log.error("OTP.SEND.FAILED email={}", EmailMasking.maskEmail(email));
                 throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
             }
         } else {
-            log.info("## OTP requested for an email without an account: {}", EmailMasking.maskEmail(email));
+            log.debug("OTP.REQUEST.IGNORED reason=no_account email={}", EmailMasking.maskEmail(email));
         }
 
         challenge.store(email, otp);

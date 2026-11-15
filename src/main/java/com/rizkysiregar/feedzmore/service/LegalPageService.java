@@ -100,7 +100,7 @@ public class LegalPageService {
             fragments.put(document, byLanguage);
         }
         if (contactEmail.isEmpty()) {
-            log.warn("LEGAL.CONTACT.EMAIL.MISSING: set LEGAL_CONTACT_EMAIL, the legal pages show no contact address");
+            log.warn("LEGAL.CONTACT.EMAIL.MISSING hint=\"set LEGAL_CONTACT_EMAIL, the legal pages show no contact address\"");
         }
     }
 

@@ -40,13 +40,13 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
         // carry their status: they are the caller's mistake, not a server failure
         if (e instanceof ErrorResponse errorResponse && errorResponse.getStatusCode().is4xxClientError()) {
             HttpStatus status = HttpStatus.valueOf(errorResponse.getStatusCode().value());
-            log.warn("{} {}", e.getClass().getSimpleName(), e.getMessage());
+            log.warn("HTTP.CLIENT.ERROR type={} message={}", e.getClass().getSimpleName(), e.getMessage());
             return new ResponseEntity<>(BaseResponse.builder()
                     .code(String.valueOf(status.value()))
                     .message(clientErrorMessage(status))
                     .build(), status);
         }
-        log.error("Exception = ", e);
+        log.error("HTTP.UNHANDLED.EXCEPTION", e);
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.INTERNAL_ERROR.getCode())
                 .message(GlobalMessage.INTERNAL_ERROR.getMessage())
@@ -65,7 +65,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     // services throw this when a row they were asked for does not exist
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<?> entityNotFound(EntityNotFoundException e) {
-        log.warn("EntityNotFoundException: {}", e.getMessage());
+        log.warn("HTTP.ENTITY.NOT.FOUND message={}", e.getMessage());
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.NOT_FOUND.getCode())
                 .message(GlobalMessage.NOT_FOUND.getMessage())
@@ -74,7 +74,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<?> uploadTooLarge(MaxUploadSizeExceededException e) {
-        log.warn("Upload rejected, too large");
+        log.warn("HTTP.UPLOAD.TOO.LARGE");
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE.getCode())
                 .message(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE.getMessage())
@@ -83,7 +83,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<?> unreadableRequestBody(HttpMessageNotReadableException e) {
-        log.warn("Unable to read request body: {}", e.getClass().getSimpleName());
+        log.warn("HTTP.BODY.UNREADABLE type={}", e.getClass().getSimpleName());
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.BAD_REQUEST.getCode())
                 .message(GlobalMessage.BAD_REQUEST.getMessage())
@@ -95,9 +95,9 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     public ResponseEntity<?> businessException(BusinessException e) {
         // 4xx is an expected outcome (validation, not found, forbidden): one line, no stack trace
         if (e.getHttpStatus() != null && e.getHttpStatus().is5xxServerError()) {
-            log.error("BusinessException = ", e);
+            log.error("BUSINESS.EXCEPTION status={} code={}", e.getHttpStatus(), e.getCode(), e);
         } else {
-            log.warn("BusinessException {} {}: {}", e.getHttpStatus(), e.getCode(), e.getMessage());
+            log.warn("BUSINESS.EXCEPTION status={} code={} message={}", e.getHttpStatus(), e.getCode(), e.getMessage());
         }
         return new ResponseEntity<>(
                 BaseResponse.builder()
@@ -111,7 +111,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ExceptionHandler(BadCredentialsException.class)
     @ResponseStatus(value = HttpStatus.UNAUTHORIZED)
     public ResponseEntity<?> badCredentialsException(BadCredentialsException e) {
-        log.warn("BadCredentialsException = ", e);
+        log.warn("AUTH.BAD.CREDENTIALS");
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.UNAUTHORIZED.getCode())
                 .message(GlobalMessage.BAD_CREDENTIALS.getMessage())
@@ -122,7 +122,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ExceptionHandler(DisabledException.class)
     @ResponseStatus(value = HttpStatus.UNAUTHORIZED)
     public ResponseEntity<?> disabledException(DisabledException e) {
-        log.warn("DisabledException = {}", e.getMessage());
+        log.warn("AUTH.USER.DISABLED message={}", e.getMessage());
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.USER_DISABLED.getCode())
                 .message(GlobalMessage.USER_DISABLED.getMessage())
@@ -132,7 +132,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
 
     @ExceptionHandler(AuthorizationDeniedException.class)
     public ResponseEntity<?> handleAccessDenied(AuthorizationDeniedException ex) {
-        log.warn("AuthorizationDeniedException Adviser Handler");
+        log.warn("AUTH.ACCESS.DENIED");
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.ACCESS_DENIED.getCode())
                 .message(GlobalMessage.ACCESS_DENIED.getMessage())
@@ -156,7 +156,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
                 })
                 .collect(Collectors.joining("; "));
 
-        log.warn("Method validation failed: {}", errorMessage);
+        log.warn("VALIDATION.FAILED kind=method message={}", errorMessage);
 
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.BAD_REQUEST.getCode())
@@ -169,7 +169,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     @ResponseStatus(value = HttpStatus.BAD_REQUEST)
     public ResponseEntity<?> methodArgumentTypeMismatchException(MethodArgumentTypeMismatchException ex) {
-        log.warn("Invalid value for parameter {}", ex.getName());
+        log.warn("VALIDATION.FAILED kind=param param={}", ex.getName());
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.BAD_REQUEST.getCode())
                 .message("Invalid value for parameter '" + ex.getName() + "'")
@@ -186,7 +186,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .collect(Collectors.joining("; "));
 
-        log.warn("Validation failed: {}", errorMessage);
+        log.warn("VALIDATION.FAILED kind=body message={}", errorMessage);
 
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.BAD_REQUEST.getCode())
@@ -198,7 +198,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ExceptionHandler(UsernameNotFoundException.class)
     @ResponseStatus(value = HttpStatus.UNAUTHORIZED)
     public ResponseEntity<?> usernameNotFoundException(UsernameNotFoundException unfe) {
-        log.warn("Method Arguments not Valid Exception = ", unfe);
+        log.warn("AUTH.USER.NOT.FOUND message={}", unfe.getMessage());
         return new ResponseEntity<>(BaseResponse.builder()
                 .code(GlobalMessage.BAD_CREDENTIALS.getCode())
                 .message(GlobalMessage.BAD_CREDENTIALS.getMessage())
@@ -209,7 +209,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ExceptionHandler(ConstraintViolationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<?> handleConstraintViolationException(ConstraintViolationException ex) {
-        log.warn("## handleConstraintViolationException = ", ex);
+        log.warn("VALIDATION.FAILED kind=constraint message={}", ex.getMessage());
 //        Map<String, String> errors = new HashMap<>();
 //        ex.getConstraintViolations().forEach(cv -> {
 //            String field = cv.getPropertyPath().iterator().next().getName();

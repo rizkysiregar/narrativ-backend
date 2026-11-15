@@ -29,7 +29,7 @@ public class PostEventPublisher {
     public void publishPostCreatedEvent(PostCreatedEvent event) {
         String eventId = resolveEventId(event);
         CorrelationData correlationData = new CorrelationData(eventId);
-        log.info("PUBLISHING EVENT id={} {}", eventId, event);
+        log.debug("EVENT.PUBLISH type=PostCreated id={} postId={}", eventId, event.getPostId());
         try {
             rabbitTemplate.convertAndSend(
                     RabbitMQConfig.POST_EXCHANGE,
@@ -38,7 +38,7 @@ public class PostEventPublisher {
                     correlationData
             );
         } catch (Exception e) {
-            log.error("Failed to publish PostCreatedEvent id={} postId={}: {}",
+            log.error("EVENT.PUBLISH.FAILED type=PostCreated id={} postId={} reason={}",
                     eventId, event.getPostId(), e.getMessage());
         }
     }
@@ -54,7 +54,7 @@ public class PostEventPublisher {
                 ? event.getPostId().toString()
                 : UUID.randomUUID().toString();
         CorrelationData correlationData = new CorrelationData(eventId);
-        log.info("PUBLISHING EVENT id={} {}", eventId, event);
+        log.debug("EVENT.PUBLISH type=VideoThumbnailRequested id={} postId={}", eventId, event.getPostId());
         try {
             rabbitTemplate.convertAndSend(
                     RabbitMQConfig.POST_EXCHANGE,
@@ -63,7 +63,7 @@ public class PostEventPublisher {
                     correlationData
             );
         } catch (Exception e) {
-            log.error("Failed to publish VideoThumbnailRequestedEvent id={} postId={}: {}",
+            log.error("EVENT.PUBLISH.FAILED type=VideoThumbnailRequested id={} postId={} reason={}",
                     eventId, event.getPostId(), e.getMessage());
         }
     }

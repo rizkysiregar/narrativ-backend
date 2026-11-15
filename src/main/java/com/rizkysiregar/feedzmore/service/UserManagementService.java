@@ -129,7 +129,7 @@ public class UserManagementService {
         user.setDeleted(true);
         userRepository.save(user);
 
-        log.info("USER.ACCOUNT.DELETED: userId={}", currentUserId);
+        log.info("USER.ACCOUNT.DELETED userId={}", currentUserId);
         return Operation.DELETED;
     }
 
@@ -151,7 +151,7 @@ public class UserManagementService {
     }
 
     public PaginatedResponse<AdminUserDetailDTO> searchUsersForAdmin(AdminUserSearchRequest request, Pageable pageable) {
-        log.info("Admin search users request: {}", request);
+        log.debug("ADMIN.USER.SEARCH request={}", request);
 
         Role role = parseEnum(Role.class, request.role());
         String statusFilter = request.status() == null || request.status().isBlank()

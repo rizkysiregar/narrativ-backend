@@ -51,7 +51,7 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public String uploadFile(MultipartFile file, String userId, String featureName) throws Exception {
-        log.info(":: UPLOAD.MINIO: {}, {}", file.getOriginalFilename(), userId);
+        log.debug("STORAGE.UPLOAD fileName={} userId={}", file.getOriginalFilename(), userId);
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String originalName = file.getOriginalFilename();
         String extension = "";
@@ -97,7 +97,7 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public String getPresignUploadUrl(String objectName, String contentType) throws Exception {
-        log.info(":: PRESIGN.UPLOAD.MINIO: {}", objectName);
+        log.debug("STORAGE.PRESIGN.UPLOAD objectKey={}", objectName);
         return minioClient.getPresignedObjectUrl(
                 GetPresignedObjectUrlArgs.builder()
                         .bucket(bucketName)
@@ -125,17 +125,17 @@ public class FileStorageServiceImpl implements FileStorageService {
         } catch (ErrorResponseException e) {
             String code = e.errorResponse() != null ? e.errorResponse().code() : null;
             if ("NoSuchKey".equals(code) || "NoSuchBucket".equals(code) || "NoSuchObject".equals(code)) {
-                log.warn(":: STAT.MINIO.OBJECT.NOT.FOUND: {} code={}", objectName, code);
+                log.debug("STORAGE.STAT.NOT.FOUND objectKey={} code={}", objectName, code);
                 throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
             }
             // the ids let a failure be traced in the MinIO log and in Cloudflare
             String amzRequestId = e.response() == null ? null : e.response().header("x-amz-request-id");
             String cfRay = e.response() == null ? null : e.response().header("cf-ray");
-            log.error(":: STAT.MINIO.FAILED: {} code={} message={} amzRequestId={} cfRay={}",
+            log.error("STORAGE.STAT.FAILED objectKey={} code={} message={} amzRequestId={} cfRay={}",
                     objectName, code, e.getMessage(), amzRequestId, cfRay);
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (Exception e) {
-            log.error(":: STAT.MINIO.OBJECT.FAILED: {}, because of {}", objectName, e.getMessage());
+            log.error("STORAGE.STAT.FAILED objectKey={} reason={}", objectName, e.getMessage());
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -169,7 +169,7 @@ public class FileStorageServiceImpl implements FileStorageService {
                     .build();
 
         } catch (Exception e) {
-            log.error(":: get object failed, objectName: {}", objectName);
+            log.error("STORAGE.GET.FAILED objectKey={} reason={}", objectName, e.getMessage());
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -212,9 +212,9 @@ public class FileStorageServiceImpl implements FileStorageService {
                             .object(objectName)
                             .build()
             );
-            log.info(":: DELETED.MINIO.OBJECT: {}", objectName);
+            log.debug("STORAGE.DELETED objectKey={}", objectName);
         } catch (Exception e) {
-            log.error(":: failed to delete object {} because of {}", objectName, e.getMessage());
+            log.error("STORAGE.DELETE.FAILED objectKey={} reason={}", objectName, e.getMessage());
         }
     }
 }

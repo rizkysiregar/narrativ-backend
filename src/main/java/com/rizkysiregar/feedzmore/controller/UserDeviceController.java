@@ -32,7 +32,7 @@ public class UserDeviceController {
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestBody @Valid RegisterDeviceRequest request
     ) {
-        log.info("Registering device for user {}", userPrincipal.getUsername());
+        log.debug("DEVICE.REGISTER username={}", userPrincipal.getUsername());
         userDeviceService.registerOrUpdatedDevice(userPrincipal.getUserId(), request);
         return Operation.CREATED;
     }

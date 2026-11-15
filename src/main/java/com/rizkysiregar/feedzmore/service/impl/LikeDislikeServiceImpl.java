@@ -32,7 +32,7 @@ public class LikeDislikeServiceImpl implements LikeDislikeService {
 
     @Override
     public Operation likePost(UUID postId, UUID userId) {
-        log.info("FEED.LIKE: USER.ID {} | POST.ID {}", userId, postId);
+        log.debug("POST.LIKE userId={} postId={}", userId, postId);
 
         if (!userRepository.existsById(userId)) {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
@@ -65,7 +65,7 @@ public class LikeDislikeServiceImpl implements LikeDislikeService {
     @Transactional
     @Override
     public Operation dislikePost(UUID postId, UUID userId) {
-        log.info("FEED.DISLIKE: USER.ID {} | POST.ID {}", userId, postId);
+        log.debug("POST.DISLIKE userId={} postId={}", userId, postId);
         int deletedCount = likeRepository.deleteDirectly(userId, postId);
 
         if (deletedCount == 0) {
@@ -76,7 +76,7 @@ public class LikeDislikeServiceImpl implements LikeDislikeService {
 
     @Override
     public PostLikeCountDTO getLikePostCount(UUID postId) {
-        log.info("FEED.LIKE.COUNT: {}", postId);
+        log.debug("POST.LIKE.COUNT postId={}", postId);
         if (!postCrudRepository.existsInteractableById(postId)) {
             throw new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND);
         }

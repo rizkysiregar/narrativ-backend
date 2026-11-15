@@ -56,7 +56,7 @@ public class FirebaseNotificationService {
     }
 
     public Mono<String> sendNotificationToTopic(String topic, String title, String body) {
-        log.info("FIREBASE.NOTIF.TOPIC: {} , title: {}, body: {}", topic, title, body);
+        log.debug("FCM.SEND.TOPIC topic={} title={}", topic, title);
         return tokenService.getAccessToken().flatMap(accessToken -> {
 
             Map<String, Object> requestBody = Map.of(
@@ -81,11 +81,11 @@ public class FirebaseNotificationService {
     }
 
     public void sendNotificationWithUserId(UUID userId, String title, String body) {
-        log.info("FIREBASE.NOTIF.TOKEN: {} , title: {}, body: {}", userId, title, body);
+        log.debug("FCM.SEND.USER userId={} title={}", userId, title);
         List<UserDeviceEntity> devices = userDeviceService.getActiveDevice(userId);
         for (UserDeviceEntity device : devices) {
             sendNotificationToToken(device.getPushToken(), title, body)
-                    .doOnError(ex -> log.error("## error sending notification to deviceId {}", device.getDeviceId(), ex))
+                    .doOnError(ex -> log.error("FCM.SEND.FAILED userId={} deviceId={}", userId, device.getDeviceId(), ex))
                     .subscribe();
         }
     }

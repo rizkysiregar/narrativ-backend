@@ -35,7 +35,7 @@ public class CommentReplyConsumer {
     @RabbitListener(queues = RabbitMQConfig.COMMENT_REPLY_QUEUE)
     public void handleCommentReplied(CommentRepliedEvent event) {
         if (event.getCommentId() == null || event.getRecipientId() == null) {
-            log.warn("COMMENT REPLY NOTIFICATION SKIPPED: missing commentId or recipientId {}", event);
+            log.warn("COMMENT.REPLY.SKIPPED reason=missing_ids commentId={} recipientId={}", event.getCommentId(), event.getRecipientId());
             return;
         }
         if (event.getRecipientId().equals(event.getReplierId())) {
@@ -43,13 +43,13 @@ public class CommentReplyConsumer {
         }
         String eventKey = event.getCommentId().toString();
         if (!deduplicator.tryReserve(RabbitMQConfig.COMMENT_REPLY_CONSUMER, eventKey)) {
-            log.info("COMMENT REPLY NOTIFICATION SKIPPED (already processed) commentId={}", event.getCommentId());
+            log.debug("COMMENT.REPLY.SKIPPED reason=already_processed commentId={}", event.getCommentId());
             return;
         }
         try {
             notifyRecipient(event);
         } catch (RuntimeException e) {
-            log.error("COMMENT REPLY NOTIFICATION FAILED commentId={}: {}", event.getCommentId(), e.getMessage());
+            log.error("COMMENT.REPLY.FAILED commentId={} reason={}", event.getCommentId(), e.getMessage());
             deduplicator.release(RabbitMQConfig.COMMENT_REPLY_CONSUMER, eventKey);
             throw e;
         }
@@ -58,7 +58,7 @@ public class CommentReplyConsumer {
     private void notifyRecipient(CommentRepliedEvent event) {
         UserEntity recipient = userRepository.findById(event.getRecipientId()).orElse(null);
         if (recipient == null || recipient.isDeleted() || recipient.getStatus() != UserStatus.ACTIVE) {
-            log.info("COMMENT REPLY NOTIFICATION SKIPPED: recipient {} is gone or banned", event.getRecipientId());
+            log.debug("COMMENT.REPLY.SKIPPED reason=recipient_unavailable recipientId={}", event.getRecipientId());
             return;
         }
 
@@ -68,7 +68,7 @@ public class CommentReplyConsumer {
                     Constants.NOTIFICATION_COMMENT_REPLY_TITLE,
                     String.format(Constants.NOTIFICATION_COMMENT_REPLY_BODY,
                             event.getReplierUsername(), event.getContentPreview()));
-            log.info("COMMENT REPLY PUSHED commentId={} to {}", event.getCommentId(), recipient.getId());
+            log.info("COMMENT.REPLY.PUSHED commentId={} recipientId={}", event.getCommentId(), recipient.getId());
             return;
         }
 
@@ -79,6 +79,6 @@ public class CommentReplyConsumer {
                 Map.of("username", recipient.getUsername(),
                         "replierUsername", event.getReplierUsername(),
                         "commentPreview", event.getContentPreview()));
-        log.info("COMMENT REPLY EMAILED commentId={} to {}", event.getCommentId(), recipient.getId());
+        log.info("COMMENT.REPLY.EMAILED commentId={} recipientId={}", event.getCommentId(), recipient.getId());
     }
 }

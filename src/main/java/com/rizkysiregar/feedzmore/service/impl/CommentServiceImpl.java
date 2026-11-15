@@ -173,7 +173,7 @@ public class CommentServiceImpl implements CommentService {
         }
         commentRepository.delete(comment);
         commentRepository.flush();
-        log.info("COMMENT.DELETED: id={} by={} asPostOwner={}", commentId, requesterId, !isAuthor);
+        log.info("COMMENT.DELETED commentId={} requesterId={} asPostOwner={}", commentId, requesterId, !isAuthor);
         return Operation.DELETED;
     }
 

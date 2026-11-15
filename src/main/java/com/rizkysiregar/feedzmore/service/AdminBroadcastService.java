@@ -62,7 +62,7 @@ public class AdminBroadcastService {
                     .sendNotificationToTopic(request.getTopic(), request.getTitle(), request.getBody())
                     .block(SEND_TIMEOUT);
         } catch (Exception e) {
-            log.error("BROADCAST.FAILED topic={} reason={}", request.getTopic(), e.getMessage());
+            log.error("ADMIN.BROADCAST.FAILED topic={} reason={}", request.getTopic(), e.getMessage());
             record(adminId, request, BroadcastStatus.FAILED, null, truncate(e.getMessage()));
             throw new BusinessException(GlobalMessage.BROADCAST_FAILED, HttpStatus.BAD_GATEWAY);
         }

@@ -44,7 +44,7 @@ public class FirebaseSchedulerService {
     @Scheduled(fixedRate = 8 * 60 * 60 * 1000) // Every 8 hours or (28,800,000 ms)
     //@Scheduled(fixedRate = 10 * 1000) // Runs every 10 seconds or (10,000 ms) for testing
     public void sendSchedulerNotification() {
-        log.info("NOTIF.SHECDULER.SET");
+        log.debug("NOTIF.SCHEDULER.TICK");
         Optional<JobExecutionLog> logOpt = jobExecutionLogRepository.findById(FIREBASE_BROADCAST_JOB);
         LocalDateTime now = LocalDateTime.now();
         if (logOpt.isEmpty()) {
@@ -64,13 +64,13 @@ public class FirebaseSchedulerService {
                 );
 
                 responseMono.subscribe(
-                        response -> log.info("Scheduler Notification Response {}", response),
-                        error -> log.error("Error sending scheduler notification", error)
+                        response -> log.info("NOTIF.SCHEDULER.SENT response={}", response),
+                        error -> log.error("NOTIF.SCHEDULER.FAILED", error)
                 );
                 jobExecutionLog.setLastExecutedAt(now);
                 jobExecutionLogRepository.save(jobExecutionLog);
             } else {
-                log.warn("No casual notification template found for notification template");
+                log.warn("NOTIF.SCHEDULER.SKIPPED reason=no_casual_template");
             }
         }
     }
