@@ -37,6 +37,35 @@ firebase:
   # alternative for local development: the key itself (single line JSON). The file wins when both are set
   credentials-json: ${FIREBASE_CREDENTIALS_JSON:}
 app:
+  appcheck:
+    # off: nothing is checked. log: requests are checked and the outcome is logged and counted, none is refused.
+    # enforce: a request without a valid Firebase App Check token is refused with 403.
+    # A rule below can only be milder than this mode, so "off" here stops every check at once.
+    mode: ${APP_APPCHECK_MODE:off}
+    # number (digits, not the id) of this environment's Firebase project; required unless the mode is off
+    project-number: ${APP_APPCHECK_PROJECT_NUMBER:}
+    header: X-Firebase-AppCheck
+    # Only what the mobile app calls is listed. The admin paths (/admin/**, /auth/admin/**, /auth/register-admin) are
+    # not: the web admin cannot attest with Play Integrity, and those paths sit behind a JWT with the ADMIN role.
+    # allowed-apps (Firebase app ids) can narrow a rule to specific apps; empty accepts any app of the project.
+    rules:
+      # anonymous endpoints: no JWT stands in the way yet, so these are what scripts and bots go for first
+      - paths:
+          - /auth/register/**
+          - /auth/login
+          - /auth/google
+          - /auth/forgot-password
+          - /auth/verify-otp
+          - /auth/reset-password
+      # signed in endpoints: already behind a JWT and a rate limit, so they are only observed for now
+      - paths:
+          - /users/**
+          - /posts/**
+          - /reports/**
+          - /notifications/**
+          - /devices/**
+          - /files/**
+        mode: log
   legal:
     # shown on the public privacy policy, terms and account deletion pages; prod refuses to start without it
     contact-email: ${LEGAL_CONTACT_EMAIL:}

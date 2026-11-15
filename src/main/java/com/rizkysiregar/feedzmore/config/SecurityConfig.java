@@ -1,5 +1,6 @@
 package com.rizkysiregar.feedzmore.config;
 
+import com.rizkysiregar.feedzmore.filter.AppCheckFilter;
 import com.rizkysiregar.feedzmore.filter.JwtFilter;
 import com.rizkysiregar.feedzmore.constant.Constants;
 import com.rizkysiregar.feedzmore.filter.RateLimitFilter;
@@ -59,6 +60,9 @@ public class SecurityConfig {
     private RateLimitFilter rateLimitFilter;
 
     @Autowired
+    private AppCheckFilter appCheckFilter;
+
+    @Autowired
     private JsonAccessDeniedHandler accessDeniedHandler;
 
     // set via MANAGEMENT_SERVER_PORT; empty when actuator shares the application port
@@ -90,6 +94,8 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                // first of the three: a request from anything but the real app is refused before a JWT is parsed or a rate limit bucket is spent
+                .addFilterBefore(appCheckFilter, JwtFilter.class)
                 .addFilterAfter(rateLimitFilter, JwtFilter.class)
                 .build();
     }

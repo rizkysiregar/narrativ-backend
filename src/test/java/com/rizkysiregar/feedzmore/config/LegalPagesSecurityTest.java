@@ -1,6 +1,7 @@
 package com.rizkysiregar.feedzmore.config;
 
 import com.rizkysiregar.feedzmore.controller.LegalController;
+import com.rizkysiregar.feedzmore.filter.AppCheckFilter;
 import com.rizkysiregar.feedzmore.filter.JwtFilter;
 import com.rizkysiregar.feedzmore.filter.RateLimitFilter;
 import com.rizkysiregar.feedzmore.service.LegalPageService;
@@ -54,6 +55,7 @@ class LegalPagesSecurityTest {
     @MockitoBean JsonAccessDeniedHandler accessDeniedHandler;
     @MockitoBean JwtFilter jwtFilter;
     @MockitoBean RateLimitFilter rateLimitFilter;
+    @MockitoBean AppCheckFilter appCheckFilter;
 
     @Value("${local.server.port}") int port;
 
@@ -61,7 +63,7 @@ class LegalPagesSecurityTest {
 
     @BeforeEach
     void passThroughFilters() throws Exception {
-        for (Object filter : new Object[]{jwtFilter, rateLimitFilter}) {
+        for (Object filter : new Object[]{jwtFilter, rateLimitFilter, appCheckFilter}) {
             doAnswer(call -> {
                 call.<FilterChain>getArgument(2).doFilter(call.getArgument(0), call.getArgument(1));
                 return null;

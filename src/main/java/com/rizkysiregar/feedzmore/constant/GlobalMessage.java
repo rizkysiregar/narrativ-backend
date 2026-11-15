@@ -54,6 +54,7 @@ public enum GlobalMessage {
     CONFIRMATION_FAILED("403", "Konfirmasi gagal. Periksa kembali kata sandi atau akun Google Anda."),
     CANNOT_BLOCK_SELF("400", "Anda tidak dapat memblokir diri sendiri."),
     EMAIL_ALREADY_TAKEN("400", "Email ini sudah terdaftar. Silakan gunakan email lain atau masuk ke akun Anda."),
+    APP_CHECK_FAILED("403", "Aplikasi tidak dapat diverifikasi. Perbarui Feedzmore dari Play Store lalu coba lagi."),
     EMAIL_NOT_VERIFIED("400", "Email Anda belum diverifikasi. Minta kode OTP dan verifikasi emailnya dulu, ya."),
     ;
 
