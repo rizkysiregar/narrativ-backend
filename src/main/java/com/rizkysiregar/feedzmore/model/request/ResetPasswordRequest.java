@@ -25,8 +25,8 @@ public class ResetPasswordRequest {
     String resetToken;
 
     @NotBlank
-    @Size(min = 8, max = 64, message = "The length of the password should be between 8 and 64")
-    @MaxUtf8Bytes(value = 72, message = "The password is too long, use fewer characters")
+    @Size(min = 8, max = 64, message = "{validation.password.size}")
+    @MaxUtf8Bytes(value = 72, message = "{validation.password.tooLongHint}")
     @ToString.Exclude
     String newPassword;
 }

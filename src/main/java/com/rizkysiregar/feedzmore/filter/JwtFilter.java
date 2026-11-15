@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rizkysiregar.feedzmore.constant.Constants;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.model.UserPrincipal;
+import com.rizkysiregar.feedzmore.exception.BusinessException;
 import com.rizkysiregar.feedzmore.model.response.BaseResponse;
 import com.rizkysiregar.feedzmore.service.JWTService;
 import com.rizkysiregar.feedzmore.util.BanMessages;
@@ -76,8 +77,9 @@ public class JwtFilter extends OncePerRequestFilter {
 
                 if (userDetails instanceof UserPrincipal principal && principal.isBanned()) {
                     log.warn("AUTH.JWT.REJECTED reason=banned username={}", username);
-                    writeUnauthorizedResponse(response, GlobalMessage.USER_BANNED.getCode(),
-                            BanMessages.bannedMessage(principal.getBanReason()));
+                    BusinessException banned = BanMessages.bannedException(principal.getBanReason());
+                    BaseResponse<Void> body = BaseResponse.error(banned.getGlobalMessage(), banned.getArgs());
+                    writeUnauthorizedResponse(response, body);
                     return;
                 }
 
@@ -121,10 +123,10 @@ public class JwtFilter extends OncePerRequestFilter {
     }
 
     private void writeUnauthorizedResponse(HttpServletResponse response, GlobalMessage message) throws IOException {
-        writeUnauthorizedResponse(response, message.getCode(), message.getMessage());
+        writeUnauthorizedResponse(response, BaseResponse.error(message));
     }
 
-    private void writeUnauthorizedResponse(HttpServletResponse response, String code, String message) throws IOException {
+    private void writeUnauthorizedResponse(HttpServletResponse response, BaseResponse<?> body) throws IOException {
         if (response.isCommitted()) {
             return;
         }
@@ -132,11 +134,6 @@ public class JwtFilter extends OncePerRequestFilter {
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-
-        BaseResponse<?> body = BaseResponse.builder()
-                .code(code)
-                .message(message)
-                .build();
 
         objectMapper.writeValue(response.getWriter(), body);
     }

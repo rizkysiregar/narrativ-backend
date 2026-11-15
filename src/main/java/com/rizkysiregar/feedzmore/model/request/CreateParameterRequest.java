@@ -6,16 +6,16 @@ import jakarta.validation.constraints.Size;
 
 public record CreateParameterRequest(
         // the key is what the code looks a parameter up by, so it cannot be changed afterwards
-        @NotBlank(message = "Key is required")
+        @NotBlank(message = "{validation.key.required}")
         @Pattern(regexp = "^[a-z][a-z0-9_.-]{2,99}$",
-                message = "Key must be 3-100 characters: lower case letters, digits, '.', '_' or '-', starting with a letter")
+                message = "{validation.key.pattern}")
         String paramKey,
 
-        @NotBlank(message = "Value is required")
-        @Size(max = 255, message = "The length of the value should be at most 255")
+        @NotBlank(message = "{validation.value.required}")
+        @Size(max = 255, message = "{validation.value.max255}")
         String paramValue,
 
-        @NotBlank(message = "Description is required")
-        @Size(max = 255, message = "The length of the description should be at most 255")
+        @NotBlank(message = "{validation.description.required}")
+        @Size(max = 255, message = "{validation.description.max255}")
         String description
 ) {}

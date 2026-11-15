@@ -17,10 +17,10 @@ public final class BanMessages {
         if (reason == null || reason.isBlank()) {
             return new BusinessException(GlobalMessage.USER_BANNED, HttpStatus.UNAUTHORIZED);
         }
-        return new BusinessException(GlobalMessage.USER_BANNED, "Alasan: " + reason.trim(), HttpStatus.UNAUTHORIZED);
+        return new BusinessException(GlobalMessage.USER_BANNED_REASON, HttpStatus.UNAUTHORIZED, reason.trim());
     }
 
     public static String bannedMessage(String reason) {
-        return bannedException(reason).getMessage();
+        return bannedException(reason).getLocalizedMessage();
     }
 }

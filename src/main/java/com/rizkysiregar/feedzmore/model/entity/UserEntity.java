@@ -23,32 +23,32 @@ public class UserEntity {
     private UUID id;
 
     @Column(nullable = false, unique = true, length = 16)
-    @NotBlank(message = "Username is required")
-    @NotEmpty(message = "Username cannot be empty")
-    @Size(min = 3, max = 16, message = "The length of the username should be between 3 and 15")
+    @NotBlank(message = "{validation.username.required}")
+    @NotEmpty(message = "{validation.username.empty}")
+    @Size(min = 3, max = 16, message = "{validation.username.size15}")
     private String username;
 
-    @NotBlank(message = "Password is required")
-    @NotEmpty(message = "Password cannot be empty")
+    @NotBlank(message = "{validation.password.required}")
+    @NotEmpty(message = "{validation.password.empty}")
     @Size(min = 3)
     private String password;
 
     @Column(nullable = false, unique = true)
-    @Email(message = "Email should be valid")
-    @NotBlank(message = "Email is required")
+    @Email(message = "{validation.email.invalid}")
+    @NotBlank(message = "{validation.email.required}")
     private String email;
 
     @Column(length = 50)
-    @NotEmpty(message = "First name cannot be empty")
+    @NotEmpty(message = "{validation.firstName.empty}")
     private String firstName;
 
     @Column(length = 50)
-    @NotEmpty(message = "Last name cannot be empty")
+    @NotEmpty(message = "{validation.lastName.empty}")
     private String lastName;
 
     @Column(length = 13)
-    @Pattern(regexp = "^[0-9]+$", message = "Phone number must contain only digits")
-    @Size(min = 10, max = 13, message = "Phone number must be between 10 and 13 digits")
+    @Pattern(regexp = "^[0-9]+$", message = "{validation.phone.digits}")
+    @Size(min = 10, max = 13, message = "{validation.phone.size}")
     private String phoneNumber;
 
     @Column(nullable = false, updatable = false)

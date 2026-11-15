@@ -14,16 +14,16 @@ import lombok.Data;
 @Data
 public class BroadcastNotificationRequest {
 
-    @NotBlank(message = "Title is required")
-    @Size(max = 100, message = "The length of the title should be at most 100")
+    @NotBlank(message = "{validation.title.required}")
+    @Size(max = 100, message = "{validation.title.max100}")
     String title;
 
     // an FCM topic name; "global" reaches everybody
-    @NotBlank(message = "Topic is required")
-    @Pattern(regexp = "^[a-zA-Z0-9\\-_.~%]{1,100}$", message = "Topic may only contain letters, digits and - _ . ~ %")
+    @NotBlank(message = "{validation.topic.required}")
+    @Pattern(regexp = "^[a-zA-Z0-9\\-_.~%]{1,100}$", message = "{validation.topic.pattern}")
     String topic;
 
-    @NotBlank(message = "Body is required")
-    @Size(max = 500, message = "The length of the body should be at most 500")
+    @NotBlank(message = "{validation.body.required}")
+    @Size(max = 500, message = "{validation.body.max500}")
     String body;
 }

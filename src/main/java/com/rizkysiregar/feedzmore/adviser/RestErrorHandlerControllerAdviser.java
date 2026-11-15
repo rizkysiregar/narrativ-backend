@@ -2,6 +2,7 @@ package com.rizkysiregar.feedzmore.adviser;
 
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.exception.BusinessException;
+import com.rizkysiregar.feedzmore.i18n.LocalizedMessages;
 import com.rizkysiregar.feedzmore.model.response.BaseResponse;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
@@ -41,53 +42,61 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
         if (e instanceof ErrorResponse errorResponse && errorResponse.getStatusCode().is4xxClientError()) {
             HttpStatus status = HttpStatus.valueOf(errorResponse.getStatusCode().value());
             log.warn("HTTP.CLIENT.ERROR type={} message={}", e.getClass().getSimpleName(), e.getMessage());
-            return new ResponseEntity<>(BaseResponse.builder()
-                    .code(String.valueOf(status.value()))
-                    .message(clientErrorMessage(status))
-                    .build(), status);
+            return new ResponseEntity<>(clientError(status), status);
         }
         log.error("HTTP.UNHANDLED.EXCEPTION", e);
-        return new ResponseEntity<>(BaseResponse.builder()
-                .code(GlobalMessage.INTERNAL_ERROR.getCode())
-                .message(GlobalMessage.INTERNAL_ERROR.getMessage())
-                .build(),
+        return new ResponseEntity<>(BaseResponse.error(GlobalMessage.INTERNAL_ERROR),
                 HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    private static String clientErrorMessage(HttpStatus status) {
+    private static BaseResponse<Void> clientError(HttpStatus status) {
         return switch (status) {
-            case BAD_REQUEST -> GlobalMessage.BAD_REQUEST.getMessage();
-            case NOT_FOUND -> GlobalMessage.NOT_FOUND.getMessage();
-            default -> status.getReasonPhrase();
+            case BAD_REQUEST -> BaseResponse.error(GlobalMessage.BAD_REQUEST);
+            case NOT_FOUND -> BaseResponse.error(GlobalMessage.NOT_FOUND);
+            default -> BaseResponse.<Void>builder()
+                    .code(String.valueOf(status.value()))
+                    .message(status.getReasonPhrase())
+                    .build();
         };
+    }
+
+    // the field names and the messages (already in the caller's language, from the validation annotations) are all
+    // there is to tell, so there is nothing for a client to fill in
+    private static BaseResponse<Void> validationError(String message) {
+        BaseResponse<Void> body = BaseResponse.error(GlobalMessage.BAD_REQUEST);
+        body.setMessage(message);
+        return body;
+    }
+
+    private static BaseResponse<Void> businessBody(BusinessException e) {
+        BaseResponse<Void> body = BaseResponse.<Void>builder()
+                .code(e.getCode())
+                .message(e.getLocalizedMessage())
+                .errorCode(e.getErrorCode())
+                .build();
+        if (e.getArgs() != null) {
+            body.setArgs(LocalizedMessages.stringArgs(e.getArgs()));
+        }
+        return body;
     }
 
     // services throw this when a row they were asked for does not exist
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<?> entityNotFound(EntityNotFoundException e) {
         log.warn("HTTP.ENTITY.NOT.FOUND message={}", e.getMessage());
-        return new ResponseEntity<>(BaseResponse.builder()
-                .code(GlobalMessage.NOT_FOUND.getCode())
-                .message(GlobalMessage.NOT_FOUND.getMessage())
-                .build(), HttpStatus.NOT_FOUND);
+        return new ResponseEntity<>(BaseResponse.error(GlobalMessage.NOT_FOUND), HttpStatus.NOT_FOUND);
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<?> uploadTooLarge(MaxUploadSizeExceededException e) {
         log.warn("HTTP.UPLOAD.TOO.LARGE");
-        return new ResponseEntity<>(BaseResponse.builder()
-                .code(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE.getCode())
-                .message(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE.getMessage())
-                .build(), HttpStatus.PAYLOAD_TOO_LARGE);
+        return new ResponseEntity<>(BaseResponse.error(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE), HttpStatus.PAYLOAD_TOO_LARGE);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<?> unreadableRequestBody(HttpMessageNotReadableException e) {
         log.warn("HTTP.BODY.UNREADABLE type={}", e.getClass().getSimpleName());
-        return new ResponseEntity<>(BaseResponse.builder()
-                .code(GlobalMessage.BAD_REQUEST.getCode())
-                .message(GlobalMessage.BAD_REQUEST.getMessage())
-                .build(), HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(BaseResponse.error(GlobalMessage.BAD_REQUEST), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(BusinessException.class)
@@ -100,10 +109,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
             log.warn("BUSINESS.EXCEPTION status={} code={} message={}", e.getHttpStatus(), e.getCode(), e.getMessage());
         }
         return new ResponseEntity<>(
-                BaseResponse.builder()
-                        .code(e.getCode())
-                        .message(e.getMessage())
-                        .build(),
+                businessBody(e),
                 e.getHttpStatus()
         );
     }
@@ -112,10 +118,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ResponseStatus(value = HttpStatus.UNAUTHORIZED)
     public ResponseEntity<?> badCredentialsException(BadCredentialsException e) {
         log.warn("AUTH.BAD.CREDENTIALS");
-        return new ResponseEntity<>(BaseResponse.builder()
-                .code(GlobalMessage.UNAUTHORIZED.getCode())
-                .message(GlobalMessage.BAD_CREDENTIALS.getMessage())
-                .build(),
+        return new ResponseEntity<>(BaseResponse.error(GlobalMessage.BAD_CREDENTIALS),
                 HttpStatus.UNAUTHORIZED);
     }
 
@@ -123,20 +126,14 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ResponseStatus(value = HttpStatus.UNAUTHORIZED)
     public ResponseEntity<?> disabledException(DisabledException e) {
         log.warn("AUTH.USER.DISABLED message={}", e.getMessage());
-        return new ResponseEntity<>(BaseResponse.builder()
-                .code(GlobalMessage.USER_DISABLED.getCode())
-                .message(GlobalMessage.USER_DISABLED.getMessage())
-                .build(),
+        return new ResponseEntity<>(BaseResponse.error(GlobalMessage.USER_DISABLED),
                 HttpStatus.UNAUTHORIZED);
     }
 
     @ExceptionHandler(AuthorizationDeniedException.class)
     public ResponseEntity<?> handleAccessDenied(AuthorizationDeniedException ex) {
         log.warn("AUTH.ACCESS.DENIED");
-        return new ResponseEntity<>(BaseResponse.builder()
-                .code(GlobalMessage.ACCESS_DENIED.getCode())
-                .message(GlobalMessage.ACCESS_DENIED.getMessage())
-                .build(),
+        return new ResponseEntity<>(BaseResponse.error(GlobalMessage.ACCESS_DENIED),
                 HttpStatus.FORBIDDEN
         );
     }
@@ -158,10 +155,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
 
         log.warn("VALIDATION.FAILED kind=method message={}", errorMessage);
 
-        return new ResponseEntity<>(BaseResponse.builder()
-                .code(GlobalMessage.BAD_REQUEST.getCode())
-                .message(errorMessage.isBlank() ? GlobalMessage.BAD_REQUEST.getMessage() : errorMessage)
-                .build(),
+        return new ResponseEntity<>(errorMessage.isBlank() ? BaseResponse.error(GlobalMessage.BAD_REQUEST) : validationError(errorMessage),
                 HttpStatus.BAD_REQUEST);
     }
 
@@ -170,10 +164,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ResponseStatus(value = HttpStatus.BAD_REQUEST)
     public ResponseEntity<?> methodArgumentTypeMismatchException(MethodArgumentTypeMismatchException ex) {
         log.warn("VALIDATION.FAILED kind=param param={}", ex.getName());
-        return new ResponseEntity<>(BaseResponse.builder()
-                .code(GlobalMessage.BAD_REQUEST.getCode())
-                .message("Invalid value for parameter '" + ex.getName() + "'")
-                .build(),
+        return new ResponseEntity<>(BaseResponse.error(GlobalMessage.INVALID_PARAMETER, ex.getName()),
                 HttpStatus.BAD_REQUEST);
     }
 
@@ -188,10 +179,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
 
         log.warn("VALIDATION.FAILED kind=body message={}", errorMessage);
 
-        return new ResponseEntity<>(BaseResponse.builder()
-                .code(GlobalMessage.BAD_REQUEST.getCode())
-                .message(errorMessage)
-                .build(),
+        return new ResponseEntity<>(validationError(errorMessage),
                 HttpStatus.BAD_REQUEST);
     }
 
@@ -199,10 +187,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
     @ResponseStatus(value = HttpStatus.UNAUTHORIZED)
     public ResponseEntity<?> usernameNotFoundException(UsernameNotFoundException unfe) {
         log.warn("AUTH.USER.NOT.FOUND message={}", unfe.getMessage());
-        return new ResponseEntity<>(BaseResponse.builder()
-                .code(GlobalMessage.BAD_CREDENTIALS.getCode())
-                .message(GlobalMessage.BAD_CREDENTIALS.getMessage())
-                .build(),
+        return new ResponseEntity<>(BaseResponse.error(GlobalMessage.BAD_CREDENTIALS),
                 HttpStatus.UNAUTHORIZED);
     }
 
@@ -217,10 +202,7 @@ public class RestErrorHandlerControllerAdviser implements ErrorController {
 //        });
 //        return errors;
 
-        return new ResponseEntity<>(BaseResponse.builder()
-                .code(GlobalMessage.BAD_REQUEST.getCode())
-                .message(GlobalMessage.BAD_REQUEST.getMessage())
-                .build(),
+        return new ResponseEntity<>(BaseResponse.error(GlobalMessage.BAD_REQUEST),
                 HttpStatus.BAD_REQUEST);
     }
 

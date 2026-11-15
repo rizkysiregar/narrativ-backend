@@ -90,7 +90,7 @@ class JwtFilterTest {
         filter().doFilter(authorizedRequest(), response, filterChain);
 
         assertEquals(401, response.getStatus());
-        assertTrue(response.getContentAsString().contains("Akun Anda telah diblokir oleh admin. Alasan: posting spam"));
+        assertTrue(response.getContentAsString().contains("Your account has been banned by an admin. Reason: posting spam"));
         assertNull(SecurityContextHolder.getContext().getAuthentication());
         verifyNoInteractions(filterChain);
     }

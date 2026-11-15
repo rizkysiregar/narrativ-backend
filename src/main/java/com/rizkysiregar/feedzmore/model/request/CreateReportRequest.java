@@ -7,16 +7,16 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record CreateReportRequest(
-        @NotNull(message = "Target type is required")
+        @NotNull(message = "{validation.targetType.required}")
         ReportTargetType targetType,
 
-        @NotBlank(message = "Target id is required")
+        @NotBlank(message = "{validation.targetId.required}")
         String targetId,
 
-        @NotNull(message = "Reason is required")
+        @NotNull(message = "{validation.reason.required}")
         ReportReason reason,
 
         // required when the reason is OTHER, checked in the service
-        @Size(max = 500, message = "The length of the description should be at most 500")
+        @Size(max = 500, message = "{validation.description.max500}")
         String description
 ) {}

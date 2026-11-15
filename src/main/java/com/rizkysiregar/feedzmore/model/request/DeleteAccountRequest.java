@@ -7,10 +7,10 @@ import jakarta.validation.constraints.Size;
  * a fresh Google id token. One of the two is required, checked in the service.
  */
 public record DeleteAccountRequest(
-        @Size(max = 255, message = "Password is too long")
+        @Size(max = 255, message = "{validation.password.tooLong}")
         String password,
 
-        @Size(max = 4096, message = "Token is too long")
+        @Size(max = 4096, message = "{validation.token.tooLong}")
         String idToken
 ) {
     @Override
