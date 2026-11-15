@@ -209,9 +209,8 @@ Use `.env.example` as the complete configuration contract. Every variable used b
 For the `dev` profile:
 
 - Copy non-sensitive variables from `.env.example` to `feedzmore-config`.
-- Set `SPRING_PROFILES_ACTIVE=dev`, not `local-dev` or `tailscale-dev`.
+- Set `SPRING_PROFILES_ACTIVE=dev`, not `local-dev`.
 - Set `DEV_INFRA_HOST=192.168.1.50`.
-- Do not include `TAILSCALE_DEV_HOST`; it is only used by the local `tailscale-dev` profile.
 - Move the sensitive keys listed in section 5 to `feedzmore-secrets` only.
 
 Before the first deployment, compare the ConfigMap and Secret key names against `.env.example`. Never copy the private `.env` file itself into a Pod or image.
