@@ -33,7 +33,7 @@ public class EmailService implements IEmailService {
 
     @Override
     public void sendEmailTemplate(String to, String subject, String templateName, Map<String, Object> variables) {
-        log.info("SEND.TEMPLATE.EMAIL: to {} | subject: {} | templateName: {}", EmailMasking.maskEmail(to), subject, templateName);
+        log.debug("EMAIL.SEND.TEMPLATE to={} subject={} template={}", EmailMasking.maskEmail(to), subject, templateName);
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -52,7 +52,7 @@ public class EmailService implements IEmailService {
 
             mailSender.send(message);
         } catch (Exception e) {
-            log.error("FAILED SEND EMAIL: {} ", e.getMessage());
+            log.error("EMAIL.SEND.FAILED kind=template reason={}", e.getMessage());
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -60,7 +60,7 @@ public class EmailService implements IEmailService {
     @Override
     public void sendEmail(String to, String subject, String body) {
         try {
-            log.info("SEND.EMAIL :{}, subject:{}", EmailMasking.maskEmail(to), subject);
+            log.debug("EMAIL.SEND to={} subject={}", EmailMasking.maskEmail(to), subject);
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(to);
             message.setSubject(subject);
@@ -68,7 +68,7 @@ public class EmailService implements IEmailService {
             message.setFrom("feedzmore.helpdesk@gmail.com");
             mailSender.send(message);
         } catch (Exception e) {
-            log.error("EmailService.sendEmail {}", e.getMessage());
+            log.error("EMAIL.SEND.FAILED kind=plain reason={}", e.getMessage());
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -93,7 +93,7 @@ public class EmailService implements IEmailService {
             mailSender.send(message);
             return true;
         } catch (Exception e) {
-            log.error("EmailService.sendOtpEmail {} ", e.getMessage());
+            log.error("EMAIL.SEND.FAILED kind=otp reason={}", e.getMessage());
             return false;
         }
     }

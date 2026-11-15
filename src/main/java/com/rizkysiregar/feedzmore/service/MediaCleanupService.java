@@ -23,6 +23,6 @@ public class MediaCleanupService {
     public void deleteObjects(List<String> objectKeys) {
         // FileStorageService logs each file it cannot delete
         objectKeys.forEach(fileStorageService::deleteObject);
-        log.info("MEDIA.CLEANUP.DONE: files={}", objectKeys.size());
+        log.info("MEDIA.CLEANUP.DONE files={}", objectKeys.size());
     }
 }

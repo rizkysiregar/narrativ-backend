@@ -98,7 +98,7 @@ public class AppCheckFilter extends OncePerRequestFilter {
         }
 
         if (mode == Mode.LOG) {
-            log.warn("APPCHECK.WOULD.REFUSE method={} path={} outcome={}", request.getMethod(), path, outcome.tag());
+            log.debug("APPCHECK.WOULD.REFUSE method={} path={} outcome={}", request.getMethod(), path, outcome.tag());
             filterChain.doFilter(request, response);
             return;
         }
@@ -122,7 +122,7 @@ public class AppCheckFilter extends OncePerRequestFilter {
         } catch (AppCheckTokenVerifier.InvalidTokenException e) {
             return Outcome.INVALID;
         } catch (AppCheckTokenVerifier.UnavailableException e) {
-            log.error("APPCHECK.UNAVAILABLE the token could not be checked, letting the request through: {}",
+            log.error("APPCHECK.UNAVAILABLE action=allowed reason={}",
                     e.getMessage());
             return Outcome.UNAVAILABLE;
         }

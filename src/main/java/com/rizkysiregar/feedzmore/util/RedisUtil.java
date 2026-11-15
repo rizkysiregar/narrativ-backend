@@ -97,6 +97,6 @@ public class RedisUtil implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        log.info("## [Redis Service run on: ] " + redisHost + ", " + redisPort);
+        log.info("REDIS.CONNECTED host={} port={}", redisHost, redisPort);
     }
 }

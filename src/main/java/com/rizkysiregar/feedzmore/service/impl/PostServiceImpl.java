@@ -81,7 +81,7 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, UUID userId, boolean mediaOnly) {
-        log.info("FETCH.EXPLORE.FEED: {}, size= {} ,userId={}, mediaOnly={}", page, size, userId, mediaOnly);
+        log.debug("FEED.EXPLORE.FETCH page={} size={} userId={} mediaOnly={}", page, size, userId, mediaOnly);
         Pageable pageable = Paging.of(page, size);
         Page<PostEntity> postPage = postPaginationRepository.findAllActivePosts(pageable, mediaOnly, userId);
         return buildPaginatedResponse(postPage, userId);
@@ -95,7 +95,7 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String username, UUID viewerId, boolean mediaOnly) {
-        log.info("FETCH.FEED.BY.USERNAME =  {}, size= {} , username= {}, mediaOnly= {}", page, size, username, mediaOnly);
+        log.debug("FEED.USER.FETCH page={} size={} username={} mediaOnly={}", page, size, username, mediaOnly);
 
         Pageable pageable = Paging.of(page, size);
 
@@ -180,24 +180,24 @@ public class PostServiceImpl implements PostService {
             String thumbnail = media.thumbnailUrl() == null ? null : fileStorageService.getPresignUrl(media.thumbnailUrl());
             return new PostMediaResponse(media.id(), media.type(), fileStorageService.getPresignUrl(media.url()), thumbnail);
         } catch (Exception e) {
-            log.error("## cannot get presign url for objectName= {}, because of= {}", media.url(), e.getMessage());
+            log.error("POST.MEDIA.PRESIGN.FAILED objectKey={} reason={}", media.url(), e.getMessage());
             return media;
         }
     }
 
     @Override
     public CreatePostUploadUrlResponse createUploadUrl(UUID userId, CreatePostUploadUrlRequest request) {
-        log.info("NEW.POST.UPLOAD.URL: {}", userId);
+        log.debug("POST.UPLOAD.URL.REQUESTED userId={}", userId);
 
         UserEntity user = userRepository.findActiveById(userId)
                 .orElseThrow(() -> {
-                    log.error("Active user not found {}", userId);
+                    log.warn("POST.UPLOAD.URL.REJECTED reason=user_not_active userId={}", userId);
                     return new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
                 });
 
         String contentType = request.getContentType();
         if (contentType == null || !isAllowedContentType(contentType)) {
-            log.error("Unsupported media type: {}", contentType);
+            log.warn("POST.UPLOAD.URL.REJECTED reason=unsupported_content_type contentType={}", contentType);
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
@@ -222,7 +222,7 @@ public class PostServiceImpl implements PostService {
                     .expiresInSeconds(PRESIGN_UPLOAD_EXPIRY_SECONDS)
                     .build();
         } catch (Exception e) {
-            log.error("Failed to create presign upload url for user {}: {}", userId, e.getMessage());
+            log.error("POST.UPLOAD.URL.FAILED userId={} reason={}", userId, e.getMessage());
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -230,17 +230,17 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional
     public CreatePostResponse addNewPost(UUID userId, AddPostRequest request) {
-        log.info("NEW.FEED.POST: {}", userId);
+        log.debug("POST.CREATE.START userId={}", userId);
 
         UserEntity user = userRepository.findActiveById(userId)
                 .orElseThrow(() -> {
-                    log.error("Active user not found {}", userId);
+                    log.warn("POST.CREATE.REJECTED reason=user_not_active userId={}", userId);
                     return new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
                 });
 
         String caption = request.getCaption() == null || request.getCaption().isBlank() ? null : request.getCaption();
         if (caption != null && caption.length() > MAX_CAPTION_LENGTH) {
-            log.error("Caption too long: {} chars", caption.length());
+            log.warn("POST.CREATE.REJECTED reason=caption_too_long length={}", caption.length());
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
@@ -249,7 +249,7 @@ public class PostServiceImpl implements PostService {
         if ((caption == null && mediaKeys.isEmpty())
                 || mediaKeys.size() > MAX_MEDIA_PER_POST
                 || new HashSet<>(mediaKeys).size() != mediaKeys.size()) {
-            log.error("Invalid post content: caption={}, mediaCount={}", caption != null, mediaKeys.size());
+            log.warn("POST.CREATE.REJECTED reason=invalid_content hasCaption={} mediaCount={}", caption != null, mediaKeys.size());
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
@@ -284,6 +284,7 @@ public class PostServiceImpl implements PostService {
                     .build());
         }
         List<PostMediaEntity> savedItems = items.isEmpty() ? List.of() : postMediaRepository.saveAll(items);
+        log.info("POST.CREATED postId={} userId={} mediaCount={}", postEntity.getId(), userId, savedItems.size());
 
         // event to publish
         PostCreatedEvent event = PostCreatedEvent.builder()
@@ -320,14 +321,14 @@ public class PostServiceImpl implements PostService {
     /** Checks one uploaded object belongs to the user and fits the size limit; returns its media type. */
     private MediaType validateMedia(UserEntity user, String objectKey) {
         if (objectKey == null || objectKey.isBlank()) {
-            log.error("Object key is empty");
+            log.warn("POST.MEDIA.REJECTED reason=empty_key");
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
         // object must belong to this user and to POST_FEED group
         String expectedPrefix = user.getUsername() + "/" + ObjectStorageTypeGroup.POST_FEED + "/";
         if (!objectKey.startsWith(expectedPrefix)) {
-            log.error("Object key does not belong to user: objectKey={}, userId={}", objectKey, user.getId());
+            log.warn("POST.MEDIA.REJECTED reason=not_owner objectKey={} userId={}", objectKey, user.getId());
             throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);
         }
 
@@ -337,7 +338,7 @@ public class PostServiceImpl implements PostService {
         // failure (e.g. proxy/HEAD hiccup) must not fail the whole post creation.
         MediaType mediaType = resolveMediaTypeFromKey(objectKey);
         if (mediaType == null) {
-            log.error("Unsupported media extension: objectKey={}", objectKey);
+            log.warn("POST.MEDIA.REJECTED reason=unsupported_extension objectKey={}", objectKey);
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
@@ -348,9 +349,9 @@ public class PostServiceImpl implements PostService {
             if (HttpStatus.NOT_FOUND.equals(e.getHttpStatus())) {
                 throw e;
             }
-            log.warn(":: POST.STAT.SKIPPED: objectKey={} reason={}", objectKey, e.getMessage());
+            log.warn("POST.MEDIA.STAT.SKIPPED objectKey={} reason={}", objectKey, e.getMessage());
         } catch (Exception e) {
-            log.warn(":: POST.STAT.SKIPPED: objectKey={} reason={}", objectKey, e.getMessage());
+            log.warn("POST.MEDIA.STAT.SKIPPED objectKey={} reason={}", objectKey, e.getMessage());
         }
 
         // Size validation is a hard business rule and must never be swallowed by
@@ -358,11 +359,11 @@ public class PostServiceImpl implements PostService {
         if (objectStat != null) {
             long size = objectStat.getSize();
             if (mediaType == MediaType.IMAGE && size > MAX_IMAGE_SIZE) {
-                log.error("Image too large: {} bytes", size);
+                log.warn("POST.MEDIA.REJECTED reason=image_too_large objectKey={} bytes={}", objectKey, size);
                 throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
             }
             if (mediaType == MediaType.VIDEO && size > MAX_VIDEO_SIZE) {
-                log.error("Video too large: {} bytes", size);
+                log.warn("POST.MEDIA.REJECTED reason=video_too_large objectKey={} bytes={}", objectKey, size);
                 throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
             }
         }
@@ -372,7 +373,7 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional
     public Operation deletePost(UUID postId, UUID userId) {
-        log.info("SOFT.DELETE.FEED.POST: postId={}, userId={}", postId, userId);
+        log.info("POST.DELETED postId={} userId={}", postId, userId);
 
         PostEntity post = postCrudRepository.findByIdAndIsDeletedFalse(postId)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND));

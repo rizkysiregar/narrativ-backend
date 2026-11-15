@@ -83,7 +83,7 @@ public class RegistrationOtpService implements IRegistrationOtpService {
 
         String otp = OtpChallenge.generateOtp();
         if (!emailService.sendOtpEmail(email, otp)) {
-            log.error("## Failed to send registration OTP to email: {}", EmailMasking.maskEmail(email));
+            log.error("OTP.REGISTRATION.SEND.FAILED email={}", EmailMasking.maskEmail(email));
             redisUtil.delete(cooldownKey); // nothing was sent, so the user may try again right away
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -116,7 +116,7 @@ public class RegistrationOtpService implements IRegistrationOtpService {
         if (actual == null || registrationToken == null || !MessageDigest.isEqual(
                 actual.toString().getBytes(StandardCharsets.UTF_8),
                 registrationToken.getBytes(StandardCharsets.UTF_8))) {
-            log.info("## registrationToken invalid for {}", EmailMasking.maskEmail(email));
+            log.warn("OTP.REGISTRATION.TOKEN.INVALID email={}", EmailMasking.maskEmail(email));
             throw new BusinessException(GlobalMessage.EMAIL_NOT_VERIFIED, HttpStatus.BAD_REQUEST);
         }
         // one time use

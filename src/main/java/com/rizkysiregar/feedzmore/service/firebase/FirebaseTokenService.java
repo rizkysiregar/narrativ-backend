@@ -42,12 +42,12 @@ public class FirebaseTokenService {
         }
         this.projectId = serviceAccount.getProjectId();
         this.credentials = serviceAccount.createScoped(Collections.singletonList(SCOPE));
-        log.info("FIREBASE.CREDENTIALS.LOADED project={}", projectId);
+        log.info("FCM.CREDENTIALS.LOADED project={}", projectId);
     }
 
     @PostConstruct
     public void init() {
-        log.info("FIREBASE.INIT.TOKEN");
+        log.debug("FCM.TOKEN.INIT");
         refreshToken();
     }
 
@@ -60,7 +60,7 @@ public class FirebaseTokenService {
         return Mono.fromSupplier(() -> {
             if (System.currentTimeMillis() >= tokenExpirationTime) {
                 // refresh token
-                log.info("## trying to refresh firebase token");
+                log.debug("FCM.TOKEN.REFRESH");
                 refreshToken();
             }
 

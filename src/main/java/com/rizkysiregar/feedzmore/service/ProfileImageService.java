@@ -56,7 +56,7 @@ public class ProfileImageService {
             String url = fileStorageService.getPresignUploadUrl(objectKey, request.contentType());
             return new ProfileImageUploadUrlResponse(url, objectKey, PRESIGN_UPLOAD_EXPIRY_SECONDS);
         } catch (Exception e) {
-            log.error("PROFILE.IMAGE.PRESIGN.UPLOAD.FAILED: user={} reason={}", userId, e.getMessage());
+            log.error("PROFILE.IMAGE.PRESIGN.UPLOAD.FAILED userId={} reason={}", userId, e.getMessage());
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -117,13 +117,13 @@ public class ProfileImageService {
                 if (HttpStatus.NOT_FOUND.equals(e.getHttpStatus())) {
                     throw e;
                 }
-                log.warn("PROFILE.STAT.FAILED: key={} attempt={}/{} reason={}", objectKey, attempt, STAT_ATTEMPTS, e.getMessage());
+                log.warn("PROFILE.IMAGE.STAT.FAILED key={} attempt={}/{} reason={}", objectKey, attempt, STAT_ATTEMPTS, e.getMessage());
             }
             if (attempt < STAT_ATTEMPTS) {
                 pause();
             }
         }
-        log.warn("PROFILE.STAT.SKIPPED: key={}", objectKey);
+        log.warn("PROFILE.IMAGE.STAT.SKIPPED key={}", objectKey);
         return null;
     }
 

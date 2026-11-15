@@ -51,12 +51,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
         Bucket bucket;
         if (userId != null) {
             String endpointType = resolveEndpointType(request);
-            log.info("RATE.LIMIT.FILTER - userId: {}, endpointType: {}", userId, endpointType);
             bucket = rateLimiterService.resolveBucket(userId, endpointType);
         } else if (isAuthEndpoint(request)) {
             // anonymous caller on login/register/otp/...: there is no user yet, so limit per client IP
             String ip = clientIpResolver.resolve(request);
-            log.info("RATE.LIMIT.FILTER - ip: {}, endpointType: {}", ip, AUTH_ENDPOINT_TYPE);
             bucket = rateLimiterService.resolveIpBucket(ip, AUTH_ENDPOINT_TYPE);
         } else {
             filterChain.doFilter(request, response);
@@ -74,6 +72,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         // Blocked — 429
         long retryAfter = TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill());
+        log.warn("RATELIMIT.BLOCKED userId={} retryAfterSec={}", userId, retryAfter);
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType("application/json");
         response.addHeader("X-Rate-Limit-Retry-After-Seconds", String.valueOf(retryAfter));

@@ -81,10 +81,10 @@ class OtpChallenge {
             return;
         }
 
-        log.info("## OTP not matched, attempt {}/{}", attempts, MAX_VERIFY_ATTEMPTS);
+        log.info("OTP.VERIFY.MISMATCH attempt={}/{}", attempts, MAX_VERIFY_ATTEMPTS);
         if (attempts == MAX_VERIFY_ATTEMPTS) {
             // budget spent: burn the OTP and block both verify and re-send for a while
-            log.warn("## OTP verify limit reached for email: {}", EmailMasking.maskEmail(email));
+            log.warn("OTP.VERIFY.LIMIT.REACHED email={}", EmailMasking.maskEmail(email));
             redisUtil.delete(otpKeyPrefix + email);
             redisUtil.delete(attemptsKey);
             redisUtil.set(lockKeyPrefix + email, "1", LOCK_SECONDS);

@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -74,7 +75,7 @@ public class JwtFilter extends OncePerRequestFilter {
                 validateUserIsEnabled(userDetails);
 
                 if (userDetails instanceof UserPrincipal principal && principal.isBanned()) {
-                    log.warn("Rejected JWT request because user is banned: {}", username);
+                    log.warn("AUTH.JWT.REJECTED reason=banned username={}", username);
                     writeUnauthorizedResponse(response, GlobalMessage.USER_BANNED.getCode(),
                             BanMessages.bannedMessage(principal.getBanReason()));
                     return;
@@ -86,18 +87,19 @@ public class JwtFilter extends OncePerRequestFilter {
 
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
+                    MDC.put(RequestTraceFilter.USER_ID_MDC_KEY, username);
                 }
             }
 
             filterChain.doFilter(request, response);
         } catch (DisabledException exception) {
-            log.warn("Rejected JWT request because user is disabled: {}", exception.getMessage());
+            log.warn("AUTH.JWT.REJECTED reason=disabled detail={}", exception.getMessage());
             writeUnauthorizedResponse(response, GlobalMessage.USER_DISABLED);
         } catch (UsernameNotFoundException exception) {
-            log.warn("Rejected JWT request because user was not found: {}", exception.getMessage());
+            log.warn("AUTH.JWT.REJECTED reason=user_not_found detail={}", exception.getMessage());
             writeUnauthorizedResponse(response, GlobalMessage.BAD_CREDENTIALS);
         } catch (JwtException | IllegalArgumentException exception) {
-            log.warn("Rejected JWT request because token is invalid: {}", exception.getMessage());
+            log.warn("AUTH.JWT.REJECTED reason=invalid_token detail={}", exception.getMessage());
             writeUnauthorizedResponse(response, GlobalMessage.UNAUTHORIZED);
         }
     }

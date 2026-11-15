@@ -46,7 +46,7 @@ public class UserBlockService {
         userBlockRepository.insertIfAbsent(UUID.randomUUID(), blockerId, targetId);
         followRepository.deleteByFollowerIdAndFollowedId(blockerId, targetId);
         followRepository.deleteByFollowerIdAndFollowedId(targetId, blockerId);
-        log.info("USER.BLOCKED: blocker={} blocked={}", blockerId, targetId);
+        log.info("USER.BLOCKED blockerId={} blockedId={}", blockerId, targetId);
         return Operation.CREATED;
     }
 

@@ -106,7 +106,7 @@ public class AuthService {
         Role role = Role.USER;
 
         if (isAdmin) {
-            log.info("register.role.admin");
+            log.debug("AUTH.REGISTER.ROLE role=ADMIN");
             role = Role.ADMIN;
         }
 
@@ -173,7 +173,7 @@ public class AuthService {
     }
 
     public LoginResponse googleLogin(GoogleLoginRequest request) {
-        log.info("GOOGLE.LOGIN");
+        log.debug("AUTH.LOGIN.GOOGLE");
         // Verify idToken with Google and extract user info from it
         GoogleUserInfo googleUser = googleTokenVerifierService.verifyToken(request.getIdToken());
 
@@ -330,7 +330,7 @@ public class AuthService {
         if (actualResetToken == null || !MessageDigest.isEqual(
                 actualResetToken.toString().getBytes(StandardCharsets.UTF_8),
                 resetPasswordRequest.getResetToken().getBytes(StandardCharsets.UTF_8))) {
-            log.info("## resetToken invalid for {}", EmailMasking.maskEmail(resetPasswordRequest.getEmail()));
+            log.warn("AUTH.RESET.TOKEN.INVALID email={}", EmailMasking.maskEmail(resetPasswordRequest.getEmail()));
             throw new BusinessException(GlobalMessage.INVALID_RESET_TOKEN, HttpStatus.BAD_REQUEST);
         }
 
@@ -345,7 +345,7 @@ public class AuthService {
             throw new BusinessException(GlobalMessage.INVALID_RESET_TOKEN, HttpStatus.BAD_REQUEST);
         }
 
-        log.info("Updating password for user: {}", EmailMasking.maskEmail(user.getEmail()));
+        log.info("AUTH.PASSWORD.RESET email={}", EmailMasking.maskEmail(user.getEmail()));
         user.setPassword(encoder.encode(resetPasswordRequest.getNewPassword()));
         userRepository.save(user);
 
@@ -356,7 +356,7 @@ public class AuthService {
     }
 
     public PublicUserDTO getUserById(String userId, UUID viewerId) {
-        log.info("Getting user by userId: {}", userId);
+        log.debug("USER.GET userId={}", userId);
         try {
             UUID id = UUID.fromString(userId);
             if (userBlockRepository.existsBetween(viewerId, id)) {
@@ -371,18 +371,18 @@ public class AuthService {
                             )
                     );
         } catch (IllegalArgumentException illegalArgumentException) { // not a valid UUID Pattern
-            log.error("Illegal argument exception", illegalArgumentException);
+            log.warn("USER.GET.REJECTED reason=invalid_id userId={}", userId);
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("Error while getting user by userId: {}", userId, e);
+            log.error("USER.GET.FAILED userId={}", userId, e);
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     public PaginatedResponse<PublicUserDTO> search(UserSearchRequest request, UUID viewerId, Pageable pageable) {
-        log.info("## search users request: {}", request);
+        log.debug("USER.SEARCH request={}", request);
 
         // the people the viewer blocked or was blocked by never show up
         List<UUID> hiddenUserIds = userBlockRepository.findRelatedUserIds(viewerId);

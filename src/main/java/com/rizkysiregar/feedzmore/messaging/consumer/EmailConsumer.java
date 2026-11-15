@@ -22,10 +22,10 @@ public class EmailConsumer {
         String eventKey = eventKey(event);
         if (eventKey != null
                 && !deduplicator.tryReserve(RabbitMQConfig.EMAIL_CONSUMER, eventKey)) {
-            log.info("EMAIL SKIPPED (already processed) postId={}", event.getPostId());
+            log.debug("EMAIL.SKIPPED reason=already_processed postId={}", event.getPostId());
             return;
         }
-        log.info("RECEIVED EVENT FOR EMAIL {}", event);
+        log.debug("EMAIL.EVENT.RECEIVED postId={}", event.getPostId());
         try {
             emailService.sendEmailTemplate(
                     event.getEmail(),
@@ -34,7 +34,7 @@ public class EmailConsumer {
                     event.getEmailProps()
             );
         } catch (Exception e) {
-            log.error("EMAIL FAILED postId={}: {}", event.getPostId(), e.getMessage());
+            log.error("EMAIL.FAILED postId={} reason={}", event.getPostId(), e.getMessage());
             if (eventKey != null) {
                 deduplicator.release(RabbitMQConfig.EMAIL_CONSUMER, eventKey);
             }

@@ -58,7 +58,7 @@ public class OrphanMediaCleanupService {
         try {
             sweep(Instant.now());
         } catch (Exception e) {
-            log.error("ORPHAN.MEDIA.SWEEP.FAILED: {}", e.getMessage(), e);
+            log.error("ORPHAN.MEDIA.SWEEP.FAILED reason={}", e.getMessage(), e);
         }
     }
 
@@ -100,7 +100,7 @@ public class OrphanMediaCleanupService {
             }
             handled++;
             if (dryRun) {
-                log.info("ORPHAN.MEDIA.WOULD.DELETE {}", key);
+                log.info("ORPHAN.MEDIA.WOULD.DELETE key={}", key);
             } else {
                 fileStorageService.deleteObject(key);
             }

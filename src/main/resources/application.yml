@@ -37,6 +37,10 @@ firebase:
   # alternative for local development: the key itself (single line JSON). The file wins when both are set
   credentials-json: ${FIREBASE_CREDENTIALS_JSON:}
 app:
+  logging:
+    # when the access log line (HTTP.REQUEST) carries the redacted JSON request body:
+    # ALWAYS (every request), ERRORS (status 400+ only) or NEVER
+    request-body: ${APP_LOGGING_REQUEST_BODY:ALWAYS}
   appcheck:
     # off: nothing is checked. log: requests are checked and the outcome is logged and counted, none is refused.
     # enforce: a request without a valid Firebase App Check token is refused with 403.
@@ -95,7 +99,16 @@ app:
 logging:
   config: ${LOGGING_CONFIG}
   level:
-    org.flywaydb: ${LOGGING_LEVEL_ORG_FLYWAYDB}
+    root: ${LOGGING_LEVEL_ROOT:INFO}
+    # DEBUG shows the per-request business logs (likes, logins, feed reads, event publishing...)
+    com.rizkysiregar.feedzmore: ${LOGGING_LEVEL_APP:INFO}
+    org.flywaydb: ${LOGGING_LEVEL_ORG_FLYWAYDB:INFO}
+    # libraries that log routine work at INFO: only their warnings and errors are useful
+    org.hibernate: WARN
+    com.zaxxer.hikari: WARN
+    org.springframework.amqp: WARN
+    org.apache.kafka: WARN
+    io.netty: WARN
 
 management:
   # actuator moves to its own port when MANAGEMENT_SERVER_PORT is set (see SecurityConfig)

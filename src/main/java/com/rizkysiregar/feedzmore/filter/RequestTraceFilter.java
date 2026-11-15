@@ -8,9 +8,9 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -27,15 +27,43 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * One access log line per request, written when the request finishes:
+ * {@code HTTP.REQUEST id= method= path= status= durationMs= ip= userId= body=}.
+ * <p>
+ * The headers and the forwarding chain are only added to requests that failed (status 400+), where they help to
+ * debug. {@code app.logging.request-body} decides when the (redacted) JSON body is included:
+ * {@code ALWAYS}, {@code ERRORS} (status 400+ only) or {@code NEVER}.
+ * {@code requestId} and {@code userId} are also put in the MDC, so every other log line of the request carries them.
+ */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RequiredArgsConstructor
 @Slf4j
 public class RequestTraceFilter extends OncePerRequestFilter {
 
+    public static final String USER_ID_MDC_KEY = "userId";
+
     private static final int MAX_BODY_BYTES = 8 * 1024;
     private static final int MAX_HEADER_VALUE_LENGTH = 512;
+    private static final long SLOW_REQUEST_MS = 2_000;
+
+    public enum BodyMode { ALWAYS, ERRORS, NEVER }
+
     private final ObjectMapper objectMapper;
+    private final BodyMode bodyMode;
+
+    public RequestTraceFilter(ObjectMapper objectMapper,
+                              @Value("${app.logging.request-body:ALWAYS}") BodyMode bodyMode) {
+        this.objectMapper = objectMapper;
+        this.bodyMode = bodyMode;
+    }
+
+    // health probes and metrics scrapes would otherwise be the most frequent lines in the log
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        return uri != null && uri.contains("/actuator/");
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -47,18 +75,45 @@ public class RequestTraceFilter extends OncePerRequestFilter {
         MDC.put("requestId", requestId);
 
         try {
-            log.info("HTTP request id={} method={} path={} query={} remoteIp={} forwardedFor={} realIp={} forwarded={} headers={}",
-                    requestId, request.getMethod(), safe(request.getRequestURI(), 1024),
-                    sanitizeQuery(request.getQueryString()), safe(request.getRemoteAddr(), 128),
-                    safe(request.getHeader("X-Forwarded-For"), MAX_HEADER_VALUE_LENGTH),
-                    safe(request.getHeader("X-Real-IP"), MAX_HEADER_VALUE_LENGTH),
-                    safe(request.getHeader("Forwarded"), MAX_HEADER_VALUE_LENGTH), headers(request));
             filterChain.doFilter(wrappedRequest, response);
         } finally {
-            log.info("HTTP response id={} status={} durationMs={} body={}",
-                    requestId, response.getStatus(), (System.nanoTime() - startedAt) / 1_000_000,
-                    body(wrappedRequest));
+            logRequest(wrappedRequest, response, requestId, (System.nanoTime() - startedAt) / 1_000_000);
+            MDC.remove(USER_ID_MDC_KEY);
             MDC.remove("requestId");
+        }
+    }
+
+    private void logRequest(ContentCachingRequestWrapper request, HttpServletResponse response,
+                            String requestId, long durationMs) {
+        int status = response.getStatus();
+        boolean failed = status >= 400;
+        boolean withBody = bodyMode == BodyMode.ALWAYS || (bodyMode == BodyMode.ERRORS && failed);
+        String userId = MDC.get(USER_ID_MDC_KEY);
+        String body = withBody ? body(request) : "[not logged]";
+        String query = sanitizeQuery(request.getQueryString());
+
+        if (failed) {
+            String message = "HTTP.REQUEST id={} method={} path={} query={} status={} durationMs={} ip={} userId={} body={} "
+                    + "forwardedFor={} realIp={} forwarded={} headers={}";
+            Object[] args = {requestId, request.getMethod(), safe(request.getRequestURI(), 1024), query, status,
+                    durationMs, safe(request.getRemoteAddr(), 128), userId, body,
+                    safe(request.getHeader("X-Forwarded-For"), MAX_HEADER_VALUE_LENGTH),
+                    safe(request.getHeader("X-Real-IP"), MAX_HEADER_VALUE_LENGTH),
+                    safe(request.getHeader("Forwarded"), MAX_HEADER_VALUE_LENGTH), headers(request)};
+            if (status >= 500) {
+                log.error(message, args);
+            } else {
+                log.warn(message, args);
+            }
+            return;
+        }
+
+        Object[] args = {requestId, request.getMethod(), safe(request.getRequestURI(), 1024), query, status,
+                durationMs, safe(request.getRemoteAddr(), 128), userId, body};
+        if (durationMs >= SLOW_REQUEST_MS) {
+            log.warn("HTTP.REQUEST.SLOW id={} method={} path={} query={} status={} durationMs={} ip={} userId={} body={}", args);
+        } else {
+            log.info("HTTP.REQUEST id={} method={} path={} query={} status={} durationMs={} ip={} userId={} body={}", args);
         }
     }
 

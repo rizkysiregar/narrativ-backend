@@ -31,7 +31,7 @@ public final class AfterCommit {
         try {
             action.run();
         } catch (Exception e) {
-            log.error("AFTER.COMMIT.FAILED {}: {}", description, e.getMessage(), e);
+            log.error("AFTER.COMMIT.FAILED description={} reason={}", description, e.getMessage(), e);
         }
     }
 }

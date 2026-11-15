@@ -38,7 +38,7 @@ public class AuthController {
     @io.swagger.v3.oas.annotations.Operation(summary = "Register a new user")
     @PostMapping("auth/register")
     public Operation register(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
-       log.info("REGISTER.USER username={}", registerUserRequest.getUsername());
+       log.debug("AUTH.REGISTER.USER username={}", registerUserRequest.getUsername());
         return authService.register(registerUserRequest, false);
     }
 
@@ -58,20 +58,20 @@ public class AuthController {
     @PostMapping("auth/register-admin")
     @PreAuthorize("hasRole('ADMIN')")
     public Operation registerAdmin(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
-        log.info("REGISTER.ADMIN username={}", registerUserRequest.getUsername());
+        log.debug("AUTH.REGISTER.ADMIN username={}", registerUserRequest.getUsername());
         return authService.register(registerUserRequest, true);
     }
 
     @PostMapping("auth/admin/login")
     public LoginResponse adminLogin(@Valid @RequestBody UserLoginRequest userLoginRequest) {
-        log.info("ADMIN LOGIN username={}", userLoginRequest.getUsername());
+        log.debug("AUTH.LOGIN.ADMIN username={}", userLoginRequest.getUsername());
         return authService.adminLogin(userLoginRequest);
     }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "User login", description = "use this to gain jwt credentials for user validity")
     @PostMapping("auth/login")
     public LoginResponse login(@Valid @RequestBody UserLoginRequest userLoginRequest) {
-        log.info("LOGIN username={}", userLoginRequest.getUsername());
+        log.debug("AUTH.LOGIN username={}", userLoginRequest.getUsername());
         return authService.login(userLoginRequest);
     }
 

@@ -26,7 +26,7 @@ public class ProfileImageUrlResolver {
         try {
             return fileStorageService.getPresignUrl(stored);
         } catch (Exception e) {
-            log.warn("PROFILE.IMAGE.PRESIGN.FAILED: key={} reason={}", stored, e.getMessage());
+            log.warn("PROFILE.IMAGE.PRESIGN.FAILED key={} reason={}", stored, e.getMessage());
             return null;
         }
     }

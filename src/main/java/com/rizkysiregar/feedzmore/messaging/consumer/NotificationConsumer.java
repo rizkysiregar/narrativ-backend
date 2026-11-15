@@ -30,7 +30,7 @@ public class NotificationConsumer {
     public void handlePostCreated(PostCreatedEvent event) {
         UUID authorId = event.getAuthorId();
         if (authorId == null) {
-            log.warn("NOTIFICATION SKIPPED for postId {}: missing authorId", event.getPostId());
+            log.warn("NOTIFICATION.SKIPPED reason=missing_author postId={}", event.getPostId());
             return;
         }
 
@@ -54,7 +54,7 @@ public class NotificationConsumer {
                                 followerId, Constants.NOTIFICATION_NEW_FEED_TITLE, body);
                         sentCount++;
                     } catch (RuntimeException e) {
-                        log.error("NOTIFICATION FAILED for postId {} followerId {}: {}",
+                        log.error("NOTIFICATION.FAILED postId={} followerId={} reason={}",
                                 event.getPostId(), followerId, e.getMessage());
                         if (eventKey != null) {
                             deduplicator.release(RabbitMQConfig.NOTIFICATION_CONSUMER, eventKey);
@@ -70,12 +70,12 @@ public class NotificationConsumer {
                 UUID afterFollowerId = followerIds.getLast();
                 followerIds = followRepository.findActiveFollowerIdsByFollowedIdAfter(authorId, afterFollowerId, page);
             }
-            log.info("NOTIFICATION DISPATCHED for postId {} to {} followers", event.getPostId(), sentCount);
+            log.info("NOTIFICATION.DISPATCHED postId={} followers={}", event.getPostId(), sentCount);
             if (firstFailure != null) {
                 throw firstFailure;
             }
         } catch (RuntimeException e) {
-            log.error("NOTIFICATION FAILED for postId {}", event.getPostId());
+            log.error("NOTIFICATION.FAILED postId={} reason={}", event.getPostId(), e.getMessage());
             throw e;
         }
     }
