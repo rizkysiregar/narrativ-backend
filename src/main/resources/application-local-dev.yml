@@ -75,3 +75,9 @@ minio:
 springdoc:
   swagger-ui:
     use-root-path: true
+
+app:
+  registration:
+    # development has no pool of real mailboxes: registering needs no OTP. Set to true to try the OTP flow
+    email-verification:
+      enabled: true

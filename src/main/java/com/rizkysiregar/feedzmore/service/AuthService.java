@@ -7,6 +7,7 @@ import com.rizkysiregar.feedzmore.model.enums.Role;
 import com.rizkysiregar.feedzmore.model.enums.UserStatus;
 import com.rizkysiregar.feedzmore.model.request.*;
 import com.rizkysiregar.feedzmore.service.auth.GoogleTokenVerifierService;
+import com.rizkysiregar.feedzmore.service.otp.IRegistrationOtpService;
 import com.rizkysiregar.feedzmore.util.RedisUtil;
 import com.rizkysiregar.feedzmore.constant.GlobalMessage;
 import com.rizkysiregar.feedzmore.model.dto.PublicUserDTO;
@@ -60,6 +61,7 @@ public class AuthService {
     private final AuditLogService auditLogService;
     private final ProfileImageUrlResolver profileImageUrlResolver;
     private final UserBlockRepository userBlockRepository;
+    private final IRegistrationOtpService registrationOtpService;
 
     public AuthService(UserRepository userRepository,
                        AuthenticationManager authManager,
@@ -69,7 +71,8 @@ public class AuthService {
                        UsernameGenerator usernameGenerator,
                        AuditLogService auditLogService,
                        ProfileImageUrlResolver profileImageUrlResolver,
-                       UserBlockRepository userBlockRepository
+                       UserBlockRepository userBlockRepository,
+                       IRegistrationOtpService registrationOtpService
     ) {
         this.userRepository = userRepository;
         this.authManager = authManager;
@@ -80,6 +83,7 @@ public class AuthService {
         this.auditLogService = auditLogService;
         this.profileImageUrlResolver = profileImageUrlResolver;
         this.userBlockRepository = userBlockRepository;
+        this.registrationOtpService = registrationOtpService;
     }
 
     @Transactional
@@ -91,6 +95,12 @@ public class AuthService {
 
         if (userRepository.findByEmail(registerUserRequest.getEmail()).isPresent()) {
             throw new BusinessException(GlobalMessage.EMAIL_ALREADY_TAKEN, HttpStatus.BAD_REQUEST);
+        }
+
+        // admins are created by an admin, only self-registration has to prove the mailbox
+        if (!isAdmin && registrationOtpService.isVerificationRequired()) {
+            registrationOtpService.consumeRegistrationToken(registerUserRequest.getEmail(),
+                    registerUserRequest.getRegistrationToken());
         }
 
         Role role = Role.USER;

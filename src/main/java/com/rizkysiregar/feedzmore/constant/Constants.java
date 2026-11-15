@@ -6,6 +6,8 @@ import java.util.List;
 public class Constants {
     public static final List<String> JWT_WHITELIST = List.of(
             "/auth/register",
+            "/auth/register/otp",
+            "/auth/register/verify-otp",
             "/auth/admin/login",
             "/auth/login",
             "/auth/google",

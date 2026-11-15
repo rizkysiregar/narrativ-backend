@@ -50,6 +50,7 @@ import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Root;
+import com.rizkysiregar.feedzmore.service.otp.IRegistrationOtpService;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 
@@ -80,6 +81,8 @@ public class AuthServiceTest {
     private UserBlockRepository userBlockRepository;
     @Mock
     private ProfileImageUrlResolver profileImageUrlResolver;
+    @Mock
+    private IRegistrationOtpService registrationOtpService;
 
     @InjectMocks
     private AuthService authService;
@@ -118,6 +121,73 @@ public class AuthServiceTest {
         verify(userRepository, times(1))
                 .save(any(UserEntity.class));
         verifyNoInteractions(auditLogService);
+    }
+
+    private RegisterUserRequest registerRequest(String token) {
+        RegisterUserRequest request = new RegisterUserRequest();
+        request.setUsername("testuser");
+        request.setPassword("password");
+        request.setEmail("test@mail.com");
+        request.setFirstName("John");
+        request.setLastName("Doe");
+        request.setRegistrationToken(token);
+        return request;
+    }
+
+    @Test
+    void testRegister_VerificationOn_ConsumesTheTokenBeforeSaving() {
+        when(registrationOtpService.isVerificationRequired()).thenReturn(true);
+        when(userRepository.save(any(UserEntity.class))).thenReturn(new UserEntity());
+
+        assertEquals(Operation.CREATED, authService.register(registerRequest("token-1"), false));
+
+        var order = inOrder(registrationOtpService, userRepository);
+        order.verify(registrationOtpService).consumeRegistrationToken("test@mail.com", "token-1");
+        order.verify(userRepository).save(any(UserEntity.class));
+    }
+
+    @Test
+    void testRegister_VerificationOn_BadTokenCreatesNoUser() {
+        when(registrationOtpService.isVerificationRequired()).thenReturn(true);
+        doThrow(new BusinessException(GlobalMessage.EMAIL_NOT_VERIFIED, HttpStatus.BAD_REQUEST))
+                .when(registrationOtpService).consumeRegistrationToken("test@mail.com", null);
+
+        assertThrows(BusinessException.class, () -> authService.register(registerRequest(null), false));
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void testRegister_VerificationOn_TakenUsernameKeepsTheToken() {
+        lenient().when(registrationOtpService.isVerificationRequired()).thenReturn(true);
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(new UserEntity()));
+
+        assertThrows(BusinessException.class, () -> authService.register(registerRequest("token-1"), false));
+
+        // the user can fix the username and register again with the same verified email
+        verify(registrationOtpService, never()).consumeRegistrationToken(any(), any());
+    }
+
+    @Test
+    void testRegister_VerificationOff_NeedsNoToken() {
+        when(registrationOtpService.isVerificationRequired()).thenReturn(false);
+        when(userRepository.save(any(UserEntity.class))).thenReturn(new UserEntity());
+
+        assertEquals(Operation.CREATED, authService.register(registerRequest(null), false));
+
+        verify(registrationOtpService, never()).consumeRegistrationToken(any(), any());
+    }
+
+    @Test
+    void testRegisterAdmin_NeedsNoToken() {
+        lenient().when(registrationOtpService.isVerificationRequired()).thenReturn(true);
+        UserEntity saved = new UserEntity();
+        saved.setId(UUID.randomUUID());
+        when(userRepository.save(any(UserEntity.class))).thenReturn(saved);
+
+        authService.register(registerRequest(null), true);
+
+        verify(registrationOtpService, never()).consumeRegistrationToken(any(), any());
     }
 
     @Test
