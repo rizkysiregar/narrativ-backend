@@ -42,4 +42,8 @@ public class RegisterUserRequest {
     private String lastName;
 
     private String profileImage;
+
+    // issued by POST /auth/register/verify-otp; only asked for where email verification is switched on
+    @ToString.Exclude
+    private String registrationToken;
 }

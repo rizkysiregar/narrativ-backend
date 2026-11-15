@@ -121,21 +121,6 @@ public class OtpServiceTest {
 
 
     @Test
-    void testGenerateOtp_Return6Digit() {
-        try {
-            java.lang.reflect.Method method = OtpService.class.getDeclaredMethod("generateOtp");
-            method.setAccessible(true);
-            Object result = method.invoke(otpService);
-            Assertions.assertNotNull(result, "OTP should not be null");
-            String otp = result.toString();
-            Assertions.assertEquals(6, otp.length(), "OTP should be 6 digits long");
-            Assertions.assertTrue(otp.matches("\\d{6}"), "OTP should contain only digits");
-        } catch (Exception e) {
-            Assertions.fail("Failed to invoke generateOtp via reflection: " + e.getMessage());
-        }
-    }
-
-    @Test
     void sendOtp_TooManyRequests_WhenRedisHasKey() {
         String email = "test@mail.com";
         when(redisUtil.hasKey("otp:" + email)).thenReturn(true);

@@ -5,6 +5,7 @@ import com.rizkysiregar.feedzmore.model.request.*;
 import com.rizkysiregar.feedzmore.model.response.LoginResponse;
 import com.rizkysiregar.feedzmore.service.AuthService;
 import com.rizkysiregar.feedzmore.service.otp.IOtpService;
+import com.rizkysiregar.feedzmore.service.otp.IRegistrationOtpService;
 import com.rizkysiregar.feedzmore.util.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,10 +25,13 @@ public class AuthController {
 
     final AuthService authService;
     private final IOtpService otpService;
+    private final IRegistrationOtpService registrationOtpService;
 
-    public AuthController(AuthService authService, IOtpService otpService) {
+    public AuthController(AuthService authService, IOtpService otpService,
+                          IRegistrationOtpService registrationOtpService) {
         this.authService = authService;
         this.otpService = otpService;
+        this.registrationOtpService = registrationOtpService;
     }
 
 
@@ -36,6 +40,18 @@ public class AuthController {
     public Operation register(@Valid @RequestBody RegisterUserRequest registerUserRequest) {
        log.info("REGISTER.USER username={}", registerUserRequest.getUsername());
         return authService.register(registerUserRequest, false);
+    }
+
+    @io.swagger.v3.oas.annotations.Operation(summary = "Send the registration OTP", description = "Sends an OTP to the email that is about to be registered. verificationRequired=false means this environment does not verify emails: skip the OTP step and register directly")
+    @PostMapping("auth/register/otp")
+    public RegisterOtpDTO registerOtp(@RequestBody @Valid RegisterOtpRequest request) {
+        return registrationOtpService.sendOtp(request.getEmail());
+    }
+
+    @io.swagger.v3.oas.annotations.Operation(summary = "Verify the registration OTP", description = "Trades the right OTP for a registrationToken, which POST /auth/register asks for")
+    @PostMapping("auth/register/verify-otp")
+    public RegistrationTokenDTO registerVerifyOtp(@RequestBody @Valid VerifyOtpRequest request) {
+        return registrationOtpService.verifyOtp(request.getEmail(), request.getOtp());
     }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Register a admin user")

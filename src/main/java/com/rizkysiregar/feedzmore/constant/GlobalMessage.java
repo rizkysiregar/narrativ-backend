@@ -24,6 +24,7 @@ public enum GlobalMessage {
     USER_DISABLED("401", "Akun Anda sudah dinonaktifkan. Silakan hubungi admin untuk mengaktifkan kembali akun Anda."),
     PARAMETER_NOT_FOUND("404", "Data pendukung tidak ditemukan. Mohon ulangi proses dari awal."),
     INVALID_OTP("400", "Kode OTP yang Anda masukkan salah. Periksa kembali kodenya, ya."),
+    OTP_RESEND_COOLDOWN("429", "Kode OTP baru saja dikirim. Tunggu 1 menit sebelum meminta kode lagi."),
     OTP_EXPIRED("404", "Kode OTP sudah tidak berlaku. Silakan minta kode yang baru."),
     INVALID_RESET_TOKEN("400", "Tautan perubahan kata sandi sudah tidak valid atau pernah digunakan."),
     USERNAME_ALREADY_TAKEN("400", "Nama pengguna ini sudah digunakan. Coba nama lain yang unik, ya!"),
@@ -53,6 +54,7 @@ public enum GlobalMessage {
     CONFIRMATION_FAILED("403", "Konfirmasi gagal. Periksa kembali kata sandi atau akun Google Anda."),
     CANNOT_BLOCK_SELF("400", "Anda tidak dapat memblokir diri sendiri."),
     EMAIL_ALREADY_TAKEN("400", "Email ini sudah terdaftar. Silakan gunakan email lain atau masuk ke akun Anda."),
+    EMAIL_NOT_VERIFIED("400", "Email Anda belum diverifikasi. Minta kode OTP dan verifikasi emailnya dulu, ya."),
     ;
 
 
