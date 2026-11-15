@@ -3,12 +3,14 @@ package com.rizkysiregar.feedzmore.service;
 import com.rizkysiregar.feedzmore.model.entity.UserDeviceEntity;
 import com.rizkysiregar.feedzmore.model.request.RegisterDeviceRequest;
 import com.rizkysiregar.feedzmore.repository.UserDeviceRepository;
+import com.rizkysiregar.feedzmore.i18n.LocalizedMessages;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -16,6 +18,15 @@ import java.util.UUID;
 public class UserDeviceService {
 
     private final UserDeviceRepository userDeviceRepository;
+
+    /** Language to write to a user in when no request is around (e.g. an email): that of the device they used last. */
+    @Transactional(readOnly = true)
+    public Locale preferredLocale(UUID userId) {
+        return LocalizedMessages.supportedLocale(
+                userDeviceRepository.findFirstByUserIdOrderByUpdateAtDesc(userId)
+                        .map(UserDeviceEntity::getLocale)
+                        .orElse(null));
+    }
 
     @Transactional
     public void registerOrUpdatedDevice(UUID userId, RegisterDeviceRequest request) {

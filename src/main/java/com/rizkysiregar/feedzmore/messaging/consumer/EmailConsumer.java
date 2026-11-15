@@ -4,10 +4,13 @@ import com.rizkysiregar.feedzmore.config.RabbitMQConfig;
 import com.rizkysiregar.feedzmore.messaging.event.PostCreatedEvent;
 import com.rizkysiregar.feedzmore.messaging.idempotency.EventDeduplicator;
 import com.rizkysiregar.feedzmore.service.email.IEmailService;
+import com.rizkysiregar.feedzmore.i18n.LocalizedMessages;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
+
+import java.util.Locale;
 
 @Component
 @Slf4j
@@ -27,12 +30,13 @@ public class EmailConsumer {
         }
         log.debug("EMAIL.EVENT.RECEIVED postId={}", event.getPostId());
         try {
-            emailService.sendEmailTemplate(
+            Locale locale = LocalizedMessages.supportedLocale(event.getLocale());
+            LocalizedMessages.withLocale(locale, () -> emailService.sendEmailTemplate(
                     event.getEmail(),
-                    "Your post status",
+                    LocalizedMessages.text("email.post.subject", locale, "Your post status"),
                     "post-status",
                     event.getEmailProps()
-            );
+            ));
         } catch (Exception e) {
             log.error("EMAIL.FAILED postId={} reason={}", event.getPostId(), e.getMessage());
             if (eventKey != null) {

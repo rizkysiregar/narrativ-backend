@@ -2,6 +2,8 @@ package com.rizkysiregar.feedzmore.messaging.consumer;
 
 import com.rizkysiregar.feedzmore.config.RabbitMQConfig;
 import com.rizkysiregar.feedzmore.constant.Constants;
+import com.rizkysiregar.feedzmore.i18n.I18nConfig;
+import com.rizkysiregar.feedzmore.i18n.LocalizedMessages;
 import com.rizkysiregar.feedzmore.messaging.event.CommentRepliedEvent;
 import com.rizkysiregar.feedzmore.messaging.idempotency.EventDeduplicator;
 import com.rizkysiregar.feedzmore.model.entity.UserEntity;
@@ -15,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -72,13 +75,19 @@ public class CommentReplyConsumer {
             return;
         }
 
-        emailService.sendEmailTemplate(
+        Locale locale = userDeviceService.preferredLocale(recipient.getId());
+        if (locale == null) {
+            locale = I18nConfig.ENGLISH;
+        }
+        Locale emailLocale = locale;
+        LocalizedMessages.withLocale(emailLocale, () -> emailService.sendEmailTemplate(
                 recipient.getEmail(),
-                event.getReplierUsername() + " membalas komentar Anda",
+                LocalizedMessages.text("email.commentReply.subject", emailLocale,
+                        "{0} replied to your comment", event.getReplierUsername()),
                 "comment-reply",
                 Map.of("username", recipient.getUsername(),
                         "replierUsername", event.getReplierUsername(),
-                        "commentPreview", event.getContentPreview()));
+                        "commentPreview", event.getContentPreview())));
         log.info("COMMENT.REPLY.EMAILED commentId={} recipientId={}", event.getCommentId(), recipient.getId());
     }
 }

@@ -14,6 +14,8 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
 import java.util.Map;
+import com.rizkysiregar.feedzmore.i18n.LocalizedMessages;
+import org.springframework.context.i18n.LocaleContextHolder;
 import com.rizkysiregar.feedzmore.util.EmailMasking;
 
 @Service
@@ -42,7 +44,7 @@ public class EmailService implements IEmailService {
             helper.setSubject(subject);
 
             // email context
-            Context context = new Context();
+            Context context = new Context(LocaleContextHolder.getLocale());
             if (variables != null) {
                 variables.forEach(context::setVariable);
             }
@@ -80,10 +82,11 @@ public class EmailService implements IEmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setTo(to);
-            helper.setSubject("Your One-Time Password (OTP)");
+            helper.setSubject(LocalizedMessages.text(
+                    "email.otp.subject", LocaleContextHolder.getLocale(), "Your One-Time Password (OTP)"));
 
             // prepare the email context
-            Context context = new Context();
+            Context context = new Context(LocaleContextHolder.getLocale());
             context.setVariable("otp", otpCode);
 
             // Process HTML with thymeleaf
