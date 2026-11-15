@@ -13,32 +13,32 @@ import lombok.ToString;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Data
 public class RegisterUserRequest {
-    @NotBlank(message = "Username is required")
-    @NotEmpty(message = "Username cannot be empty")
-    @Size(min = 3, max = 16, message = "The length of the username should be between 3 and 15")
+    @NotBlank(message = "{validation.username.required}")
+    @NotEmpty(message = "{validation.username.empty}")
+    @Size(min = 3, max = 16, message = "{validation.username.size15}")
     private String username;
 
-    @NotBlank(message = "Password is required")
-    @NotEmpty(message = "Password cannot be empty")
-    @Size(min = 8, max = 64, message = "The length of the password should be between 8 and 64")
-    @MaxUtf8Bytes(value = 72, message = "The password is too long, use fewer characters")
+    @NotBlank(message = "{validation.password.required}")
+    @NotEmpty(message = "{validation.password.empty}")
+    @Size(min = 8, max = 64, message = "{validation.password.size}")
+    @MaxUtf8Bytes(value = 72, message = "{validation.password.tooLongHint}")
     @ToString.Exclude
     private String password;
 
-    @NotBlank(message = "Email is required")
-    @NotEmpty(message = "Email cannot be empty")
-    @Email(message = "Email should be valid")
+    @NotBlank(message = "{validation.email.required}")
+    @NotEmpty(message = "{validation.email.empty}")
+    @Email(message = "{validation.email.invalid}")
     @ToString.Exclude
     private String email;
 
-    @NotBlank(message = "First name is required")
-    @NotEmpty(message = "First name cannot be empty")
-    @Size(min = 2, max = 50, message = "The length of the first name should be between 2 and 50")
+    @NotBlank(message = "{validation.firstName.required}")
+    @NotEmpty(message = "{validation.firstName.empty}")
+    @Size(min = 2, max = 50, message = "{validation.firstName.size}")
     private String firstName;
 
-    @NotBlank(message = "Last name is required")
-    @NotEmpty(message = "Last name cannot be empty")
-    @Size(min = 2, max = 50, message = "The length of the last name should be between 2 and 50")
+    @NotBlank(message = "{validation.lastName.required}")
+    @NotEmpty(message = "{validation.lastName.empty}")
+    @Size(min = 2, max = 50, message = "{validation.lastName.size}")
     private String lastName;
 
     private String profileImage;

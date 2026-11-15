@@ -254,7 +254,7 @@ public class AuthServiceTest {
 
 
     private static final String INVALID_RESET_TOKEN_MESSAGE =
-            "Tautan perubahan kata sandi sudah tidak valid atau pernah digunakan.";
+            "The password reset link is no longer valid or has already been used.";
 
     private ResetPasswordRequest resetRequest(String email, String token) {
         return ResetPasswordRequest.builder()
@@ -376,14 +376,14 @@ public class AuthServiceTest {
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.getUserById(id.toString(), UUID.randomUUID()));
-        assertEquals("Ups, data yang Anda cari tidak ditemukan.", ex.getMessage());
+        assertEquals("Oops, the data you are looking for was not found.", ex.getMessage());
     }
 
     @Test
     void testGetUserById_InvalidUUID() {
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.getUserById("invalid-uuid", UUID.randomUUID()));
-        assertEquals("Maaf, ada kendala saat memproses data Anda. Periksa kembali input Anda.", ex.getMessage());
+        assertEquals("Sorry, we could not process your data. Please check your input.", ex.getMessage());
     }
 
     @Test
@@ -420,7 +420,7 @@ public class AuthServiceTest {
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.search(request, UUID.randomUUID(), pageable));
-        assertEquals("Ups, data yang Anda cari tidak ditemukan.", ex.getMessage());
+        assertEquals("Oops, the data you are looking for was not found.", ex.getMessage());
     }
 
     @Test
@@ -659,7 +659,7 @@ public class AuthServiceTest {
         for (int attempt = 0; attempt < 2; attempt++) {
             BusinessException exception = assertThrows(BusinessException.class, () -> authService.refreshToken("tok"));
             assertEquals(org.springframework.http.HttpStatus.UNAUTHORIZED, exception.getHttpStatus());
-            assertEquals("Akun Anda telah diblokir oleh admin. Alasan: posting spam", exception.getMessage());
+            assertEquals("Your account has been banned by an admin. Reason: posting spam", exception.getMessage());
         }
 
         verify(redisUtil, never()).delete(anyString());
@@ -697,7 +697,7 @@ public class AuthServiceTest {
         BusinessException exception = assertThrows(BusinessException.class, () -> authService.login(loginRequest));
 
         assertEquals(org.springframework.http.HttpStatus.UNAUTHORIZED, exception.getHttpStatus());
-        assertEquals("Akun Anda telah diblokir oleh admin. Alasan: posting spam", exception.getMessage());
+        assertEquals("Your account has been banned by an admin. Reason: posting spam", exception.getMessage());
         verifyNoInteractions(jwtService, redisUtil);
     }
 

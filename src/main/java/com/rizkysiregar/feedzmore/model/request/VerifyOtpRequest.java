@@ -19,7 +19,7 @@ public class VerifyOtpRequest {
     @NotBlank
     String email;
 
-    @Size(min = 6 ,max = 6, message = "OTP must be exactly 6 digits")
+    @Size(min = 6 ,max = 6, message = "{validation.otp.digits}")
     @NotBlank
     @ToString.Exclude
     String otp;

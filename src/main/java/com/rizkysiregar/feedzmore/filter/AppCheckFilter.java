@@ -136,10 +136,7 @@ public class AppCheckFilter extends OncePerRequestFilter {
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
         response.setHeader(RESULT_HEADER, outcome.tag());
-        objectMapper.writeValue(response.getWriter(), BaseResponse.builder()
-                .code(GlobalMessage.APP_CHECK_FAILED.getCode())
-                .message(GlobalMessage.APP_CHECK_FAILED.getMessage())
-                .build());
+        objectMapper.writeValue(response.getWriter(), BaseResponse.error(GlobalMessage.APP_CHECK_FAILED));
     }
 
     private static String pathWithoutContext(HttpServletRequest request) {
