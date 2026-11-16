@@ -1,0 +1,9 @@
+package com.rizkysiregar.narrativ.repository;
+
+import com.rizkysiregar.narrativ.model.entity.JobExecutionLog;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface JobExecutionLogRepository extends JpaRepository<JobExecutionLog, String> {
+}

@@ -105,7 +105,7 @@ logging:
   level:
     root: ${LOGGING_LEVEL_ROOT:INFO}
     # DEBUG shows the per-request business logs (likes, logins, feed reads, event publishing...)
-    com.rizkysiregar.feedzmore: ${LOGGING_LEVEL_APP:INFO}
+    com.rizkysiregar.narrativ: ${LOGGING_LEVEL_APP:INFO}
     org.flywaydb: ${LOGGING_LEVEL_ORG_FLYWAYDB:INFO}
     # libraries that log routine work at INFO: only their warnings and errors are useful
     org.hibernate: WARN

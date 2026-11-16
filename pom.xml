@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.rizkysiregar</groupId>
-    <artifactId>feedzmore</artifactId>
+    <artifactId>narrativ</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
-    <name>feedzmore</name>
+    <name>narrativ</name>
     <description>Connect, Share, Inspire – Your World, Your Way!</description>
     <url/>
     <licenses>

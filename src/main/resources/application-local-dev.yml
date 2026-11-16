@@ -30,7 +30,7 @@ spring:
     host: ${DEV_INFRA_HOST}
     port: ${RABBITMQ_PORT}
     username: ${RABBITMQ_USERNAME}
-    password: ${RABBITMQ_FEEDZMORE_PASSWORD}
+    password: ${RABBITMQ_NARRATIV_PASSWORD}
     virtual-host: ${RABBITMQ_VIRTUAL_HOST}
     connection-timeout: 5s
     publisher-confirm-type: correlated
