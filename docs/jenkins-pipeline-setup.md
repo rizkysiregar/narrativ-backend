@@ -61,7 +61,7 @@ For a commit on `master`, the Jenkinsfile performs this sequence:
 3. Packages `target/*.jar`.
 4. Builds and pushes `ghcr.io/rizkysiregar/narrativ-service:a1b2c3d4e5f6` to GitHub Container Registry.
 5. Clones `homelabs-gitops/main`.
-6. Updates only the matching `images[].newTag` value in `apps/narrativ/kustomization.yaml` using `yq`.
+6. Updates only the matching `images[].newTag` value in `apps/narrativ-dev/kustomization.yaml` using `yq`.
 7. Commits `deploy(narrativ): a1b2c3d4e5f6` and pushes it to `main`.
 8. Stops. Argo CD detects the GitOps commit and performs the RKE2 rollout.
 
@@ -75,7 +75,7 @@ After a successful Jenkins build, verify all three layers:
 # 1. Docker Hub: confirm the SHA tag exists.
 # 2. GitOps: confirm Jenkins committed the newTag value.
 git -C /path/to/homelabs-gitops log -1 --oneline
-git -C /path/to/homelabs-gitops diff HEAD~1 HEAD -- apps/narrativ/kustomization.yaml
+git -C /path/to/homelabs-gitops diff HEAD~1 HEAD -- apps/narrativ-dev/kustomization.yaml
 
 # 3. Cluster: Argo CD should be Synced and Healthy, then test the public endpoint.
 curl -i https://api-dev-narrativ.rizkysiregar.my.id/api/v1/actuator/health
@@ -85,4 +85,4 @@ If the GitOps push is rejected because someone pushed to `main` while the pipeli
 
 ## Manual rollback
 
-To return to an earlier image, edit only `newTag` in `apps/narrativ/kustomization.yaml` to a previously pushed SHA, commit, and push. Argo CD will reconcile the rollback. Do not use `kubectl set image` for Git-managed NARRATIV resources because Argo CD will overwrite that manual state.
+To return to an earlier image, edit only `newTag` in `apps/narrativ-dev/kustomization.yaml` to a previously pushed SHA, commit, and push. Argo CD will reconcile the rollback. Do not use `kubectl set image` for Git-managed NARRATIV resources because Argo CD will overwrite that manual state.

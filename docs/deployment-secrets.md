@@ -4,7 +4,7 @@ This guide explains how the development environment variables are supplied to NA
 
 ## Design
 
-- Non-sensitive configuration is versioned in `homelabs-gitops/apps/narrativ/configmap.yaml` and reconciled by Argo CD.
+- Non-sensitive configuration is versioned in `homelabs-gitops/apps/narrativ-dev/configmap.yaml` and reconciled by Argo CD.
 - Sensitive values are kept out of Git in a private `.env` file controlled by the cluster operator.
 - The cluster operator creates or updates the Kubernetes Secret named `narrativ-secrets` in the `narrativ` namespace.
 - The NARRATIV Deployment loads both resources with `envFrom`.
@@ -68,12 +68,12 @@ Keep non-sensitive settings such as `DEV_INFRA_HOST`, ports, resource limits, an
 Before Argo CD deploys the NARRATIV application, create the namespace and its secret from a trusted administrator workstation that has `kubectl` access to the RKE2 cluster.
 
 ```bash
-kubectl create namespace narrativ --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace narrativ-dev --dry-run=client -o yaml | kubectl apply -f -
 
 grep -E '^(POSTGRES_USER|POSTGRES_PASSWORD|RABBITMQ_USERNAME|RABBITMQ_NARRATIV_PASSWORD|MAIL_USERNAME|MAIL_PASSWORD|GOOGLE_CLIENT_ID|SECRET_KEY|MINIO_ACCESS_KEY|MINIO_SECRET_KEY)=' \
   /secure/path/narrativ-dev.env > /tmp/narrativ-secrets.env
 
-kubectl -n narrativ create secret generic narrativ-secrets \
+kubectl -n narrativ-dev create secret generic narrativ-secrets \
   --from-env-file=/tmp/narrativ-secrets.env \
   --dry-run=client -o yaml | kubectl apply -f -
 
@@ -83,7 +83,7 @@ rm -f /tmp/narrativ-secrets.env
 Confirm that only key names are present; do not print secret values:
 
 ```bash
-kubectl -n narrativ describe secret narrativ-secrets
+kubectl -n narrativ-dev describe secret narrativ-secrets
 ```
 
 ## Firebase service account key
@@ -91,7 +91,7 @@ kubectl -n narrativ describe secret narrativ-secrets
 The key is a multi-line JSON file, so it does not belong in `narrativ-secrets` (which is built from an env file). It lives in its own Secret that is mounted as a file. Each environment has its own Firebase project and its own Secret: `narrativ-firebase-dev` for dev, `narrativ-firebase-prod` for prod. The backend reads the project id from the key, so a pod can only push into the project of the key it was given.
 
 ```bash
-kubectl -n narrativ create secret generic narrativ-firebase-dev \
+kubectl -n narrativ-dev create secret generic narrativ-firebase-dev \
   --from-file=credentials.json=/secure/path/narrativ-firebase-adminsdk-<id>.json \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
@@ -99,7 +99,7 @@ kubectl -n narrativ create secret generic narrativ-firebase-dev \
 The Secret key must stay `credentials.json`: the Deployment mounts the Secret at `/etc/narrativ/firebase` and the ConfigMap sets `FIREBASE_CREDENTIALS_FILE=/etc/narrativ/firebase/credentials.json`. Check it without printing the private key:
 
 ```bash
-kubectl -n narrativ get secret narrativ-firebase-dev -o jsonpath='{.data.credentials\.json}' \
+kubectl -n narrativ-dev get secret narrativ-firebase-dev -o jsonpath='{.data.credentials\.json}' \
   | base64 -d | jq '{project_id, client_email, private_key_id}'
 ```
 
@@ -116,8 +116,8 @@ Whenever a credential changes:
 3. Restart the deployment so environment variables are reloaded:
 
    ```bash
-   kubectl -n narrativ rollout restart deployment/narrativ-app
-   kubectl -n narrativ rollout status deployment/narrativ-app
+   kubectl -n narrativ-dev rollout restart deployment/narrativ-app
+   kubectl -n narrativ-dev rollout status deployment/narrativ-app
    ```
 
 Changing a Kubernetes Secret does not update environment variables in existing Pods automatically.

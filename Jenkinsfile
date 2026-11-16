@@ -13,7 +13,7 @@ pipeline {
         IMAGE_PLATFORM = 'linux/amd64'
         GITOPS_REPOSITORY = 'https://github.com/rizkysiregar/homelabs-gitops.git'
         GITOPS_BRANCH = 'main'
-        GITOPS_MANIFEST = 'apps/narrativ/kustomization.yaml'
+        GITOPS_MANIFEST = 'apps/narrativ-dev/kustomization.yaml'
         MAVEN_IMAGE = 'maven:3.9-eclipse-temurin-25'
         YQ_IMAGE = 'mikefarah/yq:4.45.4'
     }
@@ -127,7 +127,7 @@ pipeline {
                                 exit 0
                             fi
 
-                            git commit -m "deploy(narrativ): $IMAGE_TAG"
+                            git commit -m "deploy(narrativ-dev): $IMAGE_TAG"
                             git push origin "HEAD:$GITOPS_BRANCH"
                         '''
                     }

@@ -10,7 +10,7 @@ This is a one-time setup guide followed by a repeatable release workflow. Comple
 | --- | --- | --- | --- |
 | 1 | Prepare application configuration | The container must use safe production-like defaults before it starts in the cluster | `application-dev.yml` uses `ddl-auto: validate` |
 | 2 | Create the private Kubernetes Secret | Pods need credentials, but Git must not contain them | `narrativ-secrets` exists with all required keys |
-| 3 | Create GitOps manifests | Argo CD needs a desired state to reconcile | `kubectl kustomize apps/narrativ` renders valid YAML |
+| 3 | Create GitOps manifests | Argo CD needs a desired state to reconcile | `kubectl kustomize apps/narrativ-dev` renders valid YAML |
 | 4 | Push GitOps manifests | Argo CD only sees committed Git state | Changes are on `homelabs-gitops/main` |
 | 5 | Create the Argo CD Application | This tells Argo CD which repository path it owns | Application is `Synced` and `Healthy` |
 | 6 | Configure Cloudflare Tunnel hostname | It makes the private ingress reachable through the public domain | Public health endpoint responds |
@@ -26,7 +26,7 @@ Jenkins builds, tests, publishes image to Docker Hub,
 and commits the image tag to homelabs-gitops/main
         |
         v
-Argo CD watches homelabs-gitops/apps/narrativ
+Argo CD watches homelabs-gitops/apps/narrativ-dev
 and applies Kubernetes manifests to RKE2
 ```
 
@@ -78,7 +78,7 @@ The initial Cloudflare Tunnel origin will be `http://192.168.1.71:30080`.
 | Developer | Pushes application changes | None required for normal development |
 | Jenkins | Builds/tests the application, pushes Docker image, updates GitOps image tag | None |
 | Argo CD | Detects GitOps changes and reconciles Kubernetes resources | Cluster deployment access |
-| Cluster operator | Creates and rotates sensitive Kubernetes Secret manually | Limited `kubectl` access to namespace `narrativ` |
+| Cluster operator | Creates and rotates sensitive Kubernetes Secret manually | Limited `kubectl` access to namespace `narrativ-dev` |
 
 Jenkins must not use `kubectl`, Helm deployment commands, or a cluster-admin kubeconfig. It does delivery to Git; Argo CD does deployment from Git.
 
@@ -187,17 +187,17 @@ Populate the sensitive keys listed in the previous section from the existing loc
 Create or update the Kubernetes Secret before deploying the application:
 
 ```bash
-kubectl create namespace narrativ --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace narrativ-dev --dry-run=client -o yaml | kubectl apply -f -
 
 grep -E '^(POSTGRES_USER|POSTGRES_PASSWORD|RABBITMQ_USERNAME|RABBITMQ_NARRATIV_PASSWORD|MAIL_USERNAME|MAIL_PASSWORD|GOOGLE_CLIENT_ID|SECRET_KEY|MINIO_ACCESS_KEY|MINIO_SECRET_KEY)=' \
   /secure/narrativ/narrativ-dev.env > /tmp/narrativ-secrets.env
 
-kubectl -n narrativ create secret generic narrativ-secrets \
+kubectl -n narrativ-dev create secret generic narrativ-secrets \
   --from-env-file=/tmp/narrativ-secrets.env \
   --dry-run=client -o yaml | kubectl apply -f -
 
 rm -f /tmp/narrativ-secrets.env
-kubectl -n narrativ describe secret narrativ-secrets
+kubectl -n narrativ-dev describe secret narrativ-secrets
 ```
 
 The final command must show only secret key names and never print their values.
@@ -218,7 +218,7 @@ Before the first deployment, compare the ConfigMap and Secret key names against 
 After a successful rollout, verify the names without printing secret values:
 
 ```bash
-kubectl -n narrativ exec deployment/narrativ-app -- printenv | cut -d= -f1 | sort
+kubectl -n narrativ-dev exec deployment/narrativ-app -- printenv | cut -d= -f1 | sort
 ```
 
 ## 9. Set JPA schema mode before deployment
@@ -243,7 +243,7 @@ Because Flyway migrations were removed, future schema changes must be planned ex
 Create this directory in the `homelabs-gitops` repository:
 
 ```text
-apps/narrativ/
+apps/narrativ-dev/
   namespace.yaml
   configmap.yaml
   deployment.yaml
@@ -320,7 +320,7 @@ images:
 Run this locally in the GitOps repository before pushing:
 
 ```bash
-kubectl kustomize apps/narrativ
+kubectl kustomize apps/narrativ-dev
 ```
 
 ## 11. Create the Argo CD Application
@@ -333,7 +333,7 @@ Create this manually in the Argo CD dashboard, mirroring the portfolio applicati
 | Project | `default`, unless you already use a dedicated AppProject |
 | Repository | `https://github.com/rizkysiregar/homelabs-gitops.git` |
 | Revision | `main` |
-| Path | `apps/narrativ` |
+| Path | `apps/narrativ-dev` |
 | Cluster destination | `https://kubernetes.default.svc` |
 | Namespace | `narrativ` |
 | Sync | Automated |
@@ -344,10 +344,10 @@ Create the `narrativ-secrets` Secret first. Otherwise the Deployment cannot star
 After Argo CD syncs, verify:
 
 ```bash
-kubectl -n narrativ get all
-kubectl -n narrativ get ingress
-kubectl -n narrativ rollout status deployment/narrativ-app
-kubectl -n narrativ logs deployment/narrativ-app --tail=100
+kubectl -n narrativ-dev get all
+kubectl -n narrativ-dev get ingress
+kubectl -n narrativ-dev rollout status deployment/narrativ-app
+kubectl -n narrativ-dev logs deployment/narrativ-app --tail=100
 ```
 
 ## 12. Configure Cloudflare Tunnel
@@ -379,7 +379,7 @@ curl -i https://api-dev-narrativ.rizkysiregar.my.id/api/v1/actuator/health
 
 ## 13. Jenkins CI pipeline design
 
-The NARRATIV `Jenkinsfile` updates `homelabs-gitops/apps/narrativ/kustomization.yaml`; it does not update the legacy Helm chart that was removed from this repository.
+The NARRATIV `Jenkinsfile` updates `homelabs-gitops/apps/narrativ-dev/kustomization.yaml`; it does not update the legacy Helm chart that was removed from this repository.
 
 Required stages:
 
@@ -389,7 +389,7 @@ Required stages:
 4. Build image `ghcr.io/rizkysiregar/narrativ-service:<short-git-sha>`.
 5. Push the immutable SHA image tag to Docker Hub. Updating `latest` is optional and must not be used by GitOps.
 6. Clone `homelabs-gitops` branch `main` using the existing GitHub PAT credential.
-7. Update only the matching `images[].newTag` value in `apps/narrativ/kustomization.yaml` with `yq`.
+7. Update only the matching `images[].newTag` value in `apps/narrativ-dev/kustomization.yaml` with `yq`.
 8. Commit with a message such as `deploy(narrativ): <git-sha>` and push to `main`.
 9. Finish. Do not run `kubectl`, Helm upgrade, or Argo CD sync commands from Jenkins.
 
@@ -411,8 +411,8 @@ The pipeline uses the Java 25 Maven image declared in its configuration and make
 3. Restart Pods because environment variables are read only at Pod startup:
 
    ```bash
-   kubectl -n narrativ rollout restart deployment/narrativ-app
-   kubectl -n narrativ rollout status deployment/narrativ-app
+   kubectl -n narrativ-dev rollout restart deployment/narrativ-app
+   kubectl -n narrativ-dev rollout status deployment/narrativ-app
    ```
 
 4. Verify logs and the health endpoint.
@@ -435,12 +435,12 @@ For a secret rollback, restore the previous protected `.env` version manually, r
 Do not create the Argo CD Application until every required item is checked:
 
 - [ ] The ingress NodePort Service has populated endpoints and is reachable from `192.168.1.50` at `192.168.1.71:30080`.
-- [ ] `narrativ-secrets` exists in namespace `narrativ`; its key names match section 5.
+- [ ] `narrativ-secrets` exists in namespace `narrativ-dev`; its key names match section 5.
 - [ ] `narrativ-config` provides every required non-sensitive variable from `.env.example` for profile `dev`.
 - [ ] `application-dev.yml` uses `spring.jpa.hibernate.ddl-auto: validate`.
 - [ ] The worker node can reach every external development dependency on `192.168.1.50`.
 - [ ] A specific immutable image tag has been pushed to Docker Hub and is pullable by the cluster.
-- [ ] The GitOps manifests render successfully with `kubectl kustomize apps/narrativ`.
+- [ ] The GitOps manifests render successfully with `kubectl kustomize apps/narrativ-dev`.
 - [ ] The Ingress hostname is exactly `api-dev-narrativ.rizkysiregar.my.id`.
 - [ ] The Cloudflare Tunnel public hostname routes to `http://192.168.1.71:30080`.
 - [ ] Jenkins has no Kubernetes credentials and updates only the GitOps image tag.
@@ -502,9 +502,9 @@ MINIO_SECRET_KEY=
 Then create the Secret:
 
 ```bash
-kubectl create namespace narrativ --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace narrativ-dev --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl -n narrativ create secret generic narrativ-secrets \
+kubectl -n narrativ-dev create secret generic narrativ-secrets \
   --from-env-file=/secure/narrativ/narrativ-dev.env \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
@@ -518,7 +518,7 @@ This Secret stays outside Git and outside Jenkins. Argo CD will reference it but
 **Checkpoint**
 
 ```bash
-kubectl -n narrativ describe secret narrativ-secrets
+kubectl -n narrativ-dev describe secret narrativ-secrets
 ```
 
 Confirm that the expected key names appear. Do not run commands that print the secret values.
@@ -532,13 +532,13 @@ Clone the GitOps repository and create the application directory:
 ```bash
 git clone https://github.com/rizkysiregar/homelabs-gitops.git
 cd homelabs-gitops
-mkdir -p apps/narrativ
+mkdir -p apps/narrativ-dev
 ```
 
 Create these six files:
 
 ```text
-apps/narrativ/
+apps/narrativ-dev/
   namespace.yaml
   configmap.yaml
   deployment.yaml
@@ -567,7 +567,7 @@ Do not create `secret.yaml`; Secret values must not enter Git.
 **Checkpoint**
 
 ```bash
-find apps/narrativ -maxdepth 1 -type f | sort
+find apps/narrativ-dev -maxdepth 1 -type f | sort
 ```
 
 It must list exactly the six files above.
@@ -646,13 +646,13 @@ Confirm all of these statements are true before committing:
 Render the resources locally:
 
 ```bash
-kubectl kustomize apps/narrativ > /tmp/narrativ-rendered.yaml
+kubectl kustomize apps/narrativ-dev > /tmp/narrativ-rendered.yaml
 ```
 
 Review the output for the namespace, image, Service selector, and Ingress host. Then commit only the six non-secret files:
 
 ```bash
-git add apps/narrativ
+git add apps/narrativ-dev
 git commit -m "feat: add narrativ dev GitOps manifests"
 git push origin main
 ```
@@ -680,7 +680,7 @@ In the Argo CD dashboard, create an Application with:
 Name:        narrativ-dev
 Repository:  https://github.com/rizkysiregar/homelabs-gitops.git
 Revision:    main
-Path:        apps/narrativ
+Path:        apps/narrativ-dev
 Destination: https://kubernetes.default.svc
 Namespace:   narrativ
 Sync policy: Automated, Prune enabled, Self Heal enabled
@@ -702,9 +702,9 @@ Sync status: Synced
 If it is not healthy, inspect Kubernetes before proceeding:
 
 ```bash
-kubectl -n narrativ get pods,svc,ingress
-kubectl -n narrativ describe pod -l app=narrativ-app
-kubectl -n narrativ logs deployment/narrativ-app --tail=100
+kubectl -n narrativ-dev get pods,svc,ingress
+kubectl -n narrativ-dev describe pod -l app=narrativ-app
+kubectl -n narrativ-dev logs deployment/narrativ-app --tail=100
 ```
 
 ### Step 7 — publish the hostname through Cloudflare Tunnel
@@ -742,7 +742,7 @@ Configure the NARRATIV Jenkins job to run the included Jenkinsfile. It will:
 1. Build and test Java code.
 2. Build and push `ghcr.io/rizkysiregar/narrativ-service:<commit-sha>`.
 3. Clone `homelabs-gitops` branch `main`.
-4. Change only `apps/narrativ/kustomization.yaml` image `newTag`.
+4. Change only `apps/narrativ-dev/kustomization.yaml` image `newTag`.
 5. Commit and push the GitOps change.
 
 **Why**
@@ -761,10 +761,10 @@ Argo CD should then reconcile that GitOps commit automatically.
 ## 19. Post-deployment checks
 
 ```bash
-kubectl -n narrativ get pods,svc,ingress
-kubectl -n narrativ describe ingress narrativ-ingress
-kubectl -n narrativ rollout status deployment/narrativ-app
-kubectl -n narrativ logs deployment/narrativ-app --tail=100
+kubectl -n narrativ-dev get pods,svc,ingress
+kubectl -n narrativ-dev describe ingress narrativ-ingress
+kubectl -n narrativ-dev rollout status deployment/narrativ-app
+kubectl -n narrativ-dev logs deployment/narrativ-app --tail=100
 curl -i https://api-dev-narrativ.rizkysiregar.my.id/api/v1/actuator/health
 ```
 

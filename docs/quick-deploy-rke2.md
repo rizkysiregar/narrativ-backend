@@ -11,7 +11,7 @@ docker login
 make image-push TAG=latest
 ```
 
-Why: `make image-push` packages the application and uses Docker Buildx to build a `linux/amd64` image. This is required because the MacBook M4 is ARM64 while the RKE2 nodes are AMD64 Linux. The first GitOps deployment uses the `latest` image configured in `apps/narrativ/kustomization.yaml`; Jenkins will later replace this with immutable commit-SHA tags.
+Why: `make image-push` packages the application and uses Docker Buildx to build a `linux/amd64` image. This is required because the MacBook M4 is ARM64 while the RKE2 nodes are AMD64 Linux. The first GitOps deployment uses the `latest` image configured in `apps/narrativ-dev/kustomization.yaml`; Jenkins will later replace this with immutable commit-SHA tags.
 
 ## 2. Create the private Kubernetes Secret
 
@@ -25,13 +25,13 @@ install -m 600 deploy/narrativ-dev.secrets.env /secure/narrativ/narrativ-dev.env
 From a machine with `kubectl` access to RKE2, run:
 
 ```bash
-kubectl create namespace narrativ --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace narrativ-dev --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl -n narrativ create secret generic narrativ-secrets \
+kubectl -n narrativ-dev create secret generic narrativ-secrets \
   --from-env-file=/secure/narrativ/narrativ-dev.env \
   --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl -n narrativ describe secret narrativ-secrets
+kubectl -n narrativ-dev describe secret narrativ-secrets
 ```
 
 Why: the Deployment reads passwords and keys from this Secret. Do not commit this file or create a plaintext `secret.yaml`.
@@ -41,15 +41,15 @@ Why: the Deployment reads passwords and keys from this Secret. Do not commit thi
 The manifests are already prepared in:
 
 ```text
-homelabs-gitops/apps/narrativ/
+homelabs-gitops/apps/narrativ-dev/
 ```
 
 Render them first:
 
 ```bash
 cd /Users/rizkysiregar/Documents/work/personal-project/homelabs-gitops
-kubectl kustomize apps/narrativ
-git add apps/narrativ
+kubectl kustomize apps/narrativ-dev
+git add apps/narrativ-dev
 git commit -m "feat: add narrativ dev deployment"
 git push origin main
 ```
@@ -64,7 +64,7 @@ In the Argo CD UI, create:
 Application name: narrativ-dev
 Repository:       https://github.com/rizkysiregar/homelabs-gitops.git
 Revision:         main
-Path:             apps/narrativ
+Path:             apps/narrativ-dev
 Destination:      https://kubernetes.default.svc
 Namespace:        narrativ
 Sync policy:      Automated, Prune, Self Heal
@@ -87,9 +87,9 @@ Why: NodePort `30080` reaches the shared NGINX Ingress Controller, which routes 
 ## 6. Verify
 
 ```bash
-kubectl -n narrativ get pods,svc,ingress
-kubectl -n narrativ rollout status deployment/narrativ-app
-kubectl -n narrativ logs deployment/narrativ-app --tail=100
+kubectl -n narrativ-dev get pods,svc,ingress
+kubectl -n narrativ-dev rollout status deployment/narrativ-app
+kubectl -n narrativ-dev logs deployment/narrativ-app --tail=100
 curl -i https://api-dev-narrativ.rizkysiregar.my.id/api/v1/actuator/health
 ```
 
