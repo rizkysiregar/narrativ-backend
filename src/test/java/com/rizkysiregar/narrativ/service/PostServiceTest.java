@@ -793,4 +793,89 @@ public class PostServiceTest {
         assertThrows(BusinessException.class, () -> postService.getAllPostByUserId(0, 100000, "someone", userId, false));
         verifyNoInteractions(postPaginationRepository, userRepository);
     }
+
+    // ------------------------------------------------------------ one post by id
+
+    private UserEntity authorEntity() {
+        UserEntity author = new UserEntity();
+        author.setId(UUID.randomUUID());
+        author.setUsername("author");
+        return author;
+    }
+
+    @Test
+    void getPostById_returnsAMediaPostWithCountsAndPresignedMedia() throws Exception {
+        UUID viewerId = UUID.randomUUID();
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(authorEntity()).caption("hello")
+                .createdAt(LocalDateTime.now()).build();
+        when(postPaginationRepository.findVisibleById(post.getId(), viewerId)).thenReturn(Optional.of(post));
+        when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
+                .thenReturn(List.of(media(post.getId(), 0, "img.jpg", MediaType.IMAGE, null)));
+        when(fileStorageService.getPresignUrl("img.jpg")).thenReturn("signed-img");
+
+        PostFeedResponse item = postService.getPostById(post.getId(), viewerId);
+
+        assertEquals(post.getId(), item.getId());
+        assertEquals("author", item.getUsername());
+        assertEquals("hello", item.getCaption());
+        assertEquals("signed-img", item.getMedia().get(0).url());
+        assertEquals(ModerationStatus.ACTIVE, item.getModerationStatus());
+    }
+
+    @Test
+    void getPostById_returnsACaptionOnlyPostWithoutMedia() throws Exception {
+        UUID viewerId = UUID.randomUUID();
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(authorEntity()).caption("just words")
+                .createdAt(LocalDateTime.now()).build();
+        when(postPaginationRepository.findVisibleById(post.getId(), viewerId)).thenReturn(Optional.of(post));
+
+        PostFeedResponse item = postService.getPostById(post.getId(), viewerId);
+
+        assertEquals("just words", item.getCaption());
+        assertTrue(item.getMedia().isEmpty());
+        verify(fileStorageService, never()).getPresignUrl(any());
+    }
+
+    @Test
+    void getPostById_aPostTheViewerCannotSeeIsNotFound() {
+        UUID postId = UUID.randomUUID();
+        UUID viewerId = UUID.randomUUID();
+        when(postPaginationRepository.findVisibleById(postId, viewerId)).thenReturn(Optional.empty());
+
+        BusinessException error = assertThrows(BusinessException.class, () -> postService.getPostById(postId, viewerId));
+
+        assertEquals(HttpStatus.NOT_FOUND, error.getHttpStatus());
+    }
+
+    @Test
+    void getPostById_takenDownPostHidesItsContentFromOthers() {
+        PostEntity post = takenDownPost(authorEntity());
+        UUID viewerId = UUID.randomUUID();
+        when(postPaginationRepository.findVisibleById(post.getId(), viewerId)).thenReturn(Optional.of(post));
+        when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
+                .thenReturn(List.of(media(post.getId(), 0, "media.jpg", MediaType.IMAGE, null)));
+
+        PostFeedResponse item = postService.getPostById(post.getId(), viewerId);
+
+        assertEquals(ModerationStatus.TAKEN_DOWN, item.getModerationStatus());
+        assertNull(item.getCaption());
+        assertNull(item.getTakedownReason());
+        assertTrue(item.getMedia().isEmpty());
+    }
+
+    @Test
+    void getPostById_takenDownPostShowsTheAuthorHisContentAndTheReason() throws Exception {
+        UserEntity author = authorEntity();
+        PostEntity post = takenDownPost(author);
+        when(postPaginationRepository.findVisibleById(post.getId(), author.getId())).thenReturn(Optional.of(post));
+        when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
+                .thenReturn(List.of(media(post.getId(), 0, "media.jpg", MediaType.IMAGE, null)));
+        when(fileStorageService.getPresignUrl("media.jpg")).thenReturn("signed-media");
+
+        PostFeedResponse item = postService.getPostById(post.getId(), author.getId());
+
+        assertEquals("secret caption", item.getCaption());
+        assertEquals("melanggar aturan komunitas", item.getTakedownReason());
+        assertEquals("signed-media", item.getMedia().get(0).url());
+    }
 }

@@ -47,6 +47,15 @@ public class FeedPostController {
         return postService.getExplorePosts(page, size, userPrincipal.getUserId(), mediaOnly);
     }
 
+    @Operation(summary = "Get one post by id, e.g. to open it from a push notification. 404 when it is deleted, its author is gone or banned, or either side blocked the other. A taken down post is returned without caption and media, except to its author.")
+    @GetMapping("/{postId}")
+    public PostFeedResponse getPost(
+            @PathVariable UUID postId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return postService.getPostById(postId, userPrincipal.getUserId());
+    }
+
     @Operation(summary = "Get posts from followed users")
     @GetMapping("/following")
     public PaginatedResponse<PostFeedResponse> getFollowingPosts(

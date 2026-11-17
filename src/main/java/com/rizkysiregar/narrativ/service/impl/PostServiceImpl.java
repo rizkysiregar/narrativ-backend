@@ -130,48 +130,57 @@ public class PostServiceImpl implements PostService {
     }
 
     private PaginatedResponse<PostFeedResponse> buildPaginatedResponse(Page<PostEntity> postPage, UUID statusUserId) {
-        List<PostEntity> posts = postPage.getContent();
-        List<PostFeedResponse> content = List.of();
-
-        if (!posts.isEmpty()) {
-            List<UUID> postIds = posts.stream().map(PostEntity::getId).toList();
-            Map<UUID, Long> likeCounts = likeRepository.countByPostIds(postIds).stream()
-                    .collect(Collectors.toMap(PostCountDTO::postId, PostCountDTO::count));
-            Map<UUID, Long> commentCounts = commentRepository.countByPostIds(postIds, statusUserId).stream()
-                    .collect(Collectors.toMap(PostCountDTO::postId, PostCountDTO::count));
-            Set<UUID> likedPostIds = new HashSet<>(likeRepository.findLikedPostIds(statusUserId, postIds));
-            Map<UUID, List<PostMediaResponse>> mediaByPost = postMediaRepository
-                    .findByPostIdInOrderByPostIdAscPositionAsc(postIds).stream()
-                    .collect(Collectors.groupingBy(PostMediaEntity::getPostId,
-                            Collectors.mapping(m -> new PostMediaResponse(
-                                    m.getId(), m.getMediaType(), m.getMediaKey(), m.getThumbnailKey()),
-                                    Collectors.toList())));
-
-            content = posts.stream().map(post -> {
-                PostFeedResponse response = new PostFeedResponse(
-                        post.getId(),
-                        post.getUser().getUsername(),
-                        post.getCaption(),
-                        mediaByPost.getOrDefault(post.getId(), List.of()),
-                        post.getCreatedAt(),
-                        likeCounts.getOrDefault(post.getId(), 0L),
-                        commentCounts.getOrDefault(post.getId(), 0L),
-                        likedPostIds.contains(post.getId())
-                );
-                response.setUserId(post.getUser().getId());
-                applyModeration(response, post, statusUserId);
-                response.setMedia(response.getMedia().stream().map(this::presign).toList());
-                return response;
-            }).toList();
-        }
-
         return new PaginatedResponse<>(
-                content,
+                toFeedResponses(postPage.getContent(), statusUserId),
                 postPage.getNumber(),
                 postPage.getSize(),
                 postPage.getTotalElements(),
                 postPage.getTotalPages(),
                 postPage.isLast());
+    }
+
+    @Override
+    public PostFeedResponse getPostById(UUID postId, UUID viewerId) {
+        log.debug("POST.FETCH postId={} viewerId={}", postId, viewerId);
+        // deleted, banned author and blocked all answer like a post that does not exist
+        PostEntity post = postPaginationRepository.findVisibleById(postId, viewerId)
+                .orElseThrow(() -> new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND));
+        return toFeedResponses(List.of(post), viewerId).getFirst();
+    }
+
+    private List<PostFeedResponse> toFeedResponses(List<PostEntity> posts, UUID statusUserId) {
+        if (posts.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> postIds = posts.stream().map(PostEntity::getId).toList();
+        Map<UUID, Long> likeCounts = likeRepository.countByPostIds(postIds).stream()
+                .collect(Collectors.toMap(PostCountDTO::postId, PostCountDTO::count));
+        Map<UUID, Long> commentCounts = commentRepository.countByPostIds(postIds, statusUserId).stream()
+                .collect(Collectors.toMap(PostCountDTO::postId, PostCountDTO::count));
+        Set<UUID> likedPostIds = new HashSet<>(likeRepository.findLikedPostIds(statusUserId, postIds));
+        Map<UUID, List<PostMediaResponse>> mediaByPost = postMediaRepository
+                .findByPostIdInOrderByPostIdAscPositionAsc(postIds).stream()
+                .collect(Collectors.groupingBy(PostMediaEntity::getPostId,
+                        Collectors.mapping(m -> new PostMediaResponse(
+                                m.getId(), m.getMediaType(), m.getMediaKey(), m.getThumbnailKey()),
+                                Collectors.toList())));
+
+        return posts.stream().map(post -> {
+            PostFeedResponse response = new PostFeedResponse(
+                    post.getId(),
+                    post.getUser().getUsername(),
+                    post.getCaption(),
+                    mediaByPost.getOrDefault(post.getId(), List.of()),
+                    post.getCreatedAt(),
+                    likeCounts.getOrDefault(post.getId(), 0L),
+                    commentCounts.getOrDefault(post.getId(), 0L),
+                    likedPostIds.contains(post.getId())
+            );
+            response.setUserId(post.getUser().getId());
+            applyModeration(response, post, statusUserId);
+            response.setMedia(response.getMedia().stream().map(this::presign).toList());
+            return response;
+        }).toList();
     }
 
     // the media still carries object keys here; a failed presign keeps the key so one bad object cannot break the feed
