@@ -37,6 +37,11 @@ public class EventDeduplicator {
         return redisUtil.setIfAbsent(key(consumer, eventKey), MARKER, ttlSeconds);
     }
 
+    /** Like {@link #tryReserve(String, String)} with its own lifetime, for "at most once per period" rules. */
+    public boolean tryReserve(String consumer, String eventKey, java.time.Duration ttl) {
+        return redisUtil.setIfAbsent(key(consumer, eventKey), MARKER, ttl.toSeconds());
+    }
+
     /**
      * Releases a reservation so a failed event can be retried on redelivery.
      */

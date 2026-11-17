@@ -2,13 +2,18 @@ package com.rizkysiregar.narrativ.service.impl;
 
 import com.rizkysiregar.narrativ.constant.GlobalMessage;
 import com.rizkysiregar.narrativ.exception.BusinessException;
+import com.rizkysiregar.narrativ.messaging.event.PostLikedEvent;
+import com.rizkysiregar.narrativ.messaging.publisher.PostEventPublisher;
 import com.rizkysiregar.narrativ.model.dto.PostLikeCountDTO;
 import com.rizkysiregar.narrativ.model.entity.LikeEntity;
+import com.rizkysiregar.narrativ.model.entity.PostEntity;
+import com.rizkysiregar.narrativ.model.entity.UserEntity;
 import com.rizkysiregar.narrativ.repository.LikeRepository;
 import com.rizkysiregar.narrativ.repository.UserBlockRepository;
 import com.rizkysiregar.narrativ.repository.PostCrudRepository;
 import com.rizkysiregar.narrativ.repository.UserRepository;
 import com.rizkysiregar.narrativ.service.LikeDislikeService;
+import com.rizkysiregar.narrativ.util.AfterCommit;
 import com.rizkysiregar.narrativ.util.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,22 +34,19 @@ public class LikeDislikeServiceImpl implements LikeDislikeService {
     private final UserRepository userRepository;
     private final PostCrudRepository postCrudRepository;
     private final UserBlockRepository userBlockRepository;
+    private final PostEventPublisher postEventPublisher;
 
     @Override
     public Operation likePost(UUID postId, UUID userId) {
         log.debug("POST.LIKE userId={} postId={}", userId, postId);
 
-        if (!userRepository.existsById(userId)) {
-            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-        }
+        UserEntity liker = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST));
 
         // a post of someone on either side of a block answers like a post that is gone
-        boolean likeable = postCrudRepository.findInteractableById(postId)
-                .map(post -> !userBlockRepository.existsBetween(userId, post.getUser().getId()))
-                .orElse(false);
-        if (!likeable) {
-            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-        }
+        PostEntity post = postCrudRepository.findInteractableById(postId)
+                .filter(found -> !userBlockRepository.existsBetween(userId, found.getUser().getId()))
+                .orElseThrow(() -> new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST));
 
         try {
             if (!likeRepository.existsByUserIdAndPostId(userId, postId)) {
@@ -53,6 +55,17 @@ public class LikeDislikeServiceImpl implements LikeDislikeService {
                 likeEntity.setPost(postCrudRepository.getReferenceById(postId));
                 likeEntity.setCreatedAt(LocalDateTime.now());
                 likeRepository.save(likeEntity);
+
+                // only a like that was really added tells the owner; the consumer also drops repeats of an
+                // unlike/like toggle
+                PostLikedEvent event = PostLikedEvent.builder()
+                        .postId(postId)
+                        .postOwnerId(post.getUser().getId())
+                        .likerId(userId)
+                        .likerUsername(liker.getUsername())
+                        .createdAt(likeEntity.getCreatedAt())
+                        .build();
+                AfterCommit.run("post liked event " + postId, () -> postEventPublisher.publishPostLiked(event));
             }
         } catch (DataIntegrityViolationException e) {
             // Duplicate entry - race condition

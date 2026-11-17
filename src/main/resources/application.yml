@@ -98,6 +98,8 @@ app:
       dry-run: ${APP_STORAGE_ORPHAN_CLEANUP_DRY_RUN:true}
   messaging:
     idempotency-ttl-seconds: ${APP_MESSAGING_IDEMPOTENCY_TTL_SECONDS:86400}
+    # one "X liked your post" push per liker and post in this period, so an unlike/like toggle cannot spam the owner
+    like-dedup-ttl-seconds: ${APP_MESSAGING_LIKE_DEDUP_TTL_SECONDS:86400}
 
 
 logging:
