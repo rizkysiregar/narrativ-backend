@@ -22,7 +22,7 @@ This is a one-time setup guide followed by a repeatable release workflow. Comple
 Developer pushes code to narrativ-backend/master
         |
         v
-Jenkins builds, tests, publishes image to Docker Hub,
+Jenkins builds, tests, publishes image to GHCR,
 and commits the image tag to homelabs-gitops/main
         |
         v
@@ -138,7 +138,7 @@ Complete these before creating the Argo CD application:
 
 3. Confirm the worker node can reach `192.168.1.50` on all dependency ports: PostgreSQL `5433`, Redis `6379`, RabbitMQ `5672`, and Zipkin `9411`.
 4. Ensure the GHCR package `ghcr.io/rizkysiregar/narrativ-service` is available to the cluster. If it becomes private, create an `imagePullSecret` and reference it in the Deployment.
-5. Store Docker Hub and GitHub PAT credentials in Jenkins, following the existing portfolio convention.
+5. Store the GitHub PAT credential (`github-all-repo-pat`, used for GHCR and GitOps) in Jenkins.
 6. Revoke any token that has been committed in documentation or source history, and store replacement credentials only in Jenkins or the private environment file.
 
 ### Repair the ingress NodePort Service
@@ -387,10 +387,10 @@ Required stages:
 2. Run `mvn clean test` using the Java version declared by `pom.xml`.
 3. Run `mvn package` to produce `target/*.jar`.
 4. Build image `ghcr.io/rizkysiregar/narrativ-service:<short-git-sha>`.
-5. Push the immutable SHA image tag to Docker Hub. Updating `latest` is optional and must not be used by GitOps.
+5. Push the immutable SHA image tag to GHCR. Updating `latest` is optional and must not be used by GitOps.
 6. Clone `homelabs-gitops` branch `main` using the existing GitHub PAT credential.
 7. Update only the matching `images[].newTag` value in `apps/narrativ-dev/kustomization.yaml` with `yq`.
-8. Commit with a message such as `deploy(narrativ): <git-sha>` and push to `main`.
+8. Commit with a message such as `deploy(narrativ-dev): <git-sha>` and push to `main`.
 9. Finish. Do not run `kubectl`, Helm upgrade, or Argo CD sync commands from Jenkins.
 
 The pipeline uses the Java 25 Maven image declared in its configuration and makes tests a required gate. If tests fail, Jenkins stops before an image is published or a GitOps change is made. See `docs/jenkins-pipeline-setup.md` for the Jenkins credential and job setup.
@@ -439,7 +439,7 @@ Do not create the Argo CD Application until every required item is checked:
 - [ ] `narrativ-config` provides every required non-sensitive variable from `.env.example` for profile `dev`.
 - [ ] `application-dev.yml` uses `spring.jpa.hibernate.ddl-auto: validate`.
 - [ ] The worker node can reach every external development dependency on `192.168.1.50`.
-- [ ] A specific immutable image tag has been pushed to Docker Hub and is pullable by the cluster.
+- [ ] A specific immutable image tag has been pushed to GHCR and is pullable by the cluster.
 - [ ] The GitOps manifests render successfully with `kubectl kustomize apps/narrativ-dev`.
 - [ ] The Ingress hostname is exactly `api-dev-narrativ.rizkysiregar.my.id`.
 - [ ] The Cloudflare Tunnel public hostname routes to `http://192.168.1.71:30080`.
@@ -753,8 +753,8 @@ The commit SHA image tag is immutable: it always identifies exactly the code ver
 
 A Jenkins run should leave two auditable records:
 
-- an image tag in Docker Hub;
-- a `deploy: narrativ <commit-sha>` commit in `homelabs-gitops`.
+- an image tag in GHCR (`ghcr.io/rizkysiregar/narrativ-service`);
+- a `deploy(narrativ-dev): <commit-sha>` commit in `homelabs-gitops`.
 
 Argo CD should then reconcile that GitOps commit automatically.
 

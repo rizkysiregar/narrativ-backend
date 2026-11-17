@@ -29,7 +29,7 @@ Do not put credentials in a ConfigMap. A Kubernetes Secret is encoded as Base64 
 Developer pushes application code
         |
         v
-Jenkins: test, build image, push Docker Hub, update image tag in homelabs-gitops
+Jenkins: test, build image, push to GHCR, update image tag in homelabs-gitops
         |
         v
 Argo CD: detects the GitOps commit and applies ConfigMap, Deployment, Service, and Ingress
