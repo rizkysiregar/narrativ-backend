@@ -1,10 +1,10 @@
 ```markdown
-# Feedzmore Backend App
+# NARRATIV Backend App
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://your-jenkins-url)
 [![Quality Gate Status](https://img.shields.io/badge/sonar-quality--gate-blue)](https://your-sonar-url)
 
-Feedzmore is a robust backend application built with **Java 21**, **Spring Boot**, and **Jakarta EE**. It provides a
+NARRATIV is a robust backend application built with **Java 21**, **Spring Boot**, and **Jakarta EE**. It provides a
 scalable architecture for [insert brief description of what the app does].
 
 ---
@@ -31,8 +31,8 @@ Before running the application, ensure you have the following installed:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/feedzmore.git
-cd feedzmore
+git clone https://github.com/your-username/narrativ.git
+cd narrativ
 ```
 
 ```
@@ -83,7 +83,7 @@ SONAR_TOKEN=your-token mvn clean verify sonar:sonar \
 Build the application image:
 
 ```shell script
-docker build -t feedzmore-backend .
+docker build -t narrativ-backend .
 ```
 
 ### CI/CD
@@ -102,4 +102,4 @@ This project includes a `Jenkinsfile` for automated pipelines. The pipeline hand
 - `Jenkinsfile`: Pipeline definitions.
 
 ---
-© 2024 Feedzmore Team
+© 2024 NARRATIV Team

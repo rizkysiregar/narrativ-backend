@@ -1,4 +1,4 @@
-APP_NAME ?= feedzmore-service
+APP_NAME ?= narrativ-service
 DOCKER_REPO ?= rizkysiregar
 TAG ?= latest
 PLATFORM ?= linux/amd64

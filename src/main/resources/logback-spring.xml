@@ -3,7 +3,7 @@
     <!-- Console JSON logs only -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <customFields>{"app":"feedzmore-service"}</customFields>
+            <customFields>{"app":"narrativ-service"}</customFields>
             <includeLevelValue>false</includeLevelValue>
             <fieldNames>
                 <trace>traceId</trace>
