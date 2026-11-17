@@ -24,6 +24,7 @@ public class RabbitMQConfig {
     public static final String NOTIFICATION_QUEUE = "notification.queue";
     public static final String EMAIL_QUEUE = "email.queue";
     public static final String COMMENT_REPLY_QUEUE = "comment.reply.queue";
+    public static final String POST_LIKED_QUEUE = "post.liked.queue";
     public static final String VIDEO_THUMBNAIL_REQUEST_QUEUE = "video.thumbnail.request.queue";
     public static final String VIDEO_THUMBNAIL_RESULT_QUEUE = "video.thumbnail.result.queue";
 
@@ -31,12 +32,14 @@ public class RabbitMQConfig {
     public static final String NOTIFICATION_DLQ = "notification.dlq";
     public static final String EMAIL_DLQ = "email.dlq";
     public static final String COMMENT_REPLY_DLQ = "comment.reply.dlq";
+    public static final String POST_LIKED_DLQ = "post.liked.dlq";
     public static final String VIDEO_THUMBNAIL_REQUEST_DLQ = "video.thumbnail.request.dlq";
     public static final String VIDEO_THUMBNAIL_RESULT_DLQ = "video.thumbnail.result.dlq";
 
     // --- Routing keys ---
     public static final String POST_CREATED_ROUTING_KEY = "post.created";
     public static final String COMMENT_REPLIED_ROUTING_KEY = "comment.replied";
+    public static final String POST_LIKED_ROUTING_KEY = "post.liked";
     public static final String VIDEO_THUMBNAIL_REQUESTED_ROUTING_KEY = "video.thumbnail.requested";
     public static final String VIDEO_THUMBNAIL_GENERATED_ROUTING_KEY = "video.thumbnail.generated";
 
@@ -44,6 +47,7 @@ public class RabbitMQConfig {
     public static final String NOTIFICATION_CONSUMER = "notification";
     public static final String EMAIL_CONSUMER = "email";
     public static final String COMMENT_REPLY_CONSUMER = "comment-reply";
+    public static final String POST_LIKE_CONSUMER = "post-like";
 
     public static final int LISTENER_PREFETCH_COUNT = 10;
     public static final int LISTENER_MAX_RETRIES = 3;
@@ -149,7 +153,37 @@ public class RabbitMQConfig {
                 .with(EMAIL_DLQ);
     }
 
-    // --- Comment reply (push when the user has a device, email otherwise) ---
+    // --- Post liked (push to the post owner) ---
+    @Bean
+    public Queue postLikedQueue() {
+        return QueueBuilder.durable(POST_LIKED_QUEUE)
+                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", POST_LIKED_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Binding postLikedBinding() {
+        return BindingBuilder
+                .bind(postLikedQueue())
+                .to(postExchange())
+                .with(POST_LIKED_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue postLikedDlq() {
+        return QueueBuilder.durable(POST_LIKED_DLQ).build();
+    }
+
+    @Bean
+    public Binding postLikedDlqBinding() {
+        return BindingBuilder
+                .bind(postLikedDlq())
+                .to(deadLetterExchange())
+                .with(POST_LIKED_DLQ);
+    }
+
+    // --- Comment on a post (push to the post owner and to the owner of a comment that was answered) ---
     @Bean
     public Queue commentReplyQueue() {
         return QueueBuilder.durable(COMMENT_REPLY_QUEUE)

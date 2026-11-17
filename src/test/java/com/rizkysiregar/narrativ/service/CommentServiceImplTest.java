@@ -184,12 +184,14 @@ class CommentServiceImplTest {
         ArgumentCaptor<CommentRepliedEvent> event = ArgumentCaptor.forClass(CommentRepliedEvent.class);
         verify(commentEventPublisher).publishCommentReplied(event.capture());
         assertEquals(budi.getId(), event.getValue().getRecipientId());
+        assertEquals(post.getUser().getId(), event.getValue().getPostOwnerId());
         assertEquals("citra", event.getValue().getReplierUsername());
     }
 
     @Test
-    void addComment_replyingToYourOwnCommentDoesNotNotifyAnyone() {
-        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(user("owner")).build();
+    void addComment_replyingToYourOwnCommentOnSomeoneElsesPostOnlyTellsThePostOwner() {
+        UserEntity owner = user("owner");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(owner).build();
         UserEntity ani = user("ani");
         CommentEntity root = comment(post, ani, null);
         when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
@@ -198,17 +200,37 @@ class CommentServiceImplTest {
 
         commentService.addComment(post.getId(), ani.getId(), "tambahan", root.getId());
 
-        verifyNoInteractions(commentEventPublisher);
+        ArgumentCaptor<CommentRepliedEvent> event = ArgumentCaptor.forClass(CommentRepliedEvent.class);
+        verify(commentEventPublisher).publishCommentReplied(event.capture());
+        assertNull(event.getValue().getRecipientId());
+        assertEquals(owner.getId(), event.getValue().getPostOwnerId());
     }
 
     @Test
-    void addComment_topLevelCommentDoesNotNotifyAnyone() {
-        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(user("owner")).build();
+    void addComment_topLevelCommentTellsThePostOwner() {
+        UserEntity owner = user("owner");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(owner).build();
         UserEntity ani = user("ani");
         when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
         when(userRepository.findById(ani.getId())).thenReturn(Optional.of(ani));
 
         commentService.addComment(post.getId(), ani.getId(), "halo", null);
+
+        ArgumentCaptor<CommentRepliedEvent> event = ArgumentCaptor.forClass(CommentRepliedEvent.class);
+        verify(commentEventPublisher).publishCommentReplied(event.capture());
+        assertNull(event.getValue().getRecipientId());
+        assertEquals(owner.getId(), event.getValue().getPostOwnerId());
+        assertEquals(ani.getId(), event.getValue().getReplierId());
+    }
+
+    @Test
+    void addComment_ownerCommentingOnTheirOwnPostDoesNotNotifyAnyone() {
+        UserEntity owner = user("owner");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(owner).build();
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+        when(userRepository.findById(owner.getId())).thenReturn(Optional.of(owner));
+
+        commentService.addComment(post.getId(), owner.getId(), "update", null);
 
         verifyNoInteractions(commentEventPublisher);
     }

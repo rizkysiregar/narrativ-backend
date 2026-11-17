@@ -2,6 +2,7 @@ package com.rizkysiregar.narrativ.messaging.publisher;
 
 import com.rizkysiregar.narrativ.config.RabbitMQConfig;
 import com.rizkysiregar.narrativ.messaging.event.PostCreatedEvent;
+import com.rizkysiregar.narrativ.messaging.event.PostLikedEvent;
 import com.rizkysiregar.narrativ.messaging.event.VideoThumbnailRequestedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,5 +77,18 @@ class PostEventPublisherTest {
                 eq(event),
                 any(CorrelationData.class));
         assertEquals("user/POST_FEED/video_thumb.jpg", event.getThumbnailObjectKey());
+    }
+
+    @Test
+    void publishesPostLikedWithItsOwnRoutingKey() {
+        PostLikedEvent event = PostLikedEvent.builder().postId(UUID.randomUUID()).build();
+
+        publisher.publishPostLiked(event);
+
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.POST_EXCHANGE),
+                eq(RabbitMQConfig.POST_LIKED_ROUTING_KEY),
+                eq(event),
+                any(CorrelationData.class));
     }
 }

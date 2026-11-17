@@ -2,6 +2,7 @@ package com.rizkysiregar.narrativ.messaging.publisher;
 
 import com.rizkysiregar.narrativ.config.RabbitMQConfig;
 import com.rizkysiregar.narrativ.messaging.event.PostCreatedEvent;
+import com.rizkysiregar.narrativ.messaging.event.PostLikedEvent;
 import com.rizkysiregar.narrativ.messaging.event.VideoThumbnailRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,24 @@ public class PostEventPublisher {
             );
         } catch (Exception e) {
             log.error("EVENT.PUBLISH.FAILED type=PostCreated id={} postId={} reason={}",
+                    eventId, event.getPostId(), e.getMessage());
+        }
+    }
+
+    /** Same fire-and-forget semantics as {@link #publishPostCreatedEvent}: the like is already saved. */
+    @Async("postEventExecutor")
+    public void publishPostLiked(PostLikedEvent event) {
+        String eventId = UUID.randomUUID().toString();
+        log.debug("EVENT.PUBLISH type=PostLiked id={} postId={}", eventId, event.getPostId());
+        try {
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.POST_EXCHANGE,
+                    RabbitMQConfig.POST_LIKED_ROUTING_KEY,
+                    event,
+                    new CorrelationData(eventId)
+            );
+        } catch (Exception e) {
+            log.error("EVENT.PUBLISH.FAILED type=PostLiked id={} postId={} reason={}",
                     eventId, event.getPostId(), e.getMessage());
         }
     }

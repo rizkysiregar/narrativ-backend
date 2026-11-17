@@ -89,13 +89,18 @@ public class CommentServiceImpl implements CommentService {
 
         commentRepository.save(comment);
 
-        if (replyTo != null && !replyTo.getUser().getId().equals(userId)) {
+        // the post owner is always told, the owner of the answered comment too; nobody is told about themselves
+        UUID postOwnerId = post.getUser().getId();
+        UUID answeredOwnerId = replyTo != null && !replyTo.getUser().getId().equals(userId)
+                ? replyTo.getUser().getId() : null;
+        if (answeredOwnerId != null || !postOwnerId.equals(userId)) {
             CommentRepliedEvent event = CommentRepliedEvent.builder()
                     .commentId(comment.getId())
                     .postId(post.getId())
                     .replierId(userId)
                     .replierUsername(user.getUsername())
-                    .recipientId(replyTo.getUser().getId())
+                    .recipientId(answeredOwnerId)
+                    .postOwnerId(postOwnerId)
                     .contentPreview(preview(content))
                     .createdAt(comment.getCreatedAt())
                     .build();

@@ -1,6 +1,8 @@
 package com.rizkysiregar.narrativ.service;
 
 import com.rizkysiregar.narrativ.exception.BusinessException;
+import com.rizkysiregar.narrativ.messaging.event.PostLikedEvent;
+import com.rizkysiregar.narrativ.messaging.publisher.PostEventPublisher;
 import com.rizkysiregar.narrativ.model.entity.PostEntity;
 import com.rizkysiregar.narrativ.model.entity.UserEntity;
 import com.rizkysiregar.narrativ.repository.LikeRepository;
@@ -11,6 +13,7 @@ import com.rizkysiregar.narrativ.service.impl.LikeDislikeServiceImpl;
 import com.rizkysiregar.narrativ.util.Operation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +41,8 @@ class LikeDislikeServiceImplTest {
     private PostCrudRepository postCrudRepository;
     @Mock
     private UserBlockRepository userBlockRepository;
+    @Mock
+    private PostEventPublisher postEventPublisher;
 
     @InjectMocks
     private LikeDislikeServiceImpl service;
@@ -51,9 +57,16 @@ class LikeDislikeServiceImplTest {
         return user;
     }
 
+    private UserEntity likerEntity() {
+        UserEntity user = new UserEntity();
+        user.setId(liker);
+        user.setUsername("budi");
+        return user;
+    }
+
     @Test
     void likeWorksWhenNobodyBlockedAnybody() {
-        when(userRepository.existsById(liker)).thenReturn(true);
+        when(userRepository.findById(liker)).thenReturn(Optional.of(likerEntity()));
         when(postCrudRepository.findInteractableById(postId))
                 .thenReturn(Optional.of(PostEntity.builder().id(postId).user(owner).build()));
         when(userRepository.getReferenceById(liker)).thenReturn(new UserEntity());
@@ -65,8 +78,39 @@ class LikeDislikeServiceImplTest {
     }
 
     @Test
+    void aNewLikeTellsThePostOwnerThroughAnEvent() {
+        when(userRepository.findById(liker)).thenReturn(Optional.of(likerEntity()));
+        when(postCrudRepository.findInteractableById(postId))
+                .thenReturn(Optional.of(PostEntity.builder().id(postId).user(owner).build()));
+        when(userRepository.getReferenceById(liker)).thenReturn(new UserEntity());
+        when(postCrudRepository.getReferenceById(postId)).thenReturn(PostEntity.builder().build());
+
+        service.likePost(postId, liker);
+
+        ArgumentCaptor<PostLikedEvent> event = ArgumentCaptor.forClass(PostLikedEvent.class);
+        verify(postEventPublisher).publishPostLiked(event.capture());
+        assertEquals(postId, event.getValue().getPostId());
+        assertEquals(owner.getId(), event.getValue().getPostOwnerId());
+        assertEquals(liker, event.getValue().getLikerId());
+        assertEquals("budi", event.getValue().getLikerUsername());
+    }
+
+    @Test
+    void likingAPostThatIsAlreadyLikedPublishesNothing() {
+        when(userRepository.findById(liker)).thenReturn(Optional.of(likerEntity()));
+        when(postCrudRepository.findInteractableById(postId))
+                .thenReturn(Optional.of(PostEntity.builder().id(postId).user(owner).build()));
+        when(likeRepository.existsByUserIdAndPostId(liker, postId)).thenReturn(true);
+
+        assertEquals(Operation.LIKED, service.likePost(postId, liker));
+
+        verify(likeRepository, never()).save(any());
+        verifyNoInteractions(postEventPublisher);
+    }
+
+    @Test
     void likeOnThePostOfSomeoneBlockedAnswersLikeAMissingPost() {
-        when(userRepository.existsById(liker)).thenReturn(true);
+        when(userRepository.findById(liker)).thenReturn(Optional.of(likerEntity()));
         when(postCrudRepository.findInteractableById(postId))
                 .thenReturn(Optional.of(PostEntity.builder().id(postId).user(owner).build()));
         when(userBlockRepository.existsBetween(liker, owner.getId())).thenReturn(true);
@@ -80,5 +124,14 @@ class LikeDislikeServiceImplTest {
         assertEquals(missing.getMessage(), blocked.getMessage());
         assertEquals(HttpStatus.BAD_REQUEST, blocked.getHttpStatus());
         verify(likeRepository, never()).save(any());
+    }
+
+    @Test
+    void likeFromAnUnknownUserIsRejected() {
+        when(userRepository.findById(liker)).thenReturn(Optional.empty());
+
+        assertThrows(BusinessException.class, () -> service.likePost(postId, liker));
+
+        verifyNoInteractions(postEventPublisher);
     }
 }
