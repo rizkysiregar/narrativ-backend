@@ -8,6 +8,7 @@ import org.springframework.data.repository.PagingAndSortingRepository;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -63,4 +64,15 @@ public interface PostPaginationRepository extends PagingAndSortingRepository<Pos
             """)
     Page<PostEntity> findAllActivePostsByUserId(Pageable pageable, @Param("userId") UUID userId,
                                                 @Param("mediaOnly") boolean mediaOnly, @Param("viewerId") UUID viewerId);
+
+    /**
+     * One post the viewer may see: same visibility as the feeds (not deleted, author active, no block either way).
+     * A taken down post is still found; the service masks its content for everybody but the author.
+     */
+    @Query("""
+            SELECT p FROM PostEntity p JOIN FETCH p.user author
+            WHERE p.id = :postId AND p.isDeleted = false AND author.isDeleted = false AND author.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE
+              AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = author.id) OR (b.blockerId = author.id AND b.blockedId = :viewerId))
+            """)
+    Optional<PostEntity> findVisibleById(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId);
 }

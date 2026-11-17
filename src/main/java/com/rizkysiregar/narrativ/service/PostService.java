@@ -15,6 +15,7 @@ import java.util.UUID;
 public interface PostService {
     PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, UUID userId, boolean mediaOnly);
     PaginatedResponse<PostFeedResponse> getFollowingPosts(int page, int size, UUID viewerId);
+    PostFeedResponse getPostById(UUID postId, UUID viewerId);
     PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String username, UUID viewerId, boolean mediaOnly);
     CreatePostUploadUrlResponse createUploadUrl(UUID userId, CreatePostUploadUrlRequest request);
     CreatePostResponse addNewPost(UUID userId, AddPostRequest addPostRequest);
