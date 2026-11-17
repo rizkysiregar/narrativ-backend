@@ -58,6 +58,9 @@ public class FirebaseNotificationService {
             if (data != null && !data.isEmpty()) {
                 message.put("data", data);
             }
+            // high priority so the push is delivered at once, also while the phone is dozing, and may pop up
+            // on screen instead of waiting in the shade
+            message.put("android", Map.of("priority", "HIGH"));
 
             return webClient.post()
                     .uri("/projects/{projectId}/messages:send", tokenService.getProjectId())

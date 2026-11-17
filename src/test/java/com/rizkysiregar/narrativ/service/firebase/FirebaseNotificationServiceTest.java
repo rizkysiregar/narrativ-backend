@@ -100,6 +100,7 @@ public class FirebaseNotificationServiceTest {
         Map<String, Object> message = (Map<String, Object>) ((Map<String, Object>) body.getValue()).get("message");
         Assertions.assertEquals(Map.of("postId", "42"), message.get("data"));
         Assertions.assertEquals("T", message.get("token"));
+        Assertions.assertEquals(Map.of("priority", "HIGH"), message.get("android"));
     }
 
     private UserDeviceEntity device(String token, String locale) {
