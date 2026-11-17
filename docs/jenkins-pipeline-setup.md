@@ -1,6 +1,6 @@
 # NARRATIV Jenkins pipeline setup
 
-This pipeline implements CI plus GitOps delivery. Jenkins builds and publishes an image, then commits the image tag to `homelabs-gitops`. Argo CD observes that GitOps commit and deploys it to RKE2. Jenkins does not receive a kubeconfig and must never run `kubectl`, Helm, or Argo CD commands.
+This pipeline implements CI plus GitOps delivery. Jenkins builds and publishes an image, then commits the image tag to [`homelabs-gitops`](https://github.com/rizkysiregar/homelabs-gitops). Argo CD observes that GitOps commit and deploys it to RKE2. Jenkins does not receive a kubeconfig and must never run `kubectl`, Helm, or Argo CD commands.
 
 ## What the Jenkins agent needs
 
@@ -9,7 +9,7 @@ The Jenkins agent that runs this job must have:
 - a `docker` CLI;
 - permission to access the host Docker socket;
 - `git` available;
-- outbound access to Docker Hub and GitHub.
+- outbound access to GitHub and GHCR (`ghcr.io`).
 
 The pipeline runs Maven and `yq` inside short-lived Docker containers, so Java, Maven, and `yq` do not need to be installed on the Jenkins host. The Docker host is expected to be AMD64 Linux; the pipeline nevertheless explicitly builds `linux/amd64`.
 
@@ -30,8 +30,7 @@ Create the following credentials in **Manage Jenkins → Credentials → System 
 | --- | --- | --- |
 | `github-all-repo-pat` | Username with password | GitHub username and PAT. It needs repository contents read/write for `homelabs-gitops`, and (classic PAT) the `write:packages` scope to push `ghcr.io/rizkysiregar/narrativ-service`; it also needs read access to `narrativ-backend` if Jenkins checks out the source through HTTPS. |
 
-Do not place either token in a Jenkinsfile, `.env`, GitOps manifest, or shell command history. The existing SonarQube token that was previously present in the README should be revoked and regenerated before it is used again.
-
+Do not place the token in a Jenkinsfile, `.env`, GitOps manifest, or shell command history.
 ## Create the job
 
 1. In Jenkins, select **New Item**.
@@ -62,7 +61,7 @@ For a commit on `master`, the Jenkinsfile performs this sequence:
 4. Builds and pushes `ghcr.io/rizkysiregar/narrativ-service:a1b2c3d4e5f6` to GitHub Container Registry.
 5. Clones `homelabs-gitops/main`.
 6. Updates only the matching `images[].newTag` value in `apps/narrativ-dev/kustomization.yaml` using `yq`.
-7. Commits `deploy(narrativ): a1b2c3d4e5f6` and pushes it to `main`.
+7. Commits `deploy(narrativ-dev): a1b2c3d4e5f6` and pushes it to `main`.
 8. Stops. Argo CD detects the GitOps commit and performs the RKE2 rollout.
 
 The commit SHA is immutable, unlike `latest`. It tells you exactly which backend source commit is running in the cluster and makes rollback a Git revert or a tag change in `kustomization.yaml`.
@@ -72,10 +71,10 @@ The commit SHA is immutable, unlike `latest`. It tells you exactly which backend
 After a successful Jenkins build, verify all three layers:
 
 ```bash
-# 1. Docker Hub: confirm the SHA tag exists.
+# 1. GHCR: confirm the SHA tag exists in ghcr.io/rizkysiregar/narrativ-service.
 # 2. GitOps: confirm Jenkins committed the newTag value.
-git -C /path/to/homelabs-gitops log -1 --oneline
-git -C /path/to/homelabs-gitops diff HEAD~1 HEAD -- apps/narrativ-dev/kustomization.yaml
+git -C homelabs-gitops log -1 --oneline
+git -C homelabs-gitops diff HEAD~1 HEAD -- apps/narrativ-dev/kustomization.yaml
 
 # 3. Cluster: Argo CD should be Synced and Healthy, then test the public endpoint.
 curl -i https://api-dev-narrativ.rizkysiregar.my.id/api/v1/actuator/health
