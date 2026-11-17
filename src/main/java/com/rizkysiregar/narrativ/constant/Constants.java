@@ -47,12 +47,11 @@ public class Constants {
 
     // FIREBASE / NOTIFICATION
     public static final String FIREBASE_TOPIC_GLOBAL = "global";
-    public static final String NOTIFICATION_NEW_FEED_TITLE = "Ada yang baru nih!";
     public static final String NOTIFICATION_POST_TAKEDOWN_TITLE = "Postingan Anda diturunkan";
     public static final String NOTIFICATION_POST_TAKEDOWN_BODY = "Postingan Anda diturunkan oleh admin. Alasan: %s";
     public static final String NOTIFICATION_COMMENT_TAKEDOWN_TITLE = "Komentar Anda diturunkan";
     public static final String NOTIFICATION_COMMENT_TAKEDOWN_BODY = "Komentar Anda diturunkan oleh admin. Alasan: %s";
     public static final String NOTIFICATION_COMMENT_REPLY_TITLE = "Balasan baru";
     public static final String NOTIFICATION_COMMENT_REPLY_BODY = "%s membalas komentar Anda: %s";
-    public static final String NOTIFICATION_NEW_FEED_BODY = "%s baru saja mengungah sesuatu. Yuk!,jadi yang pertama memberikan like!";
+    public static final String NOTIFICATION_TYPE_NEW_POST = "NEW_POST";
 }
