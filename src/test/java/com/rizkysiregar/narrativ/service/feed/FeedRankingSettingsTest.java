@@ -21,9 +21,11 @@ class FeedRankingSettingsTest {
                 "feed.ranking.comment_weight", " 4 ",
                 "feed.ranking.gravity", "1.8",
                 "feed.ranking.report_penalty", "0",
-                "feed.ranking.max_per_author", "3"));
+                "feed.ranking.max_per_author", "3",
+                "feed.ranking.followed_factor", "1",
+                "feed.ranking.own_factor", "0"));
 
-        assertEquals(new FeedRankingSettings(3, 1.5, 4, 1.8, 0, 3), settings);
+        assertEquals(new FeedRankingSettings(3, 1.5, 4, 1.8, 0, 3, 1, 0), settings);
     }
 
     @Test
@@ -32,7 +34,8 @@ class FeedRankingSettingsTest {
                 "feed.ranking.window_days", "2.5",
                 "feed.ranking.like_weight", "abc",
                 "feed.ranking.gravity", "0",
-                "feed.ranking.max_per_author", "11"));
+                "feed.ranking.max_per_author", "11",
+                "feed.ranking.own_factor", "1.5"));
 
         assertEquals(FeedRankingSettings.DEFAULTS, settings);
     }

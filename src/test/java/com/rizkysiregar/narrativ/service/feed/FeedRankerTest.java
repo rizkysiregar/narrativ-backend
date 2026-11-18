@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,6 +16,7 @@ class FeedRankerTest {
 
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 18, 12, 0);
     private static final FeedRankingSettings SETTINGS = FeedRankingSettings.DEFAULTS;
+    private static final UUID VIEWER = UUID.randomUUID();
 
     private static RankingCandidate candidate(UUID author, double hoursAgo, long likes, long comments, long reports) {
         return new RankingCandidate(UUID.randomUUID(), author, NOW.minusSeconds((long) (hoursAgo * 3600)),
@@ -38,7 +40,7 @@ class FeedRankerTest {
         RankingCandidate stale = candidate(72, 10);
 
         assertEquals(List.of(liked.postId(), quiet.postId(), stale.postId()),
-                FeedRanker.rank(List.of(stale, quiet, liked), SETTINGS, NOW, 10));
+                FeedRanker.rank(List.of(stale, quiet, liked), SETTINGS, NOW, 10, VIEWER, Set.of()));
     }
 
     @Test
@@ -46,7 +48,7 @@ class FeedRankerTest {
         RankingCandidate fresh = candidate(0.1, 0);
         RankingCandidate yesterday = candidate(24, 10);
 
-        assertEquals(fresh.postId(), FeedRanker.rank(List.of(yesterday, fresh), SETTINGS, NOW, 10).getFirst());
+        assertEquals(fresh.postId(), FeedRanker.rank(List.of(yesterday, fresh), SETTINGS, NOW, 10, VIEWER, Set.of()).getFirst());
     }
 
     @Test
@@ -66,6 +68,20 @@ class FeedRankerTest {
     }
 
     @Test
+    void postsTheViewerAlreadyKnowsAreScaledDownNotLeftOut() {
+        UUID followed = UUID.randomUUID();
+
+        assertEquals(1, FeedRanker.familiarity(UUID.randomUUID(), SETTINGS, VIEWER, Set.of(followed)));
+        assertEquals(0.5, FeedRanker.familiarity(followed, SETTINGS, VIEWER, Set.of(followed)));
+        assertEquals(0.2, FeedRanker.familiarity(VIEWER, SETTINGS, VIEWER, Set.of(followed)));
+        // a popular post of somebody followed still beats a quiet new face
+        RankingCandidate popularFollowed = candidate(followed, 1, 20, 0, 0);
+        RankingCandidate quiet = candidate(1, 0);
+        assertEquals(List.of(popularFollowed.postId(), quiet.postId()),
+                FeedRanker.rank(List.of(quiet, popularFollowed), SETTINGS, NOW, 10, VIEWER, Set.of(followed)));
+    }
+
+    @Test
     void noAuthorHasMoreThanMaxPerAuthorPostsInAWindow() {
         UUID busy = UUID.randomUUID();
         List<RankingCandidate> candidates = new ArrayList<>();
@@ -73,7 +89,7 @@ class FeedRankerTest {
         for (int i = 0; i < 5; i++) candidates.add(candidate(busy, 1, 100 - i, 0, 0));
         for (int i = 0; i < 5; i++) candidates.add(candidate(UUID.randomUUID(), 1, 50 - i, 0, 0));
 
-        List<UUID> ranked = FeedRanker.rank(candidates, SETTINGS, NOW, 10);
+        List<UUID> ranked = FeedRanker.rank(candidates, SETTINGS, NOW, 10, VIEWER, Set.of());
 
         List<UUID> busyPosts = candidates.subList(0, 5).stream().map(RankingCandidate::postId).toList();
         // two of them open the feed, the others wait for the next window rather than sinking to the end
@@ -101,7 +117,7 @@ class FeedRankerTest {
         List<RankingCandidate> candidates = new ArrayList<>();
         for (int i = 0; i < 30; i++) candidates.add(candidate(i, 0));
 
-        List<UUID> ranked = FeedRanker.rank(candidates, SETTINGS, NOW, 12);
+        List<UUID> ranked = FeedRanker.rank(candidates, SETTINGS, NOW, 12, VIEWER, Set.of());
 
         assertEquals(12, ranked.size());
         assertTrue(ranked.contains(candidates.getFirst().postId()));

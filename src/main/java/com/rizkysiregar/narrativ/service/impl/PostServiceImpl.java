@@ -89,8 +89,9 @@ public class PostServiceImpl implements PostService {
     private static final long PRESIGN_UPLOAD_EXPIRY_SECONDS = 15L * 60;
 
     /**
-     * Explore is ranked: the recent posts of people the viewer does not follow, by engagement and age
-     * ({@link RankedFeedService}), then the older ones by date. A numbered page is cut from a fresh ranking.
+     * Explore is ranked: the recent posts by engagement and age, new faces before people the viewer follows and
+     * their own posts ({@link RankedFeedService}), then the older ones by date. It is only empty when there is no
+     * post to show at all. A numbered page is cut from a fresh ranking.
      */
     @Override
     public PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, String cursor, UUID userId, boolean mediaOnly) {
@@ -107,7 +108,7 @@ public class PostServiceImpl implements PostService {
             return exploreByDate(FeedCursor.decode(cursor), List.of(), size, userId, mediaOnly);
         }
         Pageable pageable = Paging.of(page, size);
-        return rankedFeedService.start(userId, mediaOnly, (int) pageable.getOffset(), size)
+        return rankedFeedService.start(RankedFeedService.Feed.EXPLORE, userId, mediaOnly, (int) pageable.getOffset(), size)
                 .map(slice -> exploreFrom(slice, size, userId, mediaOnly))
                 // no Redis, no ranking: explore by date, as it was before
                 .orElseGet(() -> exploreByDate(new FeedCursor(LocalDateTime.now().plusDays(1), new UUID(-1L, -1L)),
@@ -140,8 +141,8 @@ public class PostServiceImpl implements PostService {
 
     /**
      * The home feed: the viewer's own posts and those of the people they follow, by date. Once they run out the
-     * feed goes on with suggestions (the ranked explore, marked {@code suggested}), so a new user who follows
-     * nobody yet does not land on an empty screen. Only page 0 and cursor pages get them: a client paging by
+     * feed goes on with suggestions (ranked posts of people they do not follow, marked {@code suggested}), so a new
+     * user who follows nobody yet does not land on an empty screen. Only page 0 and cursor pages get them: a client paging by
      * number would otherwise get the same suggestions again on every page after the last.
      */
     @Override
@@ -175,7 +176,7 @@ public class PostServiceImpl implements PostService {
 
     // the last posts of the home feed, and suggestions in the room left on the page
     private PaginatedResponse<PostFeedResponse> startSuggestions(List<PostEntity> homePosts, int size, UUID viewerId) {
-        return rankedFeedService.start(viewerId, false, 0, size - homePosts.size())
+        return rankedFeedService.start(RankedFeedService.Feed.SUGGESTIONS, viewerId, false, 0, size - homePosts.size())
                 .map(slice -> withSuggestions(homePosts, slice, size, viewerId))
                 .orElseGet(() -> cursorPage(homePosts, Set.of(), size, null, viewerId));
     }

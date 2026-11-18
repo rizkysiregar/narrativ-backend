@@ -4,6 +4,7 @@ import com.rizkysiregar.narrativ.model.dto.RankingCandidate;
 import com.rizkysiregar.narrativ.model.entity.ParameterEntity;
 import com.rizkysiregar.narrativ.model.entity.PostEntity;
 import com.rizkysiregar.narrativ.model.entity.UserEntity;
+import com.rizkysiregar.narrativ.repository.FollowRepository;
 import com.rizkysiregar.narrativ.repository.ParameterRepository;
 import com.rizkysiregar.narrativ.repository.PostPaginationRepository;
 import com.rizkysiregar.narrativ.util.RankedCursor;
@@ -42,6 +43,8 @@ class RankedFeedServiceTest {
     private ParameterRepository parameterRepository;
     @Mock
     private RedisUtil redisUtil;
+    @Mock
+    private FollowRepository followRepository;
 
     @InjectMocks
     private RankedFeedService rankedFeedService;
@@ -74,11 +77,11 @@ class RankedFeedServiceTest {
     @Test
     void startRanksStoresTheOrderAndServesTheFirstPage() {
         List<RankingCandidate> candidates = candidates(5);
-        when(postPaginationRepository.findRankingCandidates(eq(viewerId), any(), eq(false),
+        when(postPaginationRepository.findRankingCandidates(eq(viewerId), any(), eq(false), eq(false),
                 eq(PageRequest.of(0, RankedFeedService.MAX_CANDIDATES)))).thenReturn(candidates);
         allVisible();
 
-        RankedFeedService.Slice slice = rankedFeedService.start(viewerId, false, 0, 2).orElseThrow();
+        RankedFeedService.Slice slice = rankedFeedService.start(RankedFeedService.Feed.EXPLORE, viewerId, false, 0, 2).orElseThrow();
 
         // in ranked order, whatever order the database returned them in
         assertEquals(ids(candidates).subList(0, 2), slice.posts().stream().map(PostEntity::getId).toList());
@@ -96,10 +99,10 @@ class RankedFeedServiceTest {
                 .thenReturn(List.of(new ParameterEntity("feed.ranking.window_days", "3")));
         LocalDateTime before = LocalDateTime.now().minusDays(3);
 
-        RankedFeedService.Slice slice = rankedFeedService.start(viewerId, true, 0, 10).orElseThrow();
+        RankedFeedService.Slice slice = rankedFeedService.start(RankedFeedService.Feed.SUGGESTIONS, viewerId, true, 0, 10).orElseThrow();
 
         ArgumentCaptor<LocalDateTime> since = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(postPaginationRepository).findRankingCandidates(eq(viewerId), since.capture(), eq(true), any());
+        verify(postPaginationRepository).findRankingCandidates(eq(viewerId), since.capture(), eq(true), eq(true), any());
         assertTrue(!since.getValue().isBefore(before) && since.getValue().isBefore(before.plusMinutes(1)));
         // nothing to rank: nothing stored, the feed goes on by date
         assertTrue(slice.posts().isEmpty());
@@ -108,11 +111,30 @@ class RankedFeedServiceTest {
     }
 
     @Test
+    void explorePutsPostsTheViewerAlreadyKnowsAfterNewFaces() {
+        LocalDateTime now = LocalDateTime.now();
+        UUID followed = UUID.randomUUID();
+        // the same age and likes: only who wrote them differs
+        RankingCandidate ofFollowed = new RankingCandidate(UUID.randomUUID(), followed, now.minusHours(1), 5, 0, 0);
+        RankingCandidate own = new RankingCandidate(UUID.randomUUID(), viewerId, now.minusHours(1), 5, 0, 0);
+        RankingCandidate newFace = new RankingCandidate(UUID.randomUUID(), UUID.randomUUID(), now.minusHours(1), 5, 0, 0);
+        when(postPaginationRepository.findRankingCandidates(eq(viewerId), any(), eq(false), eq(false), any()))
+                .thenReturn(List.of(own, ofFollowed, newFace));
+        when(followRepository.findFollowedIdsAmong(eq(viewerId), any())).thenReturn(List.of(followed));
+        allVisible();
+
+        RankedFeedService.Slice slice = rankedFeedService.start(RankedFeedService.Feed.EXPLORE, viewerId, false, 0, 3).orElseThrow();
+
+        assertEquals(List.of(newFace.postId(), ofFollowed.postId(), own.postId()),
+                slice.posts().stream().map(PostEntity::getId).toList());
+    }
+
+    @Test
     void withoutRedisThereIsNoRankedFeed() {
-        when(postPaginationRepository.findRankingCandidates(any(), any(), eq(false), any())).thenReturn(candidates(3));
+        when(postPaginationRepository.findRankingCandidates(any(), any(), eq(false), eq(false), any())).thenReturn(candidates(3));
         doThrow(new RuntimeException("connection refused")).when(redisUtil).set(anyString(), any(), anyLong());
 
-        assertEquals(Optional.empty(), rankedFeedService.start(viewerId, false, 0, 10));
+        assertEquals(Optional.empty(), rankedFeedService.start(RankedFeedService.Feed.EXPLORE, viewerId, false, 0, 10));
     }
 
     @Test
