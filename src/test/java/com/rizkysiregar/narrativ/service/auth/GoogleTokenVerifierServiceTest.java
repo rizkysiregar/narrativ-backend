@@ -6,27 +6,37 @@ import com.rizkysiregar.narrativ.model.dto.GoogleUserInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.oauth2.jwt.BadJwtException;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class GoogleTokenVerifierServiceTest {
 
     private static final String CLIENT_ID = "client-123.apps.googleusercontent.com";
 
     private GoogleTokenVerifierService service;
+    private final JwtDecoder decoder = mock(JwtDecoder.class);
 
     @BeforeEach
     void setup() {
-        service = new GoogleTokenVerifierService();
+        service = new GoogleTokenVerifierService(decoder);
         ReflectionTestUtils.setField(service, "clientId", CLIENT_ID);
     }
 
-    /** What https://oauth2.googleapis.com/tokeninfo answers: the booleans come as strings. */
+    /** The claims of an ID token (the older tokeninfo endpoint answered the booleans as strings, both are accepted). */
     private Map<String, Object> payload(String emailVerified) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("aud", CLIENT_ID);
@@ -79,5 +89,41 @@ class GoogleTokenVerifierServiceTest {
         BusinessException error = assertThrows(BusinessException.class, () -> service.toVerifiedUser(other));
 
         assertEquals(GlobalMessage.GOOGLE_TOKEN_MISS_MATCH.getMessage(), error.getMessage());
+    }
+
+    @Test
+    void acceptsTheClaimsOfADecodedToken() {
+        // a decoded JWT has the audience as a list and email_verified as a boolean
+        Jwt jwt = Jwt.withTokenValue("id-token").header("alg", "RS256")
+                .audience(List.of(CLIENT_ID)).subject("google-sub-1")
+                .claim("email", "Rizky@Example.com").claim("email_verified", true)
+                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60))
+                .build();
+        when(decoder.decode("id-token")).thenReturn(jwt);
+
+        GoogleUserInfo info = service.verifyToken("id-token");
+
+        assertEquals("rizky@example.com", info.getEmail());
+        assertEquals("google-sub-1", info.getGoogleId());
+    }
+
+    @Test
+    void aBadTokenIsUnauthorized() {
+        when(decoder.decode("forged")).thenThrow(new BadJwtException("signature does not match"));
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.verifyToken("forged"));
+
+        assertEquals(GlobalMessage.GOOGLE_UNAUTHORIZED.getMessage(), error.getMessage());
+    }
+
+    @Test
+    void onlyGoogleIsAcceptedAsIssuer() {
+        Jwt foreign = Jwt.withTokenValue("t").header("alg", "RS256").issuer("https://evil.example.com")
+                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60)).build();
+        Jwt google = Jwt.withTokenValue("t").header("alg", "RS256").issuer("https://accounts.google.com")
+                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60)).build();
+
+        assertTrue(GoogleTokenVerifierService.validators().validate(foreign).hasErrors());
+        assertFalse(GoogleTokenVerifierService.validators().validate(google).hasErrors());
     }
 }
