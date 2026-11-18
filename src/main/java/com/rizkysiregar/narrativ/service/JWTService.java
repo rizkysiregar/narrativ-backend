@@ -1,5 +1,6 @@
 package com.rizkysiregar.narrativ.service;
 
+import com.rizkysiregar.narrativ.model.UserPrincipal;
 import com.rizkysiregar.narrativ.model.enums.Role;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -7,12 +8,9 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
-import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.function.Function;
 
@@ -24,27 +22,20 @@ public class JWTService {
     @Value("${secret.key}")
     private String secretKey;
 
-    JWTService() {
-        try {
-            KeyGenerator keyGen = KeyGenerator.getInstance("HmacSHA256");
-            SecretKey sk = keyGen.generateKey();
-//            secretKey = Base64.getEncoder().encodeToString(sk.getEncoded()); // for generate
-
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
+    /**
+     * The subject is the user id, never the username: a username can be changed and then taken by somebody else,
+     * and a token that is still valid must keep pointing at the account it was issued to.
+     */
     public String generateToken(String username, UUID userId, Role role) {
 
         Map<String, Object> claims = new HashMap<>();
-        claims.put("userId", userId.toString());
+        claims.put("username", username);
         claims.put("role", role.name());
 
         return Jwts.builder()
                 .claims()
                 .add(claims)
-                .subject(username)
+                .subject(userId.toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_TTL_MS)) // 15 minutes expiry
                 .and()
@@ -58,12 +49,9 @@ public class JWTService {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String extractUsername(String token) {
-        return extractClaims(token, Claims::getSubject);
-    }
-
-    public String extractUserId(String token) {
-        return extractClaims(token, claims -> claims.get("userId", String.class));
+    /** Throws IllegalArgumentException when the subject is not a user id (e.g. a token from before this change). */
+    public UUID extractUserId(String token) {
+        return UUID.fromString(extractClaims(token, Claims::getSubject));
     }
 
     private <T> T extractClaims(String token, Function<Claims, T> claimResolver) {
@@ -80,9 +68,8 @@ public class JWTService {
 
     }
 
-    public boolean validateToken(String token, UserDetails userDetails) {
-        final String userName = extractUsername(token);
-        return userName.equals(userDetails.getUsername()) && !isTokenExpired(token);
+    public boolean validateToken(String token, UserPrincipal principal) {
+        return extractUserId(token).equals(principal.getUserId()) && !isTokenExpired(token);
     }
 
     private boolean isTokenExpired(String token) {
