@@ -11,6 +11,9 @@ import java.util.concurrent.Executor;
 @EnableAsync
 public class AsyncConfig {
 
+    // on shutdown queued tasks still run, for at most this long: an event that is never published is lost for good
+    static final int AWAIT_TERMINATION_SECONDS = 15;
+
     /**
      * Deletes object storage files after the request that asked for it (account deletion can mean hundreds of
      * files). A file that is not removed, because the queue is full or the app stops, no longer belongs to any
@@ -23,10 +26,16 @@ public class AsyncConfig {
         executor.setMaxPoolSize(2);
         executor.setQueueCapacity(50);
         executor.setThreadNamePrefix("media-cleanup-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(AWAIT_TERMINATION_SECONDS);
         executor.initialize();
         return executor;
     }
 
+    /**
+     * Publishes the RabbitMQ events (notifications, video thumbnail requests) after the request returned. A video
+     * whose thumbnail request is dropped keeps no thumbnail, so a pending publish is waited for on shutdown.
+     */
     @Bean(name = "postEventExecutor")
     public Executor postEventExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -34,6 +43,8 @@ public class AsyncConfig {
         executor.setMaxPoolSize(4);
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("post-event-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(AWAIT_TERMINATION_SECONDS);
         executor.initialize();
         return executor;
     }

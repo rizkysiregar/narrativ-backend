@@ -32,6 +32,8 @@ EXPOSE 9091
 
 USER 10001:10001
 
-# MaxRAMPercentage: leave room for metaspace and threads inside the pod memory limit.
+# MaxRAMPercentage: only the heap; metaspace, code cache, threads and Netty buffers live in the rest of the pod limit.
+# Going over the limit is an OOMKill: SIGKILL, no log line at all. MaxMetaspaceSize keeps the non-heap part bounded,
+# and ExitOnOutOfMemoryError stops the JVM with an error in the log instead of limping on after a heap OOM.
 # Run the application with explicit config location
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=60", "-Dspring.config.location=file:/app/config/", "org.springframework.boot.loader.launch.JarLauncher"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=55", "-XX:MaxMetaspaceSize=256m", "-XX:+ExitOnOutOfMemoryError", "-Dspring.config.location=file:/app/config/", "org.springframework.boot.loader.launch.JarLauncher"]

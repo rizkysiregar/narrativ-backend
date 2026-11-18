@@ -1,9 +1,21 @@
 server:
   port: ${SERVER_PORT}
+  # on SIGTERM (rollout, node drain) new requests are refused and the ones in flight may finish. Kubernetes gives the
+  # pod terminationGracePeriodSeconds in total, which has to cover the preStop sleep and every shutdown phase below
+  shutdown: graceful
   servlet:
     context-path: ${SERVER_SERVLET_CONTEXT_PATH}
 
 spring:
+  lifecycle:
+    # per phase: web server, RabbitMQ listeners, executors. What is still running after it is cut off
+    timeout-per-shutdown-phase: 20s
+  task:
+    scheduling:
+      shutdown:
+        # a running scheduled job (orphan cleanup, Firebase) may finish; all of them are safe to run again
+        await-termination: true
+        await-termination-period: 20s
   messages:
     basename: i18n/messages
     # an unsupported language gets the English default, not the server's own language
