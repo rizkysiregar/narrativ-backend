@@ -277,8 +277,10 @@ public class PostServiceImpl implements PostService {
 
         try {
             String presignedUrl = fileStorageService.getPresignUploadUrl(objectKey, contentType);
+            long maxBytes = ALLOWED_VIDEO_TYPES.contains(contentType) ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
             return CreatePostUploadUrlResponse.builder()
                     .presignedUrl(presignedUrl)
+                    .uploadForm(fileStorageService.getPresignUploadForm(objectKey, contentType, maxBytes))
                     .objectKey(objectKey)
                     .expiresInSeconds(PRESIGN_UPLOAD_EXPIRY_SECONDS)
                     .build();

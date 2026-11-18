@@ -3,6 +3,7 @@ package com.rizkysiregar.narrativ.service;
 import com.rizkysiregar.narrativ.constant.GlobalMessage;
 import com.rizkysiregar.narrativ.exception.BusinessException;
 import com.rizkysiregar.narrativ.model.dto.ObjectStat;
+import com.rizkysiregar.narrativ.model.dto.PresignedUploadForm;
 import com.rizkysiregar.narrativ.model.dto.UserDetailDTO;
 import com.rizkysiregar.narrativ.model.entity.UserEntity;
 import com.rizkysiregar.narrativ.model.request.CreateProfileImageUploadUrlRequest;
@@ -26,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -73,6 +75,8 @@ class ProfileImageServiceTest {
     @Test
     void createUploadUrl_buildsKeyUnderUserIdAndPresigns() throws Exception {
         when(fileStorageService.getPresignUploadUrl(anyString(), anyString())).thenReturn("https://minio/put");
+        PresignedUploadForm form = new PresignedUploadForm("https://minio/bucket", java.util.Map.of("policy", "p"));
+        when(fileStorageService.getPresignUploadForm(anyString(), eq("image/png"), eq(2L * 1024 * 1024))).thenReturn(form);
 
         ProfileImageUploadUrlResponse response =
                 profileImageService.createUploadUrl(userId, new CreateProfileImageUploadUrlRequest("image/png"));
@@ -80,6 +84,9 @@ class ProfileImageServiceTest {
         assertTrue(response.objectKey().startsWith(userId + "/PROFILE_PICTURE/"));
         assertTrue(response.objectKey().endsWith(".png"));
         assertEquals("https://minio/put", response.presignedUrl());
+        // the POST form is capped at 2 MB by storage itself
+        assertEquals(form, response.uploadForm());
+        verify(fileStorageService).getPresignUploadForm(response.objectKey(), "image/png", 2L * 1024 * 1024);
     }
 
     @Test

@@ -52,7 +52,8 @@ public class ProfileImageService {
         String objectKey = prefixOf(user) + UUID.randomUUID() + extension;
         try {
             String url = fileStorageService.getPresignUploadUrl(objectKey, request.contentType());
-            return new ProfileImageUploadUrlResponse(url, objectKey, PRESIGN_UPLOAD_EXPIRY_SECONDS);
+            return new ProfileImageUploadUrlResponse(url, objectKey, PRESIGN_UPLOAD_EXPIRY_SECONDS,
+                    fileStorageService.getPresignUploadForm(objectKey, request.contentType(), MAX_PROFILE_IMAGE_SIZE));
         } catch (Exception e) {
             log.error("PROFILE.IMAGE.PRESIGN.UPLOAD.FAILED userId={} reason={}", userId, e.getMessage());
             throw new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);

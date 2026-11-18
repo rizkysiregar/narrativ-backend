@@ -7,7 +7,10 @@ import com.rizkysiregar.narrativ.model.dto.ObjectStat;
 import com.rizkysiregar.narrativ.service.impl.FileStorageServiceImpl;
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;
+import io.minio.credentials.Credentials;
 import io.minio.messages.ErrorResponse;
+import com.rizkysiregar.narrativ.model.dto.PresignedUploadForm;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +19,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
 import java.io.ByteArrayInputStream;
+import java.util.Base64;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,7 +38,7 @@ public class FileStorageServiceTest {
 
     @BeforeEach
     void setup() {
-        fileStorageService = new FileStorageServiceImpl(minioClient, TEST_BUCKET);
+        fileStorageService = new FileStorageServiceImpl(minioClient, TEST_BUCKET, "https://storage.example.com/");
     }
 
 
@@ -63,6 +68,28 @@ public class FileStorageServiceTest {
         // Assert
         assertEquals("http://localhost:9000/test-bucket/u1/POST_FEED/x.mp4", url);
         verify(minioClient, times(1)).getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class));
+    }
+
+    @Test
+    void getPresignUploadForm_pinsKeyTypeAndMaximumSize() throws Exception {
+        when(minioClient.getPresignedPostFormData(any(PostPolicy.class)))
+                .thenReturn(Map.of("policy", "p", "x-amz-signature", "s"));
+        ArgumentCaptor<PostPolicy> policy = ArgumentCaptor.forClass(PostPolicy.class);
+
+        PresignedUploadForm form = fileStorageService.getPresignUploadForm("u1/POST_FEED/a.jpg", "image/jpeg", 5_242_880L);
+
+        assertEquals("https://storage.example.com/test-bucket", form.url());
+        assertEquals("u1/POST_FEED/a.jpg", form.fields().get("key"));
+        assertEquals("image/jpeg", form.fields().get("Content-Type"));
+        assertEquals("s", form.fields().get("x-amz-signature"));
+
+        // the conditions storage enforces, read back from the signed policy document
+        verify(minioClient).getPresignedPostFormData(policy.capture());
+        String document = new String(Base64.getDecoder().decode(policy.getValue()
+                .formData(new Credentials("ak", "sk", null, null), "us-east-1").get("policy")));
+        assertTrue(document.contains("[\"content-length-range\",1,5242880]"), document);
+        assertTrue(document.contains("\"$key\",\"u1/POST_FEED/a.jpg\""), document);
+        assertTrue(document.contains("\"$Content-Type\",\"image/jpeg\""), document);
     }
 
     @Test

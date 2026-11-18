@@ -2,6 +2,7 @@ package com.rizkysiregar.narrativ.service;
 
 import com.rizkysiregar.narrativ.model.dto.ImageObject;
 import com.rizkysiregar.narrativ.model.dto.ObjectStat;
+import com.rizkysiregar.narrativ.model.dto.PresignedUploadForm;
 import com.rizkysiregar.narrativ.model.dto.StoredObject;
 
 import java.io.InputStream;
@@ -18,6 +19,9 @@ public interface FileStorageService {
 
     String getPresignUrl(String objectName) throws Exception;
     String getPresignUploadUrl(String objectName, String contentType) throws Exception;
+
+    /** A presigned POST for exactly this key and content type, refused by storage above {@code maxBytes}. */
+    PresignedUploadForm getPresignUploadForm(String objectName, String contentType, long maxBytes) throws Exception;
     ObjectStat statObject(String objectName);
     ImageObject getObject(String objectName, String bucketName);
 
