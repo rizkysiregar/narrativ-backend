@@ -7,7 +7,5 @@ INSERT INTO app_parameters (param_key, param_value, description, created_at, upd
     ('feed.ranking.comment_weight', '2',   'Ranked feeds: points per comment (0-100)', now(), now()),
     ('feed.ranking.gravity',        '1.5', 'Ranked feeds: how fast a post sinks with age, higher sinks faster (0.5-3)', now(), now()),
     ('feed.ranking.report_penalty', '1',   'Ranked feeds: score divided by (1 + penalty x open reports) (0-10)', now(), now()),
-    ('feed.ranking.max_per_author', '2',   'Ranked feeds: at most N posts of one author in every 10 (1-10)', now(), now()),
-    ('feed.ranking.followed_factor', '0.5', 'Explore: score multiplier for posts of people the viewer follows (0-1)', now(), now()),
-    ('feed.ranking.own_factor',     '0.2', 'Explore: score multiplier for the viewer''s own posts (0-1)', now(), now())
+    ('feed.ranking.max_per_author', '2',   'Ranked feeds: at most N posts of one author in every 10 (1-10)', now(), now())
 ON CONFLICT (param_key) DO NOTHING;
