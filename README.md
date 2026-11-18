@@ -78,13 +78,22 @@ All paths are under the context path `/api/v1` (port `9091` by default). Swagger
 | Group         | Endpoints                                                                                              |
 |---------------|--------------------------------------------------------------------------------------------------------|
 | Auth          | `POST /auth/register`, `/auth/register/otp`, `/auth/register/verify-otp`, `/auth/login`, `/auth/google`, `/auth/refresh`, `/auth/logout`, `/auth/forgot-password`, `/auth/verify-otp`, `/auth/reset-password`, `/auth/admin/login`, `/auth/register-admin` |
-| Me            | `GET/PATCH /users/me`, `POST /users/me/profile-image/upload-url`, `PUT/DELETE /users/me/profile-image`, `POST /users/me/deletion`, `GET /users/me/blocks` |
+| Me            | `GET/PATCH /users/me`, `POST /users/me/profile-image/upload-url`, `PUT/DELETE /users/me/profile-image`, `POST /users/me/email/otp`, `POST /users/me/email`, `POST /users/me/deletion`, `GET /users/me/blocks` |
 | Users         | `GET /users`, `GET /users/{userId}`, `POST/DELETE /users/{userId}/follow`, `GET /users/{userId}/followers`, `/following`, `/follow-status`, `POST/DELETE /users/{userId}/block` |
 | Posts         | `GET /posts`, `/posts/explore`, `/posts/following`, `/posts/{postId}`, `/posts/users/{username}/posts`, `POST /posts/upload-url`, `POST /posts`, `DELETE /posts/{postId}` |
 | Interactions  | `POST /posts/{postId}/like`, `DELETE /posts/{postId}/dislike`, `GET /posts/{postId}/likes/count`, `GET/POST /posts/{postId}/comments`, `DELETE /comments/{commentId}`, `GET /comments/{commentId}/replies` |
 | Others        | `POST /reports`, `POST /devices`, `POST /devices/deactivate`, `GET /files/presign-url`, `GET /legal/{privacy-policy,terms,delete-account}` |
 | Admin         | `/admin/users`, `/admin/admins`, `/admin/posts`, `/admin/comments`, `/admin/reports`, `/admin/metrics`, `/admin/notifications`, `/admin/notification-templates`, `/admin/parameters`, `/admin/audit-logs` |
 | Actuator      | `/actuator/health`, `/info`, `/metrics`, `/prometheus` (separate port when `MANAGEMENT_SERVER_PORT` is set) |
+
+The feeds (`GET /posts`, `/posts/explore`, `/posts/following`, `/posts/users/{username}/posts`) page with `page` or,
+preferably, with `cursor`: every page answers `nextCursor` (absent on the last page), and passing it back returns the
+posts after it without duplicates when new posts arrive while scrolling. Each post carries the author's
+`profileImageUrl`.
+
+The email of an account changes in two steps: `POST /users/me/email/otp` mails an OTP to the new address, then
+`POST /users/me/email` with that OTP and the current password (or a Google id token) changes it, ends the other
+sessions and answers a new token pair.
 
 Authenticated endpoints expect `Authorization: Bearer <access token>`; mobile endpoints may also need the
 `X-Firebase-AppCheck` header depending on the App Check mode.

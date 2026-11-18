@@ -1,14 +1,19 @@
 package com.rizkysiregar.narrativ.controller;
 
 import com.rizkysiregar.narrativ.model.UserPrincipal;
+import com.rizkysiregar.narrativ.model.dto.SentOtpDTO;
 import com.rizkysiregar.narrativ.model.dto.UserDetailDTO;
+import com.rizkysiregar.narrativ.model.request.ChangeEmailOtpRequest;
+import com.rizkysiregar.narrativ.model.request.ConfirmEmailChangeRequest;
 import com.rizkysiregar.narrativ.model.request.DeleteAccountRequest;
 import com.rizkysiregar.narrativ.model.request.UpdateMyUserRequest;
 import com.rizkysiregar.narrativ.model.request.CreateProfileImageUploadUrlRequest;
 import com.rizkysiregar.narrativ.model.request.SetProfileImageRequest;
+import com.rizkysiregar.narrativ.model.response.LoginResponse;
 import com.rizkysiregar.narrativ.model.response.ProfileImageUploadUrlResponse;
 import com.rizkysiregar.narrativ.service.ProfileImageService;
 import com.rizkysiregar.narrativ.service.UserManagementService;
+import com.rizkysiregar.narrativ.service.otp.EmailChangeService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -23,6 +28,7 @@ public class UserAccountController {
 
     private final UserManagementService userManagementService;
     private final ProfileImageService profileImageService;
+    private final EmailChangeService emailChangeService;
 
     @Operation(summary = "Get current logged-in user profile")
     @GetMapping
@@ -77,5 +83,23 @@ public class UserAccountController {
         return userManagementService.deleteMyAccount(currentUser.getUserId(), request);
     }
 
+    @Operation(summary = "Send an OTP to the new email of the account",
+            description = "Step 1 of an email change. 400 when it is the current email or another account has it, 429 within a minute of the previous OTP")
+    @PostMapping("/email/otp")
+    public SentOtpDTO sendEmailChangeOtp(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody ChangeEmailOtpRequest request
+    ) {
+        return emailChangeService.sendOtp(currentUser.getUserId(), request.email());
+    }
 
+    @Operation(summary = "Change the email of the account",
+            description = "Step 2: the OTP sent to the new email plus the current password, or a fresh Google id token for an account that signs in with Google. Every other session is ended; the answer is a new token pair for this device")
+    @PostMapping("/email")
+    public LoginResponse confirmEmailChange(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody ConfirmEmailChangeRequest request
+    ) {
+        return emailChangeService.confirm(currentUser.getUserId(), request);
+    }
 }

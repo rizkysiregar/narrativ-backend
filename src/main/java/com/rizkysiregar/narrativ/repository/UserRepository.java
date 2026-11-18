@@ -23,6 +23,8 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID>, JpaSpec
     @Query("SELECT u FROM users u WHERE lower(u.username) = lower(:username) AND u.isDeleted = false AND u.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE")
     Optional<UserEntity> findActiveByUsername(@Param("username") String username);
 
+    Optional<UserEntity> findByGoogleId(String googleId);
+
     @Query("SELECT u FROM users u WHERE lower(u.email) = lower(:email)")
     Optional<UserEntity> findByEmail(@Param("email") String email);
 

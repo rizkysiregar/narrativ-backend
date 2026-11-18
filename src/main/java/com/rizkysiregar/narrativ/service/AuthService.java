@@ -167,6 +167,11 @@ public class AuthService {
         return userEntity.get();
     }
 
+    /** A new access and refresh token pair for a user whose identity was already proven. */
+    public LoginResponse startSession(UserEntity user) {
+        return issueSession(user);
+    }
+
     private LoginResponse issueSession(UserEntity user) {
         return LoginResponse.builder()
                 .token(jwtService.generateToken(user.getUsername(), user.getId(), user.getRole()))
@@ -182,8 +187,9 @@ public class AuthService {
         // Verify idToken with Google and extract user info from it
         GoogleUserInfo googleUser = googleTokenVerifierService.verifyToken(request.getIdToken());
 
-        // find existing user by email or create a new one
-        UserEntity user = userRepository.findByEmail(googleUser.getEmail())
+        // the linked account first: its email may have been changed since it was linked. Then by email, or a new one
+        UserEntity user = userRepository.findByGoogleId(googleUser.getGoogleId())
+                .or(() -> userRepository.findByEmail(googleUser.getEmail()))
                 .map(existing -> {
                     if (existing.getGoogleId() == null) {
                         existing.setGoogleId(googleUser.getGoogleId());
