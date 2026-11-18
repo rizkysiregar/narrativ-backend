@@ -1,5 +1,6 @@
 package com.rizkysiregar.narrativ.service.otp;
 
+import com.rizkysiregar.narrativ.constant.Constants;
 import com.rizkysiregar.narrativ.constant.GlobalMessage;
 import com.rizkysiregar.narrativ.exception.BusinessException;
 import com.rizkysiregar.narrativ.model.dto.SentOtpDTO;
@@ -18,6 +19,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -36,6 +41,8 @@ public class EmailChangeService {
     private static final long OTP_TTL_SECONDS = 5 * 60;
     private static final long RESEND_COOLDOWN_SECONDS = 60;
     private static final String COOLDOWN_KEY_PREFIX = "email_change_otp_cooldown:";
+    // the app is Indonesian first, so the notice shows Jakarta time with its zone spelled out
+    private static final DateTimeFormatter CHANGED_AT = DateTimeFormatter.ofPattern("d MMM yyyy HH:mm z", Locale.ENGLISH);
 
     private final UserRepository userRepository;
     private final AuthService authService;
@@ -103,16 +110,13 @@ public class EmailChangeService {
         authService.revokeRefreshTokens(userId);
         LoginResponse session = authService.startSession(user);
 
-        AfterCommit.run("notify old address of email change " + userId, () -> emailService.sendEmail(previous,
+        String changedAt = CHANGED_AT.format(ZonedDateTime.now(Constants.ADMIN_ZONE));
+        AfterCommit.run("notify old address of email change " + userId, () -> emailService.sendEmailTemplate(previous,
                 "Your Narrativ email was changed / Email Narrativ Anda telah diubah",
-                """
-                        The email of your Narrativ account @%s was changed to %s.
-                        If you did not do this, reset your password right away and contact us.
-
-                        Email akun Narrativ @%s telah diubah menjadi %s.
-                        Jika ini bukan Anda, segera atur ulang kata sandi dan hubungi kami.
-                        """.formatted(user.getUsername(), EmailMasking.maskEmail(email),
-                        user.getUsername(), EmailMasking.maskEmail(email))));
+                "email-changed",
+                Map.of("username", user.getUsername(),
+                        "newEmail", EmailMasking.maskEmail(email),
+                        "changedAt", changedAt)));
         return session;
     }
 
