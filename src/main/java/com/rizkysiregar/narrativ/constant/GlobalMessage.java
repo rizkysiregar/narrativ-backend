@@ -13,6 +13,7 @@ public enum GlobalMessage {
     RATE_LIMIT("429", "Hang on, we are very busy right now. Please try again in {0} seconds!"),
     TOO_MANY_REQUEST_OTP("429", "You have reached the attempt limit. Please request a new OTP code in 5 minutes."),
     BAD_REQUEST_FILE_TO_LARGE("400", "The file is too large. Please upload a smaller file."),
+    UPLOAD_NOT_VERIFIED("503", "We could not check your upload right now. Please try again in a moment."),
     NOT_FOUND("404", "Oops, the data you are looking for was not found."),
     UNAUTHORIZED("401", "Your session has ended. Please sign in again."),
     ACCESS_DENIED("403", "Access denied: you do not have permission to access this resource."),
