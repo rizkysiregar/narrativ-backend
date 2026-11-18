@@ -26,7 +26,7 @@ public class FeedPostController {
         this.postService = postService;
     }
 
-    @Operation(summary = "Get posts from followed users for Home feed. Pass the nextCursor of a page as cursor to get the next one (page is then ignored and the totals are -1); page keeps working.")
+    @Operation(summary = "Home feed: your own posts and those of the people you follow, newest first; when they run out, suggestions from explore follow (suggested=true). Pass the nextCursor of a page as cursor to get the next one (page is then ignored and the totals are -1); page keeps working, but only page 0 gets suggestions.")
     @GetMapping
     public PaginatedResponse<PostFeedResponse> getHomePosts(
             @RequestParam(defaultValue = "0") int page,
@@ -37,7 +37,7 @@ public class FeedPostController {
         return postService.getFollowingPosts(page, size, cursor, userPrincipal.getUserId());
     }
 
-    @Operation(summary = "Get all public posts for Explore feed. mediaOnly=true leaves out caption only posts (grid view).")
+    @Operation(summary = "Explore feed: posts of people you do not follow, the recent ones ranked by likes, comments and age (at most 2 of one author in every 10), then older ones by date. Totals are -1; page through with nextCursor. mediaOnly=true leaves out caption only posts (grid view).")
     @GetMapping("/explore")
     public PaginatedResponse<PostFeedResponse> getExplorePosts(
             @RequestParam(defaultValue = "0") int page,
@@ -58,7 +58,7 @@ public class FeedPostController {
         return postService.getPostById(postId, userPrincipal.getUserId());
     }
 
-    @Operation(summary = "Get posts from followed users")
+    @Operation(summary = "Same as GET /posts")
     @GetMapping("/following")
     public PaginatedResponse<PostFeedResponse> getFollowingPosts(
             @RequestParam(defaultValue = "0") int page,
