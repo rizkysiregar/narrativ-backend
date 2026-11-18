@@ -27,7 +27,9 @@ import com.rizkysiregar.narrativ.service.MediaCleanupService;
 import com.rizkysiregar.narrativ.service.ProfileImageUrlResolver;
 import com.rizkysiregar.narrativ.service.UploadedObjectStats;
 import com.rizkysiregar.narrativ.util.AfterCommit;
+import com.rizkysiregar.narrativ.service.feed.RankedFeedService;
 import com.rizkysiregar.narrativ.util.FeedCursor;
+import com.rizkysiregar.narrativ.util.RankedCursor;
 import com.rizkysiregar.narrativ.util.Operation;
 import com.rizkysiregar.narrativ.util.Paging;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +47,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -67,6 +70,7 @@ public class PostServiceImpl implements PostService {
     private final FileStorageService fileStorageService;
     private final PostEventPublisher postEventPublisher;
     private final ProfileImageUrlResolver profileImageUrlResolver;
+    private final RankedFeedService rankedFeedService;
 
     private static final int MAX_MEDIA_PER_POST = 5;
     private static final int MAX_CAPTION_LENGTH = 500;
@@ -84,28 +88,104 @@ public class PostServiceImpl implements PostService {
     );
     private static final long PRESIGN_UPLOAD_EXPIRY_SECONDS = 15L * 60;
 
+    /**
+     * Explore is ranked: the recent posts of people the viewer does not follow, by engagement and age
+     * ({@link RankedFeedService}), then the older ones by date. A numbered page is cut from a fresh ranking.
+     */
     @Override
     public PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, String cursor, UUID userId, boolean mediaOnly) {
         log.debug("FEED.EXPLORE.FETCH page={} size={} cursor={} userId={} mediaOnly={}", page, size, cursor != null, userId, mediaOnly);
         if (cursor != null) {
-            FeedCursor after = FeedCursor.decode(cursor);
-            return afterCursor(size, userId, limit ->
-                    postPaginationRepository.findAllActivePostsAfter(mediaOnly, userId, after.createdAt(), after.id(), limit));
+            Paging.of(0, size);
+            Optional<RankedCursor> ranked = RankedCursor.tryDecode(cursor);
+            if (ranked.isPresent()) {
+                // an expired ranking goes on by date below it, which keeps every post of it out of the next pages
+                return rankedFeedService.resume(ranked.get(), userId, size)
+                        .map(slice -> exploreFrom(slice, size, userId, mediaOnly))
+                        .orElseGet(() -> exploreByDate(ranked.get().afterRanking(), List.of(), size, userId, mediaOnly));
+            }
+            return exploreByDate(FeedCursor.decode(cursor), List.of(), size, userId, mediaOnly);
         }
         Pageable pageable = Paging.of(page, size);
-        Page<PostEntity> postPage = postPaginationRepository.findAllActivePosts(pageable, mediaOnly, userId);
-        return buildPaginatedResponse(postPage, userId);
+        return rankedFeedService.start(userId, mediaOnly, (int) pageable.getOffset(), size)
+                .map(slice -> exploreFrom(slice, size, userId, mediaOnly))
+                // no Redis, no ranking: explore by date, as it was before
+                .orElseGet(() -> exploreByDate(new FeedCursor(LocalDateTime.now().plusDays(1), new UUID(-1L, -1L)),
+                        List.of(), size, userId, mediaOnly));
     }
 
+    private PaginatedResponse<PostFeedResponse> exploreFrom(RankedFeedService.Slice slice, int size, UUID viewerId,
+                                                            boolean mediaOnly) {
+        if (slice.next() != null) {
+            return cursorPage(slice.posts(), Set.of(), size, slice.next().encode(), viewerId);
+        }
+        // the ranking ran out within this page: the older posts by date fill it up
+        return exploreByDate(RankedCursor.below(slice.windowStart()), slice.posts(), size, viewerId, mediaOnly);
+    }
+
+    /** A page of explore by date after {@code after}, appended to what the page already holds. */
+    private PaginatedResponse<PostFeedResponse> exploreByDate(FeedCursor after, List<PostEntity> already, int size,
+                                                              UUID viewerId, boolean mediaOnly) {
+        int missing = size - already.size();
+        // one row more than missing tells whether another page follows
+        List<PostEntity> rows = postPaginationRepository.findExplorePostsAfter(
+                mediaOnly, viewerId, after.createdAt(), after.id(), PageRequest.of(0, missing + 1));
+        boolean hasMore = rows.size() > missing;
+        List<PostEntity> byDate = hasMore ? rows.subList(0, missing) : rows;
+        List<PostEntity> posts = new ArrayList<>(already);
+        posts.addAll(byDate);
+        String next = !hasMore ? null : byDate.isEmpty() ? after.encode() : cursorOf(byDate.getLast());
+        return cursorPage(posts, Set.of(), size, next, viewerId);
+    }
+
+    /**
+     * The home feed: the viewer's own posts and those of the people they follow, by date. Once they run out the
+     * feed goes on with suggestions (the ranked explore, marked {@code suggested}), so a new user who follows
+     * nobody yet does not land on an empty screen. Only page 0 and cursor pages get them: a client paging by
+     * number would otherwise get the same suggestions again on every page after the last.
+     */
     @Override
     public PaginatedResponse<PostFeedResponse> getFollowingPosts(int page, int size, String cursor, UUID viewerId) {
         if (cursor != null) {
+            Paging.of(0, size);
+            Optional<RankedCursor> suggestions = RankedCursor.tryDecode(cursor);
+            if (suggestions.isPresent()) {
+                // the suggestions end with their ranking, the home feed has no date order to go on with
+                return rankedFeedService.resume(suggestions.get(), viewerId, size)
+                        .map(slice -> withSuggestions(List.of(), slice, size, viewerId))
+                        .orElseGet(() -> cursorPage(List.of(), Set.of(), size, null, viewerId));
+            }
             FeedCursor after = FeedCursor.decode(cursor);
-            return afterCursor(size, viewerId, limit ->
-                    postPaginationRepository.findFollowingPostsAfter(viewerId, after.createdAt(), after.id(), limit));
+            List<PostEntity> rows = postPaginationRepository.findFollowingPostsAfter(
+                    viewerId, after.createdAt(), after.id(), PageRequest.of(0, size + 1));
+            if (rows.size() > size) {
+                List<PostEntity> posts = rows.subList(0, size);
+                return cursorPage(posts, Set.of(), size, cursorOf(posts.getLast()), viewerId);
+            }
+            return startSuggestions(rows, size, viewerId);
         }
         Page<PostEntity> postPage = postPaginationRepository.findFollowingPosts(Paging.of(page, size), viewerId);
-        return buildPaginatedResponse(postPage, viewerId);
+        if (page > 0 || !postPage.isLast()) {
+            return buildPaginatedResponse(postPage, viewerId);
+        }
+        PaginatedResponse<PostFeedResponse> firstPage = startSuggestions(postPage.getContent(), size, viewerId);
+        return new PaginatedResponse<>(firstPage.getContent(), postPage.getNumber(), postPage.getSize(),
+                postPage.getTotalElements(), postPage.getTotalPages(), firstPage.isLast(), firstPage.getNextCursor());
+    }
+
+    // the last posts of the home feed, and suggestions in the room left on the page
+    private PaginatedResponse<PostFeedResponse> startSuggestions(List<PostEntity> homePosts, int size, UUID viewerId) {
+        return rankedFeedService.start(viewerId, false, 0, size - homePosts.size())
+                .map(slice -> withSuggestions(homePosts, slice, size, viewerId))
+                .orElseGet(() -> cursorPage(homePosts, Set.of(), size, null, viewerId));
+    }
+
+    private PaginatedResponse<PostFeedResponse> withSuggestions(List<PostEntity> homePosts, RankedFeedService.Slice slice,
+                                                                int size, UUID viewerId) {
+        List<PostEntity> posts = new ArrayList<>(homePosts);
+        posts.addAll(slice.posts());
+        Set<UUID> suggested = slice.posts().stream().map(PostEntity::getId).collect(Collectors.toSet());
+        return cursorPage(posts, suggested, size, slice.next() == null ? null : slice.next().encode(), viewerId);
     }
 
     @Override
@@ -133,7 +213,7 @@ public class PostServiceImpl implements PostService {
 
     /**
      * One page after a cursor. One row more than asked is read, which tells whether another page follows without a
-     * count query; the totals are unknown and answered as -1.
+     * count query.
      */
     private PaginatedResponse<PostFeedResponse> afterCursor(int size, UUID viewerId,
                                                             Function<Pageable, List<PostEntity>> query) {
@@ -141,14 +221,15 @@ public class PostServiceImpl implements PostService {
         List<PostEntity> rows = query.apply(PageRequest.of(0, size + 1));
         boolean hasMore = rows.size() > size;
         List<PostEntity> posts = hasMore ? rows.subList(0, size) : rows;
-        return new PaginatedResponse<>(
-                toFeedResponses(posts, viewerId),
-                -1,
-                size,
-                -1,
-                -1,
-                !hasMore,
-                hasMore ? cursorOf(posts.getLast()) : null);
+        return cursorPage(posts, Set.of(), size, hasMore ? cursorOf(posts.getLast()) : null, viewerId);
+    }
+
+    // a page without totals (-1): it is the last one when no cursor follows
+    private PaginatedResponse<PostFeedResponse> cursorPage(List<PostEntity> posts, Set<UUID> suggestedIds, int size,
+                                                           String nextCursor, UUID viewerId) {
+        List<PostFeedResponse> content = toFeedResponses(posts, viewerId);
+        content.stream().filter(post -> suggestedIds.contains(post.getId())).forEach(post -> post.setSuggested(true));
+        return new PaginatedResponse<>(content, -1, size, -1, -1, nextCursor == null, nextCursor);
     }
 
     private static String cursorOf(PostEntity post) {

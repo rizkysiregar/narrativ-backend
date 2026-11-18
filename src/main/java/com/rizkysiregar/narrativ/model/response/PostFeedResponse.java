@@ -31,6 +31,8 @@ public class PostFeedResponse {
     private ModerationStatus moderationStatus = ModerationStatus.ACTIVE;
     private String takedownReason;
     private Instant takenDownAt;
+    // true on the posts suggested under the home feed once the posts of the people followed run out
+    private boolean suggested;
 
     public PostFeedResponse(UUID id, String username, String caption, List<PostMediaResponse> media,
                             LocalDateTime createdAt,

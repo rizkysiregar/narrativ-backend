@@ -91,6 +91,17 @@ preferably, with `cursor`: every page answers `nextCursor` (absent on the last p
 posts after it without duplicates when new posts arrive while scrolling. Each post carries the author's
 `profileImageUrl`.
 
+- **Home** (`GET /posts`, `/posts/following`) shows your own posts and those of the people you follow, newest first.
+  When they run out, the feed goes on with suggestions from explore, marked `"suggested": true`, so a new account
+  does not start on an empty screen.
+- **Explore** (`/posts/explore`) shows posts of people you do not follow (never your own, no taken down post). The
+  posts of the last 7 days come first, ranked by
+  `(likes + 2 x comments + 1) / (age in hours + 2)^1.5 / (1 + open reports)`, with at most 2 posts of one author in
+  every 10. Older posts follow by date. The ranking of a scroll is kept in Redis for 30 minutes, so the order does not
+  shift between its pages; without Redis explore is by date only.
+- The weights are app parameters under `feed.ranking.*` (seeded by V15) and can be tuned from App management without
+  a deploy.
+
 The email of an account changes in two steps: `POST /users/me/email/otp` mails an OTP to the new address, then
 `POST /users/me/email` with that OTP and the current password (or a Google id token) changes it, ends the other
 sessions and answers a new token pair.
