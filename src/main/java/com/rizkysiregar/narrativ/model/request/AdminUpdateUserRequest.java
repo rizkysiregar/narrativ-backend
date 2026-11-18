@@ -1,12 +1,14 @@
 package com.rizkysiregar.narrativ.model.request;
 
 import com.rizkysiregar.narrativ.model.enums.Role;
+import com.rizkysiregar.narrativ.model.request.constraint.UsernameRules;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record AdminUpdateUserRequest(
         @Size(min = 3, max = 16, message = "{validation.username.size16}")
+        @Pattern(regexp = UsernameRules.PATTERN, message = "{validation.username.pattern}")
         String username,
 
         @Email(message = "{validation.email.invalid}")

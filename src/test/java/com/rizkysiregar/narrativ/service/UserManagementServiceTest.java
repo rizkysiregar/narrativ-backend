@@ -14,6 +14,7 @@ import com.rizkysiregar.narrativ.model.request.AdminUpdateUserRequest;
 import com.rizkysiregar.narrativ.model.request.AdminUserSearchRequest;
 import com.rizkysiregar.narrativ.model.request.BanUserRequest;
 import com.rizkysiregar.narrativ.model.request.UnbanUserRequest;
+import com.rizkysiregar.narrativ.model.request.UpdateMyUserRequest;
 import com.rizkysiregar.narrativ.repository.CommentRepository;
 import com.rizkysiregar.narrativ.repository.FollowRepository;
 import com.rizkysiregar.narrativ.repository.PostCrudRepository;
@@ -110,6 +111,29 @@ class UserManagementServiceTest {
         assertEquals(Role.USER, metadata.getValue().get("previousRole"));
         assertEquals(Role.ADMIN, metadata.getValue().get("newRole"));
         assertFalse(metadata.getValue().containsValue("Jane"));
+    }
+
+    @Test
+    void updateMyProfile_cannotChangeTheEmailWithoutVerification() {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findActiveById(id)).thenReturn(Optional.of(user(id, Role.USER)));
+
+        assertFails(GlobalMessage.EMAIL_CHANGE_NOT_ALLOWED, HttpStatus.BAD_REQUEST, () -> userManagementService.updateMyProfile(id,
+                new UpdateMyUserRequest(null, "victim@mail.com", null, null, null)));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateMyProfile_sendingTheCurrentEmailAgainIsFine() {
+        UUID id = UUID.randomUUID();
+        UserEntity me = user(id, Role.USER);
+        when(userRepository.findActiveById(id)).thenReturn(Optional.of(me));
+        when(userRepository.save(me)).thenReturn(me);
+
+        userManagementService.updateMyProfile(id, new UpdateMyUserRequest(null, "SomeOne@mail.com", "New", null, null));
+
+        assertEquals("someone@mail.com", me.getEmail());
+        assertEquals("New", me.getFirstName());
     }
 
     @Test
