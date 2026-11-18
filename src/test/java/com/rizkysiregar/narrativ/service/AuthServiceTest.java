@@ -107,7 +107,6 @@ public class AuthServiceTest {
         request.setEmail("test@mail.com");
         request.setFirstName("John");
         request.setLastName("Doe");
-        request.setProfileImage("profile.png");
 
         when(userRepository.save(any(UserEntity.class)))
                 .thenReturn(userEntity);
@@ -252,6 +251,60 @@ public class AuthServiceTest {
         verify(userRepository).findByUsername("testuser");
     }
 
+
+    @Test
+    void adminLogin_userAccountIsRefusedWithoutASession() {
+        UserLoginRequest loginRequest = new UserLoginRequest();
+        loginRequest.setUsername("testuser");
+        loginRequest.setPassword("password");
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+        UserEntity user = new UserEntity();
+        user.setId(UUID.randomUUID());
+        user.setUsername("testuser");
+        user.setRole(Role.USER);
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+
+        BusinessException e = assertThrows(BusinessException.class, () -> authService.adminLogin(loginRequest));
+
+        assertEquals(HttpStatus.FORBIDDEN, e.getHttpStatus());
+        // no refresh token was stored for an account that may not use the admin login
+        verify(redisUtil, never()).set(anyString(), any(), anyLong());
+        verify(jwtService, never()).generateToken(any(), any(), any());
+    }
+
+    @Test
+    void refreshTokensAreStoredOnlyAsTheirHash() {
+        String hash = AuthService.hashToken("2b0c2a3e-1111-2222-3333-444455556666");
+
+        assertEquals(64, hash.length());
+        assertFalse(hash.contains("2b0c2a3e"));
+        assertEquals(hash, AuthService.hashToken("2b0c2a3e-1111-2222-3333-444455556666"));
+    }
+
+    @Test
+    void register_storesTheEmailInLowerCase() {
+        RegisterUserRequest request = new RegisterUserRequest();
+        request.setUsername("testuser");
+        request.setPassword("password");
+        request.setEmail("  Test@Mail.COM ");
+        request.setFirstName("John");
+        request.setLastName("Doe");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
+            UserEntity saved = inv.getArgument(0);
+            saved.setId(UUID.randomUUID());
+            return saved;
+        });
+
+        authService.register(request, false);
+
+        verify(userRepository).findByEmail("test@mail.com");
+        ArgumentCaptor<UserEntity> saved = ArgumentCaptor.forClass(UserEntity.class);
+        verify(userRepository).save(saved.capture());
+        assertEquals("test@mail.com", saved.getValue().getEmail());
+        assertNull(saved.getValue().getProfileImage());
+    }
 
     private static final String INVALID_RESET_TOKEN_MESSAGE =
             "The password reset link is no longer valid or has already been used.";
@@ -543,7 +596,7 @@ public class AuthServiceTest {
         user.setUsername("testuser");
         user.setRole(Role.USER);
 
-        when(redisUtil.get("refresh_token:old-token")).thenReturn(userId.toString());
+        when(redisUtil.get("refresh_token:" + AuthService.hashToken("old-token"))).thenReturn(userId.toString());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(jwtService.generateToken("testuser", userId, Role.USER)).thenReturn("newAccess");
 
@@ -553,30 +606,30 @@ public class AuthServiceTest {
         assertNotNull(result.getRefreshToken());
         assertNotEquals("old-token", result.getRefreshToken());
         assertEquals(userId.toString(), result.getUserId());
-        verify(redisUtil).delete("refresh_token:old-token");
-        verify(redisUtil).removeFromSet("user_refresh_tokens:" + userId, "old-token");
-        verify(redisUtil).set(eq("refresh_token:" + result.getRefreshToken()), eq(userId.toString()), anyLong());
-        verify(redisUtil).addToSet(eq("user_refresh_tokens:" + userId), eq(result.getRefreshToken()), anyLong());
+        verify(redisUtil).delete("refresh_token:" + AuthService.hashToken("old-token"));
+        verify(redisUtil).removeFromSet("user_refresh_tokens:" + userId, AuthService.hashToken("old-token"));
+        verify(redisUtil).set(eq("refresh_token:" + AuthService.hashToken(result.getRefreshToken())), eq(userId.toString()), anyLong());
+        verify(redisUtil).addToSet(eq("user_refresh_tokens:" + userId), eq(AuthService.hashToken(result.getRefreshToken())), anyLong());
     }
 
     @Test
     void logoutRevokesOnlyTheGivenRefreshToken() {
         UUID userId = UUID.randomUUID();
-        when(redisUtil.get("refresh_token:tok")).thenReturn(userId.toString());
+        when(redisUtil.get("refresh_token:" + AuthService.hashToken("tok"))).thenReturn(userId.toString());
 
         authService.logout("tok");
 
-        verify(redisUtil).delete("refresh_token:tok");
-        verify(redisUtil).removeFromSet("user_refresh_tokens:" + userId, "tok");
+        verify(redisUtil).delete("refresh_token:" + AuthService.hashToken("tok"));
+        verify(redisUtil).removeFromSet("user_refresh_tokens:" + userId, AuthService.hashToken("tok"));
     }
 
     @Test
     void logoutWithAnUnknownTokenIsANoOp() {
-        when(redisUtil.get("refresh_token:gone")).thenReturn(null);
+        when(redisUtil.get("refresh_token:" + AuthService.hashToken("gone"))).thenReturn(null);
 
         authService.logout("gone");
 
-        verify(redisUtil).delete("refresh_token:gone");
+        verify(redisUtil).delete("refresh_token:" + AuthService.hashToken("gone"));
         verify(redisUtil, never()).removeFromSet(anyString(), anyString());
     }
 
@@ -614,7 +667,7 @@ public class AuthServiceTest {
 
     @Test
     void testRefreshToken_InvalidToken() {
-        when(redisUtil.get("refresh_token:bad")).thenReturn(null);
+        when(redisUtil.get("refresh_token:" + AuthService.hashToken("bad"))).thenReturn(null);
 
         assertThrows(BusinessException.class, () -> authService.refreshToken("bad"));
         verify(jwtService, never()).generateToken(any(), any(), any());
@@ -623,11 +676,11 @@ public class AuthServiceTest {
     @Test
     void testRefreshToken_UserDeleted() {
         UUID userId = UUID.randomUUID();
-        when(redisUtil.get("refresh_token:tok")).thenReturn(userId.toString());
+        when(redisUtil.get("refresh_token:" + AuthService.hashToken("tok"))).thenReturn(userId.toString());
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         assertThrows(BusinessException.class, () -> authService.refreshToken("tok"));
-        verify(redisUtil).delete("refresh_token:tok");
+        verify(redisUtil).delete("refresh_token:" + AuthService.hashToken("tok"));
     }
 
 
@@ -637,13 +690,13 @@ public class AuthServiceTest {
         UserEntity deleted = new UserEntity();
         deleted.setId(userId);
         deleted.setDeleted(true);
-        when(redisUtil.get("refresh_token:tok")).thenReturn(userId.toString());
+        when(redisUtil.get("refresh_token:" + AuthService.hashToken("tok"))).thenReturn(userId.toString());
         when(userRepository.findById(userId)).thenReturn(Optional.of(deleted));
 
         BusinessException exception = assertThrows(BusinessException.class, () -> authService.refreshToken("tok"));
 
         assertEquals(GlobalMessage.UNAUTHORIZED.getMessage(), exception.getMessage());
-        verify(redisUtil).delete("refresh_token:tok");
+        verify(redisUtil).delete("refresh_token:" + AuthService.hashToken("tok"));
     }
 
     @Test
@@ -653,7 +706,7 @@ public class AuthServiceTest {
         banned.setId(userId);
         banned.setStatus(UserStatus.BANNED);
         banned.setBanReason("posting spam");
-        when(redisUtil.get("refresh_token:tok")).thenReturn(userId.toString());
+        when(redisUtil.get("refresh_token:" + AuthService.hashToken("tok"))).thenReturn(userId.toString());
         when(userRepository.findById(userId)).thenReturn(Optional.of(banned));
 
         for (int attempt = 0; attempt < 2; attempt++) {

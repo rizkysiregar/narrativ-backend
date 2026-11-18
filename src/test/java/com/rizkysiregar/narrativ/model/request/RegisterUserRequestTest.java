@@ -6,6 +6,7 @@ import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegisterUserRequestTest {
@@ -31,5 +32,31 @@ class RegisterUserRequestTest {
 
         assertEquals("rizky", request.getUsername());
         assertTrue(validator.validate(request).isEmpty());
+    }
+
+    @Test
+    void aProfileImageSentAtRegistrationIsIgnored() throws Exception {
+        // it used to be stored as is, and an object key there was presigned for anybody: any object of the bucket
+        RegisterUserRequest request = objectMapper.readValue("""
+                {"username":"rizky","password":"secret123","email":"rizky@example.com","firstName":"Rizky","lastName":"Siregar","profileImage":"victim/POST_FEED/a.jpg"}
+                """, RegisterUserRequest.class);
+
+        assertTrue(validator.validate(request).isEmpty());
+    }
+
+    @Test
+    void usernameIsLimitedToLettersDigitsDotsAndUnderscores() {
+        for (String ok : new String[]{"rizky", "Rizky_99", "r.siregar"}) {
+            assertTrue(validator.validateProperty(withUsername(ok), "username").isEmpty(), ok);
+        }
+        for (String bad : new String[]{"a/b/c", "has space", "rízky", "rizky!", "../x"}) {
+            assertFalse(validator.validateProperty(withUsername(bad), "username").isEmpty(), bad);
+        }
+    }
+
+    private static RegisterUserRequest withUsername(String username) {
+        RegisterUserRequest request = new RegisterUserRequest();
+        request.setUsername(username);
+        return request;
     }
 }

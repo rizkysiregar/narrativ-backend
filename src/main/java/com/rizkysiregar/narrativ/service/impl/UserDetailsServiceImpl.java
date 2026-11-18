@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+import java.util.UUID;
 
 
 @Service
@@ -34,5 +35,12 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         }
 
         return new UserPrincipal(user.get());
+    }
+
+    /** The lookup behind an access token: its subject is the user id, which never changes. */
+    public @NonNull UserPrincipal loadUserById(@NonNull UUID userId) throws UsernameNotFoundException {
+        return userRepository.findById(userId)
+                .map(UserPrincipal::new)
+                .orElseThrow(() -> new UsernameNotFoundException(Constants.INVALID_USERNAME_PASSWORD));
     }
 }

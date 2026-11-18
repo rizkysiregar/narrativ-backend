@@ -3,6 +3,7 @@ package com.rizkysiregar.narrativ.filter;
 
 import com.rizkysiregar.narrativ.constant.GlobalMessage;
 import com.rizkysiregar.narrativ.exception.BusinessException;
+import com.rizkysiregar.narrativ.model.UserPrincipal;
 import com.rizkysiregar.narrativ.service.ratelimit.RateLimiterService;
 import com.rizkysiregar.narrativ.util.ClientIpResolver;
 import io.github.bucket4j.Bucket;
@@ -88,7 +89,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         // JwtFilter already set this — no need to re-parse the token
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) return null;
-        return auth.getName(); // returns username set by JwtFilter
+        // the id, not the username: renaming the account must not hand out a fresh bucket
+        return auth.getPrincipal() instanceof UserPrincipal principal ? principal.getUserId().toString() : auth.getName();
     }
 
     private boolean isAuthEndpoint(HttpServletRequest request) {

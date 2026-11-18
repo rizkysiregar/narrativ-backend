@@ -6,6 +6,7 @@ import com.rizkysiregar.narrativ.model.response.LoginResponse;
 import com.rizkysiregar.narrativ.service.AuthService;
 import com.rizkysiregar.narrativ.service.otp.IOtpService;
 import com.rizkysiregar.narrativ.service.otp.IRegistrationOtpService;
+import com.rizkysiregar.narrativ.util.EmailNormalizer;
 import com.rizkysiregar.narrativ.util.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,13 +46,13 @@ public class AuthController {
     @io.swagger.v3.oas.annotations.Operation(summary = "Send the registration OTP", description = "Sends an OTP to the email that is about to be registered. verificationRequired=false means this environment does not verify emails: skip the OTP step and register directly")
     @PostMapping("auth/register/otp")
     public RegisterOtpDTO registerOtp(@RequestBody @Valid RegisterOtpRequest request) {
-        return registrationOtpService.sendOtp(request.getEmail());
+        return registrationOtpService.sendOtp(EmailNormalizer.normalize(request.getEmail()));
     }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Verify the registration OTP", description = "Trades the right OTP for a registrationToken, which POST /auth/register asks for")
     @PostMapping("auth/register/verify-otp")
     public RegistrationTokenDTO registerVerifyOtp(@RequestBody @Valid VerifyOtpRequest request) {
-        return registrationOtpService.verifyOtp(request.getEmail(), request.getOtp());
+        return registrationOtpService.verifyOtp(EmailNormalizer.normalize(request.getEmail()), request.getOtp());
     }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Register a admin user")
@@ -97,13 +98,13 @@ public class AuthController {
     @io.swagger.v3.oas.annotations.Operation(summary = "User validation and OTP Request", description = "Sends an OTP to the email when it has an account. The answer is the same for every email, registered or not, so it does not reveal which emails have an account")
     @PostMapping("auth/forgot-password")
     public SentOtpDTO forgotPassword(@RequestBody @Valid ForgotPasswordRequest request) {
-        return otpService.sendOtp(request.getEmail());
+        return otpService.sendOtp(EmailNormalizer.normalize(request.getEmail()));
     }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Verify OTP", description = "Validate is OTP matched or not")
     @PostMapping("auth/verify-otp")
     public ResetTokenDTO verifyOtp(@RequestBody @Valid VerifyOtpRequest request) {
-        return otpService.verifyOtp(request.getEmail(), request.getOtp());
+        return otpService.verifyOtp(EmailNormalizer.normalize(request.getEmail()), request.getOtp());
     }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "New password", description = "Take email and new password also resetToken is needed")

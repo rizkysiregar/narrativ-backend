@@ -2,20 +2,24 @@ package com.rizkysiregar.narrativ.model.request;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.rizkysiregar.narrativ.model.request.constraint.MaxUtf8Bytes;
+import com.rizkysiregar.narrativ.model.request.constraint.UsernameRules;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.ToString;
 
-// phoneNumber is no longer collected at registration; apps that still send it must not get a 400, so it is ignored
+// phoneNumber and profileImage are no longer taken at registration; apps that still send them must not get a 400,
+// so they are ignored. A picture is set afterwards through the presigned upload of /users/me/profile-image
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Data
 public class RegisterUserRequest {
     @NotBlank(message = "{validation.username.required}")
     @NotEmpty(message = "{validation.username.empty}")
     @Size(min = 3, max = 16, message = "{validation.username.size15}")
+    @Pattern(regexp = UsernameRules.PATTERN, message = "{validation.username.pattern}")
     private String username;
 
     @NotBlank(message = "{validation.password.required}")
@@ -40,8 +44,6 @@ public class RegisterUserRequest {
     @NotEmpty(message = "{validation.lastName.empty}")
     @Size(min = 2, max = 50, message = "{validation.lastName.size}")
     private String lastName;
-
-    private String profileImage;
 
     // issued by POST /auth/register/verify-otp; only asked for where email verification is switched on
     @ToString.Exclude

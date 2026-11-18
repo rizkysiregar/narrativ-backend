@@ -21,13 +21,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -68,14 +68,15 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         try {
-            String username = jwtService.extractUsername(token);
+            UUID userId = jwtService.extractUserId(token);
 
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            if (SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserPrincipal principal = userDetailsService.loadUserById(userId);
+                String username = principal.getUsername();
 
-                validateUserIsEnabled(userDetails);
+                validateUserIsEnabled(principal);
 
-                if (userDetails instanceof UserPrincipal principal && principal.isBanned()) {
+                if (principal.isBanned()) {
                     log.warn("AUTH.JWT.REJECTED reason=banned username={}", username);
                     BusinessException banned = BanMessages.bannedException(principal.getBanReason());
                     BaseResponse<Void> body = BaseResponse.error(banned.getGlobalMessage(), banned.getArgs());
@@ -83,9 +84,9 @@ public class JwtFilter extends OncePerRequestFilter {
                     return;
                 }
 
-                if (jwtService.validateToken(token, userDetails)) {
+                if (jwtService.validateToken(token, principal)) {
                     UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                            new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
 
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
@@ -116,7 +117,7 @@ public class JwtFilter extends OncePerRequestFilter {
         return authHeader.substring(7);
     }
 
-    private void validateUserIsEnabled(UserDetails userDetails) {
+    private void validateUserIsEnabled(UserPrincipal userDetails) {
         if (!userDetails.isEnabled()) {
             throw new DisabledException("User is disabled");
         }

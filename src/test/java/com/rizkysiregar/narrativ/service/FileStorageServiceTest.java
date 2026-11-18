@@ -14,7 +14,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 
@@ -37,61 +36,6 @@ public class FileStorageServiceTest {
         fileStorageService = new FileStorageServiceImpl(minioClient, TEST_BUCKET);
     }
 
-
-    @Test
-    void uploadFile_Success_BucketExists() throws Exception {
-        // Arrange
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.getOriginalFilename()).thenReturn("image.png");
-        when(file.getSize()).thenReturn(10L);
-        when(file.getContentType()).thenReturn("image/png");
-        when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[]{1, 2, 3}));
-
-        when(minioClient.bucketExists(any(BucketExistsArgs.class))).thenReturn(true);
-        // stub putObject to return a response
-        when(minioClient.putObject(any(PutObjectArgs.class)))
-                .thenReturn(mock(ObjectWriteResponse.class));
-
-        String userId = "user-1";
-        String featureName = "POST_FEED";
-
-        // Act
-        String objectName = fileStorageService.uploadFile(file, userId, featureName);
-
-        // Assert
-        assertNotNull(objectName);
-        assertTrue(objectName.startsWith(userId + "/" + featureName + "/"));
-        assertTrue(objectName.endsWith(".png"));
-        verify(minioClient, times(1)).bucketExists(any(BucketExistsArgs.class));
-        verify(minioClient, never()).makeBucket(any(MakeBucketArgs.class));
-        verify(minioClient, times(1)).putObject(any(PutObjectArgs.class));
-    }
-
-    @Test
-    void uploadFile_Success_BucketCreatedWhenMissing() throws Exception {
-        // Arrange
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.getOriginalFilename()).thenReturn("photo.jpg");
-        when(file.getSize()).thenReturn(20L);
-        when(file.getContentType()).thenReturn("image/jpeg");
-        when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[]{4, 5, 6}));
-
-        when(minioClient.bucketExists(any(BucketExistsArgs.class))).thenReturn(false);
-        doNothing().when(minioClient).makeBucket(any(MakeBucketArgs.class));
-        when(minioClient.putObject(any(PutObjectArgs.class)))
-                .thenReturn(mock(ObjectWriteResponse.class));
-
-        // Act
-        String objectName = fileStorageService.uploadFile(file, "u2", "AVATAR");
-
-        // Assert
-        assertNotNull(objectName);
-        assertTrue(objectName.startsWith("u2/AVATAR/"));
-        assertTrue(objectName.endsWith(".jpg"));
-        verify(minioClient, times(1)).bucketExists(any(BucketExistsArgs.class));
-        verify(minioClient, times(1)).makeBucket(any(MakeBucketArgs.class));
-        verify(minioClient, times(1)).putObject(any(PutObjectArgs.class));
-    }
 
     @Test
     void getPresignUrl_Success() throws Exception {

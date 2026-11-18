@@ -112,7 +112,6 @@ public class SecurityConfig {
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
         provider.setPasswordEncoder(new BCryptPasswordEncoder(12));
-//        provider.setUserDetailsService(userDetailsService);
         return provider;
     }
 
@@ -133,26 +132,4 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", config); // allow all endpoint for this cors config
         return source;
     }
-
-
-//    @Bean
-//    public UserDetailsService userDetailsService() {
-//        UserDetails user1 = User
-//                .withDefaultPasswordEncoder()
-//                .username("ridho")
-//                .password("r@123")
-//                .roles("ADMIN")
-//                .build();
-//
-//        UserDetails user2 = User
-//                .withDefaultPasswordEncoder()
-//                .username("icha")
-//                .password("i@123")
-//                .roles("USER")
-//                .build();
-//
-//        return new InMemoryUserDetailsManager(user1, user2);
-//    }
-
-
 }

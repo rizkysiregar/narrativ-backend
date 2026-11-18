@@ -15,17 +15,25 @@ import java.util.UUID;
 
 @Repository
 public interface UserRepository extends JpaRepository<UserEntity, UUID>, JpaSpecificationExecutor<UserEntity> {
-    Optional<UserEntity> findByUsername(String username);
+    // usernames and emails are unique regardless of case (see V13), so every lookup ignores it too
+    @Query("SELECT u FROM users u WHERE lower(u.username) = lower(:username)")
+    Optional<UserEntity> findByUsername(@Param("username") String username);
 
     // "active" = not deleted by the user and not banned by an admin
-    @Query("SELECT u FROM users u WHERE u.username = :username AND u.isDeleted = false AND u.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE")
+    @Query("SELECT u FROM users u WHERE lower(u.username) = lower(:username) AND u.isDeleted = false AND u.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE")
     Optional<UserEntity> findActiveByUsername(@Param("username") String username);
-    Optional<UserEntity> findByEmail(String email);
+
+    @Query("SELECT u FROM users u WHERE lower(u.email) = lower(:email)")
+    Optional<UserEntity> findByEmail(@Param("email") String email);
 
     @Query("SELECT u FROM users u WHERE u.id = :id AND u.isDeleted = false AND u.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE")
     Optional<UserEntity> findActiveById(@Param("id") UUID id);
 
     long countByRoleAndIsDeletedFalse(Role role);
-    boolean existsByUsernameAndIdNot(String username, UUID id); // Check if there is any user in the database who has this username, but does NOT have this ID
-    boolean existsByEmailAndIdNot(String email, UUID id);
+    // is the username / email held by any user other than this one
+    @Query("SELECT COUNT(u) > 0 FROM users u WHERE lower(u.username) = lower(:username) AND u.id <> :id")
+    boolean existsByUsernameAndIdNot(@Param("username") String username, @Param("id") UUID id);
+
+    @Query("SELECT COUNT(u) > 0 FROM users u WHERE lower(u.email) = lower(:email) AND u.id <> :id")
+    boolean existsByEmailAndIdNot(@Param("email") String email, @Param("id") UUID id);
 }

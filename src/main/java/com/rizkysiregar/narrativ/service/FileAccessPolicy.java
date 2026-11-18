@@ -9,8 +9,10 @@ import org.springframework.stereotype.Component;
 
 /**
  * Who may touch which object through the generic {@code /files} endpoints. Object keys look like
- * {@code owner/GROUP/file}. Post media is only reachable through the feed (which presigns what the viewer may see,
+ * {@code ownerId/GROUP/file}. Post media is only reachable through the feed (which presigns what the viewer may see,
  * and hides taken down posts), so here it is limited to its owner; profile pictures are shown to everybody.
+ * The owner is matched by user id only: keys that older versions wrote under a username are not handed out here,
+ * since that username may belong to somebody else by now.
  */
 @Component
 public class FileAccessPolicy {
@@ -24,20 +26,10 @@ public class FileAccessPolicy {
         if (ObjectStorageTypeGroup.PROFILE_PICTURE.equals(group)) {
             return;
         }
-        if (ObjectStorageTypeGroup.POST_FEED.equals(group) && segments[0].equals(caller.getUsername())) {
+        if (ObjectStorageTypeGroup.POST_FEED.equals(group) && segments[0].equals(caller.getUserId().toString())) {
             return;
         }
         throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);
-    }
-
-    /** Only profile pictures go through this endpoint, and only into the caller's own folder. */
-    public void checkUpload(UserPrincipal caller, String userId, String featureName) {
-        if (!ObjectStorageTypeGroup.PROFILE_PICTURE.equals(featureName) || isUnsafe(userId)) {
-            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-        }
-        if (!userId.equals(caller.getUsername()) && !userId.equals(caller.getUserId().toString())) {
-            throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);
-        }
     }
 
     private String[] segmentsOf(String path) {
@@ -54,10 +46,6 @@ public class FileAccessPolicy {
             }
         }
         return segments;
-    }
-
-    private boolean isUnsafe(String value) {
-        return value == null || value.isBlank() || value.contains("/") || value.contains("\\") || value.contains("..");
     }
 
     private boolean isAdmin(UserPrincipal caller) {

@@ -27,6 +27,7 @@ import com.rizkysiregar.narrativ.repository.PostCrudRepository;
 import com.rizkysiregar.narrativ.repository.UserRepository;
 import com.rizkysiregar.narrativ.util.AdminDates;
 import com.rizkysiregar.narrativ.util.AfterCommit;
+import com.rizkysiregar.narrativ.util.EmailNormalizer;
 import com.rizkysiregar.narrativ.util.Operation;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -74,10 +75,18 @@ public class UserManagementService {
     public UserDetailDTO updateMyProfile(UUID currentUserId, UpdateMyUserRequest request) {
         UserEntity user = findActiveUserOrThrow(currentUserId);
 
+        // An unverified email change would skip the OTP of registration, and would let somebody park their account on
+        // an address they do not own: a later Google sign-in with that address is linked to the existing account.
+        // Sending the email it already has (a client that posts the whole form) is fine.
+        if (request.email() != null && !request.email().isBlank()
+                && !EmailNormalizer.normalize(request.email()).equals(EmailNormalizer.normalize(user.getEmail()))) {
+            throw new BusinessException(GlobalMessage.EMAIL_CHANGE_NOT_ALLOWED, HttpStatus.BAD_REQUEST);
+        }
+
         applyCommonUserUpdates(
                 user,
                 request.username(),
-                request.email(),
+                null,
                 request.firstName(),
                 request.lastName(),
                 request.phoneNumber(),
@@ -388,8 +397,9 @@ public class UserManagementService {
         }
 
         if (email != null && !email.isBlank()) {
-            validateEmailIsAvailable(email, user.getId());
-            user.setEmail(email);
+            String normalized = EmailNormalizer.normalize(email);
+            validateEmailIsAvailable(normalized, user.getId());
+            user.setEmail(normalized);
         }
 
         if (firstName != null) {

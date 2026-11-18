@@ -19,6 +19,7 @@ import com.rizkysiregar.narrativ.repository.UserBlockRepository;
 import com.rizkysiregar.narrativ.repository.UserRepository;
 import com.rizkysiregar.narrativ.util.BanMessages;
 import com.rizkysiregar.narrativ.util.EmailMasking;
+import com.rizkysiregar.narrativ.util.EmailNormalizer;
 import com.rizkysiregar.narrativ.util.LikePatterns;
 import com.rizkysiregar.narrativ.util.Operation;
 import com.rizkysiregar.narrativ.util.UsernameGenerator;
@@ -37,7 +38,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -88,19 +91,20 @@ public class AuthService {
 
     @Transactional
     public Operation register(RegisterUserRequest registerUserRequest, Boolean isAdmin) {
+        String email = EmailNormalizer.normalize(registerUserRequest.getEmail());
 
+        // case-insensitive: "Alice" next to "alice" would be an impersonation waiting to happen
         if (userRepository.findByUsername(registerUserRequest.getUsername()).isPresent()) {
             throw new BusinessException(GlobalMessage.USERNAME_ALREADY_TAKEN, HttpStatus.BAD_REQUEST);
         }
 
-        if (userRepository.findByEmail(registerUserRequest.getEmail()).isPresent()) {
+        if (userRepository.findByEmail(email).isPresent()) {
             throw new BusinessException(GlobalMessage.EMAIL_ALREADY_TAKEN, HttpStatus.BAD_REQUEST);
         }
 
         // admins are created by an admin, only self-registration has to prove the mailbox
         if (!isAdmin && registrationOtpService.isVerificationRequired()) {
-            registrationOtpService.consumeRegistrationToken(registerUserRequest.getEmail(),
-                    registerUserRequest.getRegistrationToken());
+            registrationOtpService.consumeRegistrationToken(email, registerUserRequest.getRegistrationToken());
         }
 
         Role role = Role.USER;
@@ -113,10 +117,9 @@ public class AuthService {
         UserEntity entity = new UserEntity();
         entity.setUsername(registerUserRequest.getUsername());
         entity.setPassword(encoder.encode(registerUserRequest.getPassword()));
-        entity.setEmail(registerUserRequest.getEmail());
+        entity.setEmail(email);
         entity.setFirstName(registerUserRequest.getFirstName());
         entity.setLastName(registerUserRequest.getLastName());
-        entity.setProfileImage(registerUserRequest.getProfileImage());
         entity.setRole(role);
 
         UserEntity saved = userRepository.save(entity);
@@ -130,6 +133,21 @@ public class AuthService {
     }
 
     public LoginResponse login(UserLoginRequest userLoginRequest) {
+        return issueSession(authenticate(userLoginRequest));
+    }
+
+    public LoginResponse adminLogin(UserLoginRequest request) {
+        UserEntity user = authenticate(request);
+
+        // checked before a session exists: a user account must not walk away with a refresh token from here
+        if (user.getRole() != Role.ADMIN) {
+            throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);
+        }
+
+        return issueSession(user);
+    }
+
+    private UserEntity authenticate(UserLoginRequest userLoginRequest) {
         Authentication authentication =
                 authManager.authenticate(new UsernamePasswordAuthenticationToken(userLoginRequest.getUsername(), userLoginRequest.getPassword()));
 
@@ -146,30 +164,17 @@ public class AuthService {
 
         // after the password was verified, so the ban status is never revealed to someone guessing credentials
         assertNotBanned(userEntity.get());
-
-        String token = jwtService.generateToken(
-                userEntity.get().getUsername(),
-                userEntity.get().getId(),
-                userEntity.get().getRole()
-        );
-
-        return LoginResponse.builder()
-                .token(token)
-                .refreshToken(issueRefreshToken(userEntity.get().getId()))
-                .username(userEntity.get().getUsername())
-                .userId(userEntity.get().getId().toString())
-                .role(userEntity.get().getRole())
-                .build();
+        return userEntity.get();
     }
 
-    public LoginResponse adminLogin(UserLoginRequest request) {
-        LoginResponse loginResult = login(request);
-
-        if (!loginResult.getRole().equals(Role.ADMIN)) {
-            throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);
-        }
-
-        return loginResult;
+    private LoginResponse issueSession(UserEntity user) {
+        return LoginResponse.builder()
+                .token(jwtService.generateToken(user.getUsername(), user.getId(), user.getRole()))
+                .refreshToken(issueRefreshToken(user.getId()))
+                .username(user.getUsername())
+                .userId(user.getId().toString())
+                .role(user.getRole())
+                .build();
     }
 
     public LoginResponse googleLogin(GoogleLoginRequest request) {
@@ -191,19 +196,12 @@ public class AuthService {
 
         assertNotBanned(user);
         userRepository.save(user);
-        // Generate JWT - same as regular login
-        String token = jwtService.generateToken(user.getUsername(), user.getId(), user.getRole());
-        return LoginResponse.builder()
-                .token(token)
-                .refreshToken(issueRefreshToken(user.getId()))
-                .username(user.getUsername())
-                .userId(user.getId().toString())
-                .role(user.getRole())
-                .build();
+        return issueSession(user);
     }
 
     public LoginResponse refreshToken(String refreshToken) {
-        String key = REFRESH_TOKEN_PREFIX.concat(refreshToken);
+        String tokenHash = hashToken(refreshToken);
+        String key = REFRESH_TOKEN_PREFIX.concat(tokenHash);
         Object storedUserId = redisUtil.get(key);
 
         if (storedUserId == null) {
@@ -231,15 +229,9 @@ public class AuthService {
 
         // rotation: a refresh token can only be used once
         redisUtil.delete(key);
-        redisUtil.removeFromSet(USER_REFRESH_TOKENS_PREFIX.concat(storedUserId.toString()), refreshToken);
+        redisUtil.removeFromSet(USER_REFRESH_TOKENS_PREFIX.concat(storedUserId.toString()), tokenHash);
 
-        return LoginResponse.builder()
-                .token(jwtService.generateToken(user.getUsername(), user.getId(), user.getRole()))
-                .refreshToken(issueRefreshToken(user.getId()))
-                .username(user.getUsername())
-                .userId(user.getId().toString())
-                .role(user.getRole())
-                .build();
+        return issueSession(user);
     }
 
     /**
@@ -247,11 +239,12 @@ public class AuthService {
      * a retry (or a logout after the session already expired) never fails.
      */
     public void logout(String refreshToken) {
-        String key = REFRESH_TOKEN_PREFIX.concat(refreshToken);
+        String tokenHash = hashToken(refreshToken);
+        String key = REFRESH_TOKEN_PREFIX.concat(tokenHash);
         Object storedUserId = redisUtil.get(key);
         redisUtil.delete(key);
         if (storedUserId != null) {
-            redisUtil.removeFromSet(USER_REFRESH_TOKENS_PREFIX.concat(storedUserId.toString()), refreshToken);
+            redisUtil.removeFromSet(USER_REFRESH_TOKENS_PREFIX.concat(storedUserId.toString()), tokenHash);
         }
     }
 
@@ -280,9 +273,23 @@ public class AuthService {
 
     private String issueRefreshToken(UUID userId) {
         String refreshToken = UUID.randomUUID().toString();
-        redisUtil.set(REFRESH_TOKEN_PREFIX.concat(refreshToken), userId.toString(), REFRESH_TOKEN_TTL_SECONDS);
-        redisUtil.addToSet(USER_REFRESH_TOKENS_PREFIX.concat(userId.toString()), refreshToken, REFRESH_TOKEN_TTL_SECONDS);
+        String tokenHash = hashToken(refreshToken);
+        redisUtil.set(REFRESH_TOKEN_PREFIX.concat(tokenHash), userId.toString(), REFRESH_TOKEN_TTL_SECONDS);
+        redisUtil.addToSet(USER_REFRESH_TOKENS_PREFIX.concat(userId.toString()), tokenHash, REFRESH_TOKEN_TTL_SECONDS);
         return refreshToken;
+    }
+
+    /**
+     * Redis only ever holds the SHA-256 of a refresh token, so a dump or a look at the keys hands out no session.
+     * The token itself is a random UUID, so a plain (unsalted) hash is enough.
+     */
+    static String hashToken(String refreshToken) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(refreshToken.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);
+        }
     }
 
     /**
@@ -292,8 +299,8 @@ public class AuthService {
      */
     public void revokeRefreshTokens(UUID userId) {
         String indexKey = USER_REFRESH_TOKENS_PREFIX.concat(userId.toString());
-        for (String token : redisUtil.membersOfSet(indexKey)) {
-            redisUtil.delete(REFRESH_TOKEN_PREFIX.concat(token));
+        for (String tokenHash : redisUtil.membersOfSet(indexKey)) {
+            redisUtil.delete(REFRESH_TOKEN_PREFIX.concat(tokenHash));
         }
         redisUtil.delete(indexKey);
     }
@@ -324,17 +331,18 @@ public class AuthService {
 
         // The token is checked before the user is looked up, so an unknown email, a missing or expired token and a
         // wrong token all get the same answer and the endpoint never tells which emails are registered.
-        String resetTokenKey = "reset_token:".concat(resetPasswordRequest.getEmail());
+        String email = EmailNormalizer.normalize(resetPasswordRequest.getEmail());
+        String resetTokenKey = "reset_token:".concat(email);
         Object actualResetToken = redisUtil.get(resetTokenKey);
 
         if (actualResetToken == null || !MessageDigest.isEqual(
                 actualResetToken.toString().getBytes(StandardCharsets.UTF_8),
                 resetPasswordRequest.getResetToken().getBytes(StandardCharsets.UTF_8))) {
-            log.warn("AUTH.RESET.TOKEN.INVALID email={}", EmailMasking.maskEmail(resetPasswordRequest.getEmail()));
+            log.warn("AUTH.RESET.TOKEN.INVALID email={}", EmailMasking.maskEmail(email));
             throw new BusinessException(GlobalMessage.INVALID_RESET_TOKEN, HttpStatus.BAD_REQUEST);
         }
 
-        UserEntity user = userRepository.findByEmail(resetPasswordRequest.getEmail())
+        UserEntity user = userRepository.findByEmail(email)
                 .filter(found -> !found.isDeleted())
                 .orElse(null);
 
