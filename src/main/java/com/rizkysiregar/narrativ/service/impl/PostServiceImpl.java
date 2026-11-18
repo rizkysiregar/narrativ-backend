@@ -8,7 +8,6 @@ import com.rizkysiregar.narrativ.messaging.event.PostCreatedEvent;
 import com.rizkysiregar.narrativ.messaging.event.VideoThumbnailRequestedEvent;
 import com.rizkysiregar.narrativ.messaging.publisher.PostEventPublisher;
 import com.rizkysiregar.narrativ.model.dto.PostCountDTO;
-import com.rizkysiregar.narrativ.model.dto.ObjectStat;
 import com.rizkysiregar.narrativ.model.response.CreatePostResponse;
 import com.rizkysiregar.narrativ.model.response.CreatePostUploadUrlResponse;
 import com.rizkysiregar.narrativ.model.response.PostFeedResponse;
@@ -25,12 +24,16 @@ import com.rizkysiregar.narrativ.repository.*;
 import com.rizkysiregar.narrativ.service.FileStorageService;
 import com.rizkysiregar.narrativ.service.PostService;
 import com.rizkysiregar.narrativ.service.MediaCleanupService;
+import com.rizkysiregar.narrativ.service.ProfileImageUrlResolver;
+import com.rizkysiregar.narrativ.service.UploadedObjectStats;
 import com.rizkysiregar.narrativ.util.AfterCommit;
+import com.rizkysiregar.narrativ.util.FeedCursor;
 import com.rizkysiregar.narrativ.util.Operation;
 import com.rizkysiregar.narrativ.util.Paging;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -44,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 
@@ -62,6 +66,7 @@ public class PostServiceImpl implements PostService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final PostEventPublisher postEventPublisher;
+    private final ProfileImageUrlResolver profileImageUrlResolver;
 
     private static final int MAX_MEDIA_PER_POST = 5;
     private static final int MAX_CAPTION_LENGTH = 500;
@@ -80,24 +85,36 @@ public class PostServiceImpl implements PostService {
     private static final long PRESIGN_UPLOAD_EXPIRY_SECONDS = 15L * 60;
 
     @Override
-    public PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, UUID userId, boolean mediaOnly) {
-        log.debug("FEED.EXPLORE.FETCH page={} size={} userId={} mediaOnly={}", page, size, userId, mediaOnly);
+    public PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, String cursor, UUID userId, boolean mediaOnly) {
+        log.debug("FEED.EXPLORE.FETCH page={} size={} cursor={} userId={} mediaOnly={}", page, size, cursor != null, userId, mediaOnly);
+        if (cursor != null) {
+            FeedCursor after = FeedCursor.decode(cursor);
+            return afterCursor(size, userId, limit ->
+                    postPaginationRepository.findAllActivePostsAfter(mediaOnly, userId, after.createdAt(), after.id(), limit));
+        }
         Pageable pageable = Paging.of(page, size);
         Page<PostEntity> postPage = postPaginationRepository.findAllActivePosts(pageable, mediaOnly, userId);
         return buildPaginatedResponse(postPage, userId);
     }
 
     @Override
-    public PaginatedResponse<PostFeedResponse> getFollowingPosts(int page, int size, UUID viewerId) {
+    public PaginatedResponse<PostFeedResponse> getFollowingPosts(int page, int size, String cursor, UUID viewerId) {
+        if (cursor != null) {
+            FeedCursor after = FeedCursor.decode(cursor);
+            return afterCursor(size, viewerId, limit ->
+                    postPaginationRepository.findFollowingPostsAfter(viewerId, after.createdAt(), after.id(), limit));
+        }
         Page<PostEntity> postPage = postPaginationRepository.findFollowingPosts(Paging.of(page, size), viewerId);
         return buildPaginatedResponse(postPage, viewerId);
     }
 
     @Override
-    public PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String username, UUID viewerId, boolean mediaOnly) {
-        log.debug("FEED.USER.FETCH page={} size={} username={} mediaOnly={}", page, size, username, mediaOnly);
+    public PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String cursor, String username, UUID viewerId, boolean mediaOnly) {
+        log.debug("FEED.USER.FETCH page={} size={} cursor={} username={} mediaOnly={}", page, size, cursor != null, username, mediaOnly);
 
-        Pageable pageable = Paging.of(page, size);
+        // checked first, so a bad request never costs a lookup
+        FeedCursor after = cursor == null ? null : FeedCursor.decode(cursor);
+        Pageable pageable = after == null ? Paging.of(page, size) : Paging.of(0, size);
 
         UserEntity user = userRepository.findActiveByUsername(username)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
@@ -106,8 +123,36 @@ public class PostServiceImpl implements PostService {
             throw new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
 
+        if (after != null) {
+            return afterCursor(size, viewerId, limit -> postPaginationRepository.findAllActivePostsByUserIdAfter(
+                    user.getId(), mediaOnly, viewerId, after.createdAt(), after.id(), limit));
+        }
         Page<PostEntity> postPage = postPaginationRepository.findAllActivePostsByUserId(pageable, user.getId(), mediaOnly, viewerId);
         return buildPaginatedResponse(postPage, viewerId);
+    }
+
+    /**
+     * One page after a cursor. One row more than asked is read, which tells whether another page follows without a
+     * count query; the totals are unknown and answered as -1.
+     */
+    private PaginatedResponse<PostFeedResponse> afterCursor(int size, UUID viewerId,
+                                                            Function<Pageable, List<PostEntity>> query) {
+        Paging.of(0, size);
+        List<PostEntity> rows = query.apply(PageRequest.of(0, size + 1));
+        boolean hasMore = rows.size() > size;
+        List<PostEntity> posts = hasMore ? rows.subList(0, size) : rows;
+        return new PaginatedResponse<>(
+                toFeedResponses(posts, viewerId),
+                -1,
+                size,
+                -1,
+                -1,
+                !hasMore,
+                hasMore ? cursorOf(posts.getLast()) : null);
+    }
+
+    private static String cursorOf(PostEntity post) {
+        return new FeedCursor(post.getCreatedAt(), post.getId()).encode();
     }
 
     /**
@@ -129,6 +174,7 @@ public class PostServiceImpl implements PostService {
         }
     }
 
+    // a numbered page also hands out the cursor after its last post, so a client can switch to cursors from page 0
     private PaginatedResponse<PostFeedResponse> buildPaginatedResponse(Page<PostEntity> postPage, UUID statusUserId) {
         return new PaginatedResponse<>(
                 toFeedResponses(postPage.getContent(), statusUserId),
@@ -136,7 +182,8 @@ public class PostServiceImpl implements PostService {
                 postPage.getSize(),
                 postPage.getTotalElements(),
                 postPage.getTotalPages(),
-                postPage.isLast());
+                postPage.isLast(),
+                postPage.isLast() || postPage.isEmpty() ? null : cursorOf(postPage.getContent().getLast()));
     }
 
     @Override
@@ -164,6 +211,8 @@ public class PostServiceImpl implements PostService {
                         Collectors.mapping(m -> new PostMediaResponse(
                                 m.getId(), m.getMediaType(), m.getMediaKey(), m.getThumbnailKey()),
                                 Collectors.toList())));
+        // one presign per author, a page often holds several posts of the same person
+        Map<UUID, String> profileImageUrls = new HashMap<>();
 
         return posts.stream().map(post -> {
             PostFeedResponse response = new PostFeedResponse(
@@ -177,6 +226,8 @@ public class PostServiceImpl implements PostService {
                     likedPostIds.contains(post.getId())
             );
             response.setUserId(post.getUser().getId());
+            response.setProfileImageUrl(profileImageUrls.computeIfAbsent(post.getUser().getId(),
+                    id -> profileImageUrlResolver.resolve(post.getUser().getProfileImage())));
             applyModeration(response, post, statusUserId);
             response.setMedia(response.getMedia().stream().map(this::presign).toList());
             return response;
@@ -342,40 +393,23 @@ public class PostServiceImpl implements PostService {
             throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);
         }
 
-        // validate the uploaded object. The media type is derived from the object
-        // key extension (the backend generated it from the requested content type),
-        // while statObject is best-effort for the size check: a transient storage
-        // failure (e.g. proxy/HEAD hiccup) must not fail the whole post creation.
+        // The media type is derived from the object key extension (the backend generated it from the requested
+        // content type, which the presigned upload enforces). Size is a hard rule, so an object whose size storage
+        // cannot tell right now is refused rather than accepted unchecked.
         MediaType mediaType = resolveMediaTypeFromKey(objectKey);
         if (mediaType == null) {
             log.warn("POST.MEDIA.REJECTED reason=unsupported_extension objectKey={}", objectKey);
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
-        ObjectStat objectStat = null;
-        try {
-            objectStat = fileStorageService.statObject(objectKey);
-        } catch (BusinessException e) {
-            if (HttpStatus.NOT_FOUND.equals(e.getHttpStatus())) {
-                throw e;
-            }
-            log.warn("POST.MEDIA.STAT.SKIPPED objectKey={} reason={}", objectKey, e.getMessage());
-        } catch (Exception e) {
-            log.warn("POST.MEDIA.STAT.SKIPPED objectKey={} reason={}", objectKey, e.getMessage());
+        long size = UploadedObjectStats.statOrRefuse(fileStorageService, objectKey).getSize();
+        if (mediaType == MediaType.IMAGE && size > MAX_IMAGE_SIZE) {
+            log.warn("POST.MEDIA.REJECTED reason=image_too_large objectKey={} bytes={}", objectKey, size);
+            throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
         }
-
-        // Size validation is a hard business rule and must never be swallowed by
-        // the best-effort stat handling above.
-        if (objectStat != null) {
-            long size = objectStat.getSize();
-            if (mediaType == MediaType.IMAGE && size > MAX_IMAGE_SIZE) {
-                log.warn("POST.MEDIA.REJECTED reason=image_too_large objectKey={} bytes={}", objectKey, size);
-                throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
-            }
-            if (mediaType == MediaType.VIDEO && size > MAX_VIDEO_SIZE) {
-                log.warn("POST.MEDIA.REJECTED reason=video_too_large objectKey={} bytes={}", objectKey, size);
-                throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
-            }
+        if (mediaType == MediaType.VIDEO && size > MAX_VIDEO_SIZE) {
+            log.warn("POST.MEDIA.REJECTED reason=video_too_large objectKey={} bytes={}", objectKey, size);
+            throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
         }
         return mediaType;
     }

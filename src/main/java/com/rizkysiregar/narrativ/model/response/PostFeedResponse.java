@@ -17,6 +17,8 @@ public class PostFeedResponse {
     // the author, so the client can report or block them
     private UUID userId;
     private String username;
+    // the author's picture, ready to load (presigned or an external url); null when they have none
+    private String profileImageUrl;
     private String caption;
     // empty for a caption-only post
     private List<PostMediaResponse> media = List.of();

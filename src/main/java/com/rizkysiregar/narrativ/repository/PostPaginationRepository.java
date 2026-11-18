@@ -8,6 +8,8 @@ import org.springframework.data.repository.PagingAndSortingRepository;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -75,4 +77,46 @@ public interface PostPaginationRepository extends PagingAndSortingRepository<Pos
               AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = author.id) OR (b.blockerId = author.id AND b.blockedId = :viewerId))
             """)
     Optional<PostEntity> findVisibleById(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId);
+
+    // --- keyset variants of the feeds above: the posts strictly after a cursor, no count query ---
+
+    @Query("""
+            SELECT p FROM PostEntity p JOIN FETCH p.user author
+            WHERE p.isDeleted = false AND author.isDeleted = false AND author.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE
+              AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = author.id) OR (b.blockerId = author.id AND b.blockedId = :viewerId))
+              AND (:mediaOnly = false OR EXISTS (SELECT m.id FROM PostMediaEntity m WHERE m.postId = p.id))
+              AND (p.createdAt < :cursorAt OR (p.createdAt = :cursorAt AND p.id < :cursorId))
+            ORDER BY p.createdAt DESC, p.id DESC
+            """)
+    List<PostEntity> findAllActivePostsAfter(@Param("mediaOnly") boolean mediaOnly, @Param("viewerId") UUID viewerId,
+                                             @Param("cursorAt") LocalDateTime cursorAt, @Param("cursorId") UUID cursorId,
+                                             Pageable limit);
+
+    @Query("""
+            SELECT p FROM PostEntity p JOIN FETCH p.user author
+            WHERE p.isDeleted = false AND author.isDeleted = false AND author.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE
+              AND EXISTS (
+                  SELECT f.id FROM FollowEntity f
+                  WHERE f.follower.id = :viewerId AND f.followed.id = author.id
+              )
+              AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = author.id) OR (b.blockerId = author.id AND b.blockedId = :viewerId))
+              AND (p.createdAt < :cursorAt OR (p.createdAt = :cursorAt AND p.id < :cursorId))
+            ORDER BY p.createdAt DESC, p.id DESC
+            """)
+    List<PostEntity> findFollowingPostsAfter(@Param("viewerId") UUID viewerId,
+                                             @Param("cursorAt") LocalDateTime cursorAt, @Param("cursorId") UUID cursorId,
+                                             Pageable limit);
+
+    @Query("""
+            SELECT p FROM PostEntity p JOIN FETCH p.user author
+            WHERE author.id = :userId AND author.isDeleted = false AND author.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE AND p.isDeleted = false
+              AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = author.id) OR (b.blockerId = author.id AND b.blockedId = :viewerId))
+              AND (:mediaOnly = false OR EXISTS (SELECT m.id FROM PostMediaEntity m WHERE m.postId = p.id))
+              AND (p.createdAt < :cursorAt OR (p.createdAt = :cursorAt AND p.id < :cursorId))
+            ORDER BY p.createdAt DESC, p.id DESC
+            """)
+    List<PostEntity> findAllActivePostsByUserIdAfter(@Param("userId") UUID userId, @Param("mediaOnly") boolean mediaOnly,
+                                                     @Param("viewerId") UUID viewerId,
+                                                     @Param("cursorAt") LocalDateTime cursorAt, @Param("cursorId") UUID cursorId,
+                                                     Pageable limit);
 }

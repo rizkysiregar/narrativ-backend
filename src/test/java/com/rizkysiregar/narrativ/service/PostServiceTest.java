@@ -20,6 +20,7 @@ import com.rizkysiregar.narrativ.model.request.CreatePostUploadUrlRequest;
 import com.rizkysiregar.narrativ.model.response.PaginatedResponse;
 import com.rizkysiregar.narrativ.repository.*;
 import com.rizkysiregar.narrativ.service.impl.PostServiceImpl;
+import com.rizkysiregar.narrativ.util.FeedCursor;
 import com.rizkysiregar.narrativ.util.Operation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -67,6 +68,8 @@ public class PostServiceTest {
     private FileStorageService fileStorageService;
     @Mock
     private PostEventPublisher postEventPublisher;
+    @Mock
+    private ProfileImageUrlResolver profileImageUrlResolver;
 
     @InjectMocks
     private PostServiceImpl postService;
@@ -168,6 +171,103 @@ public class PostServiceTest {
         assertEquals("signed-image.jpg", response.getContent().getFirst().getMedia().getFirst().url());
         assertTrue(response.getContent().getFirst().isLiked());
         verify(postPaginationRepository).findFollowingPosts(pageable, viewerId);
+    }
+
+    @Test
+    void feedCarriesTheAuthorsProfilePictureResolvedOncePerAuthor() {
+        UUID viewerId = UUID.randomUUID();
+        UserEntity author = new UserEntity();
+        author.setId(UUID.randomUUID());
+        author.setUsername("followed");
+        author.setProfileImage(author.getId() + "/PROFILE_PICTURE/me.jpg");
+        PostEntity first = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("a").createdAt(LocalDateTime.now()).build();
+        PostEntity second = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("b").createdAt(LocalDateTime.now()).build();
+        PageRequest pageable = PageRequest.of(0, 10);
+        when(postPaginationRepository.findFollowingPosts(pageable, viewerId))
+                .thenReturn(new PageImpl<>(List.of(first, second), pageable, 2));
+        when(profileImageUrlResolver.resolve(author.getProfileImage())).thenReturn("https://signed/me.jpg");
+
+        PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 10, viewerId);
+
+        assertEquals("https://signed/me.jpg", response.getContent().get(0).getProfileImageUrl());
+        assertEquals("https://signed/me.jpg", response.getContent().get(1).getProfileImageUrl());
+        verify(profileImageUrlResolver, times(1)).resolve(author.getProfileImage());
+    }
+
+    @Test
+    void numberedPageHandsOutTheCursorOfItsLastPost() {
+        UUID viewerId = UUID.randomUUID();
+        UserEntity author = new UserEntity();
+        author.setId(UUID.randomUUID());
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("a")
+                .createdAt(LocalDateTime.of(2026, 11, 18, 10, 0, 0, 123456000)).build();
+        PageRequest pageable = PageRequest.of(0, 1);
+        when(postPaginationRepository.findFollowingPosts(pageable, viewerId))
+                .thenReturn(new PageImpl<>(List.of(post), pageable, 5));
+
+        PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 1, viewerId);
+
+        assertEquals(new FeedCursor(post.getCreatedAt(), post.getId()).encode(), response.getNextCursor());
+    }
+
+    @Test
+    void cursorPageReadsOneRowMoreToKnowWhetherAnotherPageFollows() {
+        UUID viewerId = UUID.randomUUID();
+        UserEntity author = new UserEntity();
+        author.setId(UUID.randomUUID());
+        LocalDateTime now = LocalDateTime.of(2026, 11, 18, 10, 0);
+        PostEntity p1 = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("1").createdAt(now.minusMinutes(1)).build();
+        PostEntity p2 = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("2").createdAt(now.minusMinutes(2)).build();
+        PostEntity p3 = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("3").createdAt(now.minusMinutes(3)).build();
+        FeedCursor after = new FeedCursor(now, UUID.randomUUID());
+        when(postPaginationRepository.findFollowingPostsAfter(viewerId, after.createdAt(), after.id(), PageRequest.of(0, 3)))
+                .thenReturn(List.of(p1, p2, p3));
+
+        PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 2, after.encode(), viewerId);
+
+        assertEquals(2, response.getContent().size());
+        assertFalse(response.isLast());
+        assertEquals(-1, response.getTotalElements());
+        assertEquals(new FeedCursor(p2.getCreatedAt(), p2.getId()).encode(), response.getNextCursor());
+        verify(postPaginationRepository, never()).findFollowingPosts(any(), any());
+    }
+
+    @Test
+    void lastCursorPageHasNoNextCursor() {
+        UUID viewerId = UUID.randomUUID();
+        FeedCursor after = new FeedCursor(LocalDateTime.now(), UUID.randomUUID());
+        when(postPaginationRepository.findAllActivePostsAfter(false, viewerId, after.createdAt(), after.id(), PageRequest.of(0, 11)))
+                .thenReturn(List.of());
+
+        PaginatedResponse<PostFeedResponse> response = postService.getExplorePosts(0, 10, after.encode(), viewerId, false);
+
+        assertTrue(response.isLast());
+        assertNull(response.getNextCursor());
+    }
+
+    @Test
+    void aMangledCursorIsABadRequest() {
+        UUID viewerId = UUID.randomUUID();
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> postService.getFollowingPosts(0, 10, "not-a-cursor", viewerId));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        verifyNoInteractions(postPaginationRepository);
+    }
+
+    @Test
+    void addNewPost_isRefusedWhenTheSizeCannotBeChecked() {
+        UUID userId = UUID.randomUUID();
+        String objectKey = userId + "/POST_FEED/" + UUID.randomUUID() + ".jpg";
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(author(userId)));
+        when(fileStorageService.statObject(objectKey))
+                .thenThrow(new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> postService.addNewPost(userId, request("caption", objectKey)));
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ex.getHttpStatus());
+        verify(fileStorageService, times(3)).statObject(objectKey);
+        verify(postCrudRepository, never()).save(any());
     }
 
     @Test
