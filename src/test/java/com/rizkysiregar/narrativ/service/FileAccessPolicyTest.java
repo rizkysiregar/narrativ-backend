@@ -35,14 +35,21 @@ class FileAccessPolicyTest {
 
     @Test
     void ownerCanReadHisPostMedia() {
-        assertDoesNotThrow(() -> policy.checkRead(principal("alice", Role.USER), "alice/POST_FEED/a.jpg"));
-        assertDoesNotThrow(() -> policy.checkRead(principal("alice", Role.USER), "alice/POST_FEED/b_thumb.jpg"));
+        assertDoesNotThrow(() -> policy.checkRead(principal("alice", Role.USER), aliceId + "/POST_FEED/a.jpg"));
+        assertDoesNotThrow(() -> policy.checkRead(principal("alice", Role.USER), aliceId + "/POST_FEED/b_thumb.jpg"));
+    }
+
+    @Test
+    void aKeyUnderAUsernameIsNotOwnedByWhoeverHoldsThatUsernameNow() {
+        // older keys were written under the username; it may have been renamed and taken by somebody else since
+        assertFails(HttpStatus.FORBIDDEN, GlobalMessage.ACCESS_DENIED,
+                () -> policy.checkRead(principal("alice", Role.USER), "alice/POST_FEED/a.jpg"));
     }
 
     @Test
     void otherUsersCannotReadPostMediaThroughTheFilesEndpoint() {
         assertFails(HttpStatus.FORBIDDEN, GlobalMessage.ACCESS_DENIED,
-                () -> policy.checkRead(principal("bob", Role.USER), "alice/POST_FEED/a.jpg"));
+                () -> policy.checkRead(principal("bob", Role.USER), aliceId + "/POST_FEED/a.jpg"));
     }
 
     @Test
@@ -68,18 +75,5 @@ class FileAccessPolicyTest {
                 "alice/POST_FEED", "alice//a.jpg", "alice\\POST_FEED\\a.jpg"}) {
             assertFails(HttpStatus.BAD_REQUEST, GlobalMessage.BAD_REQUEST, () -> policy.checkRead(alice, path));
         }
-    }
-
-    @Test
-    void uploadIsOnlyForTheCallersOwnProfilePicture() {
-        UserPrincipal alice = principal("alice", Role.USER);
-        assertDoesNotThrow(() -> policy.checkUpload(alice, "alice", "PROFILE_PICTURE"));
-        assertDoesNotThrow(() -> policy.checkUpload(alice, aliceId.toString(), "PROFILE_PICTURE"));
-
-        assertFails(HttpStatus.FORBIDDEN, GlobalMessage.ACCESS_DENIED, () -> policy.checkUpload(alice, "bob", "PROFILE_PICTURE"));
-        // post media must use the presigned flow, which validates type, size and the 5 media limit
-        assertFails(HttpStatus.BAD_REQUEST, GlobalMessage.BAD_REQUEST, () -> policy.checkUpload(alice, "alice", "POST_FEED"));
-        assertFails(HttpStatus.BAD_REQUEST, GlobalMessage.BAD_REQUEST, () -> policy.checkUpload(alice, "alice/../bob", "PROFILE_PICTURE"));
-        assertFails(HttpStatus.BAD_REQUEST, GlobalMessage.BAD_REQUEST, () -> policy.checkUpload(alice, "", "PROFILE_PICTURE"));
     }
 }

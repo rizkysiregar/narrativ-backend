@@ -216,9 +216,10 @@ public class PostServiceImpl implements PostService {
             extension = "." + contentType.substring(contentType.indexOf('/') + 1);
         }
 
-        // format it: username/POST_FEED/{uuid}{ext}
+        // format it: userId/POST_FEED/{uuid}{ext}. The id, not the username: a username can be changed and then
+        // taken by somebody else, who would otherwise own the folder of the earlier holder
         String objectKey = String.format("%s/%s/%s%s",
-                user.getUsername(),
+                user.getId(),
                 ObjectStorageTypeGroup.POST_FEED,
                 UUID.randomUUID(),
                 extension);
@@ -335,7 +336,7 @@ public class PostServiceImpl implements PostService {
         }
 
         // object must belong to this user and to POST_FEED group
-        String expectedPrefix = user.getUsername() + "/" + ObjectStorageTypeGroup.POST_FEED + "/";
+        String expectedPrefix = user.getId() + "/" + ObjectStorageTypeGroup.POST_FEED + "/";
         if (!objectKey.startsWith(expectedPrefix)) {
             log.warn("POST.MEDIA.REJECTED reason=not_owner objectKey={} userId={}", objectKey, user.getId());
             throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);

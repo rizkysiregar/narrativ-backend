@@ -3,7 +3,6 @@ package com.rizkysiregar.narrativ.service;
 import com.rizkysiregar.narrativ.model.dto.ImageObject;
 import com.rizkysiregar.narrativ.model.dto.ObjectStat;
 import com.rizkysiregar.narrativ.model.dto.StoredObject;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.util.stream.Stream;
@@ -16,7 +15,6 @@ import java.util.stream.Stream;
  */
 
 public interface FileStorageService {
-    String uploadFile(MultipartFile file, String userId, String featureName) throws Exception;
 
     String getPresignUrl(String objectName) throws Exception;
     String getPresignUploadUrl(String objectName, String contentType) throws Exception;

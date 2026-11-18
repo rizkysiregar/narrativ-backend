@@ -199,7 +199,7 @@ public class PostServiceTest {
         // Assert
         assertNotNull(response);
         assertEquals("http://minio/presigned-url", response.getPresignedUrl());
-        assertTrue(response.getObjectKey().startsWith("testuser/POST_FEED/"));
+        assertTrue(response.getObjectKey().startsWith(userId + "/POST_FEED/"));
         assertTrue(response.getObjectKey().endsWith(".mp4"));
         assertEquals(900L, response.getExpiresInSeconds());
         verify(fileStorageService).getPresignUploadUrl(eq(response.getObjectKey()), eq("video/mp4"));
@@ -228,7 +228,7 @@ public class PostServiceTest {
     void testAddNewPost_Success() throws Exception {
         // Arrange
         UUID userId = UUID.randomUUID();
-        String objectKey = "testuser/POST_FEED/" + UUID.randomUUID() + ".jpg";
+        String objectKey = userId + "/POST_FEED/" + UUID.randomUUID() + ".jpg";
         AddPostRequest request = request("My first post", objectKey);
 
         UserEntity user = new UserEntity();
@@ -296,9 +296,9 @@ public class PostServiceTest {
     void addNewPost_mixedMedia_keepsOrderAndRequestsThumbnailPerVideo() {
         UUID userId = UUID.randomUUID();
         UserEntity user = author(userId);
-        String photo = "testuser/POST_FEED/a.jpg";
-        String clip1 = "testuser/POST_FEED/b.mp4";
-        String clip2 = "testuser/POST_FEED/c.mov";
+        String photo = userId + "/POST_FEED/a.jpg";
+        String clip1 = userId + "/POST_FEED/b.mp4";
+        String clip2 = userId + "/POST_FEED/c.mov";
         when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
         when(fileStorageService.statObject(anyString()))
                 .thenReturn(ObjectStat.builder().size(1024L).contentType("x").build());
@@ -344,7 +344,7 @@ public class PostServiceTest {
         when(userRepository.findActiveById(userId)).thenReturn(Optional.of(author(userId)));
         String[] keys = new String[6];
         for (int i = 0; i < keys.length; i++) {
-            keys[i] = "testuser/POST_FEED/" + i + ".jpg";
+            keys[i] = userId + "/POST_FEED/" + i + ".jpg";
         }
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -361,7 +361,7 @@ public class PostServiceTest {
         when(userRepository.findActiveById(userId)).thenReturn(Optional.of(author(userId)));
 
         assertThrows(BusinessException.class, () -> postService.addNewPost(userId,
-                request("caption", "testuser/POST_FEED/a.jpg", "testuser/POST_FEED/a.jpg")));
+                request("caption", userId + "/POST_FEED/a.jpg", userId + "/POST_FEED/a.jpg")));
         verify(postCrudRepository, never()).save(any());
     }
 
@@ -385,11 +385,11 @@ public class PostServiceTest {
     void addNewPost_secondMediaOwnedByOtherUser_savesNothing() {
         UUID userId = UUID.randomUUID();
         when(userRepository.findActiveById(userId)).thenReturn(Optional.of(author(userId)));
-        when(fileStorageService.statObject("testuser/POST_FEED/a.jpg"))
+        when(fileStorageService.statObject(userId + "/POST_FEED/a.jpg"))
                 .thenReturn(ObjectStat.builder().size(1024L).contentType("image/jpeg").build());
 
         BusinessException ex = assertThrows(BusinessException.class, () -> postService.addNewPost(userId,
-                request("caption", "testuser/POST_FEED/a.jpg", "other/POST_FEED/b.jpg")));
+                request("caption", userId + "/POST_FEED/a.jpg", "other/POST_FEED/b.jpg")));
 
         assertEquals(GlobalMessage.ACCESS_DENIED.getMessage(), ex.getMessage());
         verify(postCrudRepository, never()).save(any());
@@ -402,7 +402,7 @@ public class PostServiceTest {
         UserEntity user = new UserEntity();
         user.setId(userId);
         user.setUsername("testuser");
-        String objectKey = "testuser/POST_FEED/clip.mp4";
+        String objectKey = userId + "/POST_FEED/clip.mp4";
         AddPostRequest request = request("clip", objectKey);
         when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
@@ -423,7 +423,7 @@ public class PostServiceTest {
         verify(postEventPublisher).publishVideoThumbnailRequested(requested.capture());
         assertEquals(saved.getId(), requested.getValue().getPostId());
         assertNotNull(requested.getValue().getMediaId());
-        assertEquals("testuser/POST_FEED/clip_thumb.jpg", requested.getValue().getThumbnailObjectKey());
+        assertEquals(userId + "/POST_FEED/clip_thumb.jpg", requested.getValue().getThumbnailObjectKey());
     }
 
     @Test
@@ -432,7 +432,7 @@ public class PostServiceTest {
         UserEntity user = new UserEntity();
         user.setId(userId);
         user.setUsername("testuser");
-        String objectKey = "testuser/POST_FEED/photo.jpg";
+        String objectKey = userId + "/POST_FEED/photo.jpg";
         AddPostRequest request = request(null, objectKey);
         when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
         when(fileStorageService.statObject(objectKey))
@@ -515,7 +515,7 @@ public class PostServiceTest {
     void testAddNewPost_UserNotFound_ThrowsBadRequest() {
         // Arrange
         UUID userId = UUID.randomUUID();
-        AddPostRequest request = request("caption", "testuser/POST_FEED/x.jpg");
+        AddPostRequest request = request("caption", userId + "/POST_FEED/x.jpg");
 
         when(userRepository.findActiveById(userId))
                 .thenReturn(Optional.empty());
@@ -567,10 +567,23 @@ public class PostServiceTest {
     }
 
     @Test
+    void addNewPost_keyUnderTheUsername_isRejected() {
+        // media is filed under the user id; a key under a username may belong to whoever held that username before
+        UUID userId = UUID.randomUUID();
+        UserEntity user = author(userId);
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                postService.addNewPost(userId, request("caption", "testuser/POST_FEED/" + UUID.randomUUID() + ".jpg")));
+        assertEquals(GlobalMessage.ACCESS_DENIED.getMessage(), ex.getMessage());
+        verify(postCrudRepository, never()).save(any());
+    }
+
+    @Test
     void testAddNewPost_ImageTooLarge_ThrowsBadRequestFileTooLarge() {
         // Arrange
         UUID userId = UUID.randomUUID();
-        String objectKey = "testuser/POST_FEED/" + UUID.randomUUID() + ".jpg";
+        String objectKey = userId + "/POST_FEED/" + UUID.randomUUID() + ".jpg";
         AddPostRequest request = request("caption", objectKey);
 
         UserEntity user = new UserEntity();
@@ -596,7 +609,7 @@ public class PostServiceTest {
     void testAddNewPost_VideoTooLarge_ThrowsBadRequestFileTooLarge() {
         // Arrange
         UUID userId = UUID.randomUUID();
-        String objectKey = "testuser/POST_FEED/" + UUID.randomUUID() + ".mp4";
+        String objectKey = userId + "/POST_FEED/" + UUID.randomUUID() + ".mp4";
         AddPostRequest request = request("caption", objectKey);
 
         UserEntity user = new UserEntity();
@@ -622,7 +635,7 @@ public class PostServiceTest {
     void testAddNewPost_UnsupportedObjectType_ThrowsBadRequest() {
         // Arrange
         UUID userId = UUID.randomUUID();
-        String objectKey = "testuser/POST_FEED/" + UUID.randomUUID() + ".bin";
+        String objectKey = userId + "/POST_FEED/" + UUID.randomUUID() + ".bin";
         AddPostRequest request = request("caption", objectKey);
 
         UserEntity user = new UserEntity();

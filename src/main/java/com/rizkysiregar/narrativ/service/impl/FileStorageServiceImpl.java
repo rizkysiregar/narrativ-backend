@@ -15,14 +15,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.awt.*;
 import java.io.InputStream;
-import java.text.SimpleDateFormat;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -47,40 +43,6 @@ public class FileStorageServiceImpl implements FileStorageService {
     ) {
         this.minioClient = minioClient;
         this.bucketName = bucketName;
-    }
-
-    @Override
-    public String uploadFile(MultipartFile file, String userId, String featureName) throws Exception {
-        log.debug("STORAGE.UPLOAD fileName={} userId={}", file.getOriginalFilename(), userId);
-        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        String originalName = file.getOriginalFilename();
-        String extension = "";
-
-
-        if (originalName != null && originalName.contains(".")) {
-            extension = originalName.substring(originalName.lastIndexOf("."));
-        }
-
-        // format it: userId/featureName/fileName
-        String objectName = String.format("%s/%s/%s_%s%s", userId, featureName, timestamp, "upload", extension);
-
-        // ensure bucket exist
-        boolean found = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build());
-        if (!found) {
-            minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
-        }
-
-        // upload
-        minioClient.putObject(
-                PutObjectArgs.builder()
-                        .bucket(bucketName)
-                        .object(objectName)
-                        .stream(file.getInputStream(), file.getSize(), -1)
-                        .contentType(file.getContentType())
-                        .build()
-        );
-
-        return objectName;
     }
 
     @Override
