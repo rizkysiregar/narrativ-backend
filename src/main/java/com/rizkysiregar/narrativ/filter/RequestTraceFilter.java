@@ -53,7 +53,7 @@ public class RequestTraceFilter extends OncePerRequestFilter {
     private final BodyMode bodyMode;
 
     public RequestTraceFilter(ObjectMapper objectMapper,
-                              @Value("${app.logging.request-body:ALWAYS}") BodyMode bodyMode) {
+                              @Value("${app.logging.request-body:ERRORS}") BodyMode bodyMode) {
         this.objectMapper = objectMapper;
         this.bodyMode = bodyMode;
     }
@@ -206,7 +206,8 @@ public class RequestTraceFilter extends OncePerRequestFilter {
         return normalized.contains("password") || normalized.contains("token")
                 || normalized.contains("secret") || normalized.contains("authorization")
                 || normalized.contains("cookie") || normalized.contains("apikey")
-                || normalized.contains("credential") || normalized.contains("otp");
+                || normalized.contains("credential") || normalized.contains("otp")
+                || normalized.contains("email");
     }
 
     private String safe(String value, int limit) {

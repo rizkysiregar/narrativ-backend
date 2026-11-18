@@ -43,8 +43,9 @@ firebase:
 app:
   logging:
     # when the access log line (HTTP.REQUEST) carries the redacted JSON request body:
-    # ALWAYS (every request), ERRORS (status 400+ only) or NEVER
-    request-body: ${APP_LOGGING_REQUEST_BODY:ALWAYS}
+    # ALWAYS (every request), ERRORS (status 400+ only) or NEVER. ERRORS by default: a body holds captions, comments
+    # and names, which do not belong in the log of every successful request
+    request-body: ${APP_LOGGING_REQUEST_BODY:ERRORS}
   appcheck:
     # off: nothing is checked. log: requests are checked and the outcome is logged and counted, none is refused.
     # enforce: a request without a valid Firebase App Check token is refused with 403.
