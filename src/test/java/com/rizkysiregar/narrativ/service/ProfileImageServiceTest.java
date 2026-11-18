@@ -168,16 +168,17 @@ class ProfileImageServiceTest {
     }
 
     @Test
-    void setProfileImage_toleratesStatFailingEveryTime() {
+    void setProfileImage_isRefusedWhenStorageCannotTellTheSize() {
+        // a presigned PUT cannot cap the size: an object that cannot be checked is not accepted unchecked
         when(fileStorageService.statObject(key("new.jpg")))
                 .thenThrow(new BusinessException(GlobalMessage.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
-        when(userRepository.save(user)).thenReturn(user);
 
-        profileImageService.setProfileImage(userId, new SetProfileImageRequest(key("new.jpg")));
+        assertFails(GlobalMessage.UPLOAD_NOT_VERIFIED, HttpStatus.SERVICE_UNAVAILABLE,
+                () -> profileImageService.setProfileImage(userId, new SetProfileImageRequest(key("new.jpg"))));
 
-        assertEquals(key("new.jpg"), user.getProfileImage());
         verify(fileStorageService, times(3)).statObject(key("new.jpg"));
         verify(fileStorageService, never()).deleteObject(anyString());
+        verify(userRepository, never()).save(any());
     }
 
     @Test

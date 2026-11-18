@@ -26,14 +26,15 @@ public class FeedPostController {
         this.postService = postService;
     }
 
-    @Operation(summary = "Get posts from followed users for Home feed")
+    @Operation(summary = "Get posts from followed users for Home feed. Pass the nextCursor of a page as cursor to get the next one (page is then ignored and the totals are -1); page keeps working.")
     @GetMapping
     public PaginatedResponse<PostFeedResponse> getHomePosts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String cursor,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        return postService.getFollowingPosts(page, size, userPrincipal.getUserId());
+        return postService.getFollowingPosts(page, size, cursor, userPrincipal.getUserId());
     }
 
     @Operation(summary = "Get all public posts for Explore feed. mediaOnly=true leaves out caption only posts (grid view).")
@@ -42,9 +43,10 @@ public class FeedPostController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "false") boolean mediaOnly,
+            @RequestParam(required = false) String cursor,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        return postService.getExplorePosts(page, size, userPrincipal.getUserId(), mediaOnly);
+        return postService.getExplorePosts(page, size, cursor, userPrincipal.getUserId(), mediaOnly);
     }
 
     @Operation(summary = "Get one post by id, e.g. to open it from a push notification. 404 when it is deleted, its author is gone or banned, or either side blocked the other. A taken down post is returned without caption and media, except to its author.")
@@ -61,9 +63,10 @@ public class FeedPostController {
     public PaginatedResponse<PostFeedResponse> getFollowingPosts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String cursor,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        return postService.getFollowingPosts(page, size, userPrincipal.getUserId());
+        return postService.getFollowingPosts(page, size, cursor, userPrincipal.getUserId());
     }
 
     @Operation(summary = "Getting feed user specific feed post by username. mediaOnly=true leaves out caption only posts (grid view).")
@@ -72,9 +75,10 @@ public class FeedPostController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "false") boolean mediaOnly,
+            @RequestParam(required = false) String cursor,
             @PathVariable String username,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
-        return postService.getAllPostByUserId(page, size, username, userPrincipal.getUserId(), mediaOnly);
+        return postService.getAllPostByUserId(page, size, cursor, username, userPrincipal.getUserId(), mediaOnly);
     }
 
     @Operation(summary = "Get presigned upload URL for post media. Client uploads the file directly to object storage using this URL.")

@@ -31,8 +31,6 @@ public class ProfileImageService {
 
     static final long MAX_PROFILE_IMAGE_SIZE = 2L * 1024 * 1024;
     private static final long PRESIGN_UPLOAD_EXPIRY_SECONDS = 15L * 60;
-    private static final int STAT_ATTEMPTS = 3;
-    private static final long STAT_RETRY_DELAY_MS = 150;
     private static final Map<String, String> CONTENT_TYPE_EXTENSIONS = Map.of(
             "image/jpeg", ".jpg",
             "image/png", ".png",
@@ -70,17 +68,15 @@ public class ProfileImageService {
             throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);
         }
 
-        // a missing object is rejected; size and type are checked whenever storage can tell them
-        ObjectStat stat = statWithRetry(objectKey);
-        if (stat != null) {
-            if (stat.getSize() > MAX_PROFILE_IMAGE_SIZE) {
-                fileStorageService.deleteObject(objectKey);
-                throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
-            }
-            if (!CONTENT_TYPE_EXTENSIONS.containsKey(stat.getContentType())) {
-                fileStorageService.deleteObject(objectKey);
-                throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-            }
+        // a missing object is rejected, and so is one whose size and type storage cannot tell right now
+        ObjectStat stat = UploadedObjectStats.statOrRefuse(fileStorageService, objectKey);
+        if (stat.getSize() > MAX_PROFILE_IMAGE_SIZE) {
+            fileStorageService.deleteObject(objectKey);
+            throw new BusinessException(GlobalMessage.BAD_REQUEST_FILE_TO_LARGE, HttpStatus.BAD_REQUEST);
+        }
+        if (!CONTENT_TYPE_EXTENSIONS.containsKey(stat.getContentType())) {
+            fileStorageService.deleteObject(objectKey);
+            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
 
         String previous = user.getProfileImage();
@@ -101,38 +97,6 @@ public class ProfileImageService {
         deleteIfUploaded(user, previous, null);
 
         return toDto(saved);
-    }
-
-    /**
-     * The stat (a HEAD) sometimes fails transiently on the way to object storage, so it is retried a few times.
-     * A missing object (404) is final and rethrown. When every attempt fails otherwise, null is returned and the
-     * caller skips the size and type checks, like post media does: the extension was fixed by the backend when it
-     * signed the upload and the content type is part of that signature.
-     */
-    private ObjectStat statWithRetry(String objectKey) {
-        for (int attempt = 1; attempt <= STAT_ATTEMPTS; attempt++) {
-            try {
-                return fileStorageService.statObject(objectKey);
-            } catch (BusinessException e) {
-                if (HttpStatus.NOT_FOUND.equals(e.getHttpStatus())) {
-                    throw e;
-                }
-                log.warn("PROFILE.IMAGE.STAT.FAILED key={} attempt={}/{} reason={}", objectKey, attempt, STAT_ATTEMPTS, e.getMessage());
-            }
-            if (attempt < STAT_ATTEMPTS) {
-                pause();
-            }
-        }
-        log.warn("PROFILE.IMAGE.STAT.SKIPPED key={}", objectKey);
-        return null;
-    }
-
-    private void pause() {
-        try {
-            Thread.sleep(STAT_RETRY_DELAY_MS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
     }
 
     private UserDetailDTO toDto(UserEntity user) {

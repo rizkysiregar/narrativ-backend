@@ -549,6 +549,27 @@ public class AuthServiceTest {
     }
 
     @Test
+    void googleLogin_findsTheLinkedAccountEvenAfterItsEmailChanged() {
+        GoogleLoginRequest request = new GoogleLoginRequest();
+        request.setIdToken("valid-id-token");
+        when(googleTokenVerifierService.verifyToken("valid-id-token")).thenReturn(GoogleUserInfo.builder()
+                .email("old@gmail.com").googleId("google-id-1").build());
+        UserEntity linked = new UserEntity();
+        linked.setId(UUID.randomUUID());
+        linked.setUsername("rizky");
+        linked.setEmail("new@mail.com");
+        linked.setGoogleId("google-id-1");
+        linked.setRole(Role.USER);
+        when(userRepository.findByGoogleId("google-id-1")).thenReturn(Optional.of(linked));
+        when(jwtService.generateToken(anyString(), any(), any(Role.class))).thenReturn("mock-jwt-token");
+
+        LoginResponse result = authService.googleLogin(request);
+
+        assertEquals("rizky", result.getUsername());
+        verify(userRepository, never()).findByEmail(anyString());
+    }
+
+    @Test
     void testGoogleLogin_Success_NewUser() {
         // Arrange
         GoogleLoginRequest request = new GoogleLoginRequest();

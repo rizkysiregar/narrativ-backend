@@ -106,6 +106,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         // account deletion asks for the password, so it gets the strict bucket
         if (uri.endsWith("/users/me/deletion") && "POST".equals(method)) return RateLimiterService.SENSITIVE;
+        // the email change sends mails and checks the password, so it is held to the same strict bucket
+        if ((uri.endsWith("/users/me/email") || uri.endsWith("/users/me/email/otp")) && "POST".equals(method)) {
+            return RateLimiterService.SENSITIVE;
+        }
         // the presigned upload urls have their own, higher bucket: every media of a post needs one
         if (uri.endsWith("/posts/upload-url") && "POST".equals(method)) return "post-upload";
         if (uri.contains("/posts") && "GET".equals(method)) return "feed";
