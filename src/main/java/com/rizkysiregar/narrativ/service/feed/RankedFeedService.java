@@ -1,7 +1,9 @@
 package com.rizkysiregar.narrativ.service.feed;
 
+import com.rizkysiregar.narrativ.model.dto.RankingCandidate;
 import com.rizkysiregar.narrativ.model.entity.ParameterEntity;
 import com.rizkysiregar.narrativ.model.entity.PostEntity;
+import com.rizkysiregar.narrativ.repository.FollowRepository;
 import com.rizkysiregar.narrativ.repository.ParameterRepository;
 import com.rizkysiregar.narrativ.repository.PostPaginationRepository;
 import com.rizkysiregar.narrativ.util.RankedCursor;
@@ -14,16 +16,18 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * The ranked part of explore, also shown as suggestions once the home feed runs out.
+ * The ranked part of explore, and the suggestions shown once the home feed runs out.
  * <p>
  * The first page ranks the recent posts the viewer may discover ({@link FeedRanker}) and keeps the order in Redis
  * for a while; the next pages are cut from that same order. Scores move with every like, so ranking again on each
@@ -45,6 +49,7 @@ public class RankedFeedService {
 
     private final PostPaginationRepository postPaginationRepository;
     private final ParameterRepository parameterRepository;
+    private final FollowRepository followRepository;
     private final RedisUtil redisUtil;
 
     /**
@@ -54,15 +59,22 @@ public class RankedFeedService {
     public record Slice(List<PostEntity> posts, RankedCursor next, LocalDateTime windowStart) {
     }
 
+    public enum Feed {
+        // every post the viewer may see, the ones they already know scaled down
+        EXPLORE,
+        // only posts of people the viewer does not follow and not their own: the home feed above lists those
+        SUGGESTIONS
+    }
+
     /** Ranks anew and returns {@code count} posts after the first {@code skip}; empty when Redis is unavailable. */
-    public Optional<Slice> start(UUID viewerId, boolean mediaOnly, int skip, int count) {
+    public Optional<Slice> start(Feed feed, UUID viewerId, boolean mediaOnly, int skip, int count) {
         FeedRankingSettings settings = settings();
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime windowStart = now.minusDays(settings.windowDays());
-        List<UUID> ranked = FeedRanker.rank(
-                postPaginationRepository.findRankingCandidates(viewerId, windowStart, mediaOnly, PageRequest.of(0, MAX_CANDIDATES)),
-                settings, now, SNAPSHOT_SIZE);
-        log.debug("FEED.RANKING.BUILT viewerId={} mediaOnly={} posts={}", viewerId, mediaOnly, ranked.size());
+        List<RankingCandidate> candidates = postPaginationRepository.findRankingCandidates(
+                viewerId, windowStart, mediaOnly, feed == Feed.SUGGESTIONS, PageRequest.of(0, MAX_CANDIDATES));
+        List<UUID> ranked = FeedRanker.rank(candidates, settings, now, SNAPSHOT_SIZE, viewerId, followedAmong(viewerId, candidates));
+        log.debug("FEED.RANKING.BUILT feed={} viewerId={} mediaOnly={} posts={}", feed, viewerId, mediaOnly, ranked.size());
         if (ranked.isEmpty()) {
             return Optional.of(new Slice(List.of(), null, windowStart));
         }
@@ -110,6 +122,12 @@ public class RankedFeedService {
         }
         RankedCursor next = position < ranked.size() ? new RankedCursor(snapshotId, position, windowStart) : null;
         return new Slice(posts, next, windowStart);
+    }
+
+    private Set<UUID> followedAmong(UUID viewerId, List<RankingCandidate> candidates) {
+        List<UUID> authors = candidates.stream().map(RankingCandidate::authorId).distinct()
+                .filter(author -> !author.equals(viewerId)).toList();
+        return authors.isEmpty() ? Set.of() : new HashSet<>(followRepository.findFollowedIdsAmong(viewerId, authors));
     }
 
     private FeedRankingSettings settings() {

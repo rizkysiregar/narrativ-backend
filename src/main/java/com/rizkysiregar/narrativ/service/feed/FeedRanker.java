@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -17,7 +18,8 @@ import java.util.UUID;
  *   (likeWeight x likes + commentWeight x comments + 1) / (age in hours + 2) ^ gravity / (1 + reportPenalty x open reports)
  * </pre>
  * A post climbs with engagement and sinks with age, so a new post gets its chance on top (the + 1) and a popular old
- * one does not stay there for days. The order is then spread so no author fills a page.
+ * one does not stay there for days. A post the viewer already knows (their own, or of somebody they follow) is
+ * scaled down, so the new faces come first. The order is then spread so no author fills a page.
  */
 public final class FeedRanker {
 
@@ -34,11 +36,15 @@ public final class FeedRanker {
                 / (1 + settings.reportPenalty() * candidate.openReportCount());
     }
 
-    /** The ids of the best {@code limit} candidates, in feed order. Ties go to the newer post. */
-    public static List<UUID> rank(List<RankingCandidate> candidates, FeedRankingSettings settings,
-                                  LocalDateTime now, int limit) {
+    /**
+     * The ids of the best {@code limit} candidates for {@code viewerId}, in feed order. Ties go to the newer post.
+     * {@code followedAuthors} holds whom of the candidates' authors the viewer follows.
+     */
+    public static List<UUID> rank(List<RankingCandidate> candidates, FeedRankingSettings settings, LocalDateTime now,
+                                  int limit, UUID viewerId, Set<UUID> followedAuthors) {
         Map<UUID, Double> scores = new HashMap<>();
-        candidates.forEach(c -> scores.put(c.postId(), score(c, settings, now)));
+        candidates.forEach(c -> scores.put(c.postId(),
+                score(c, settings, now) * familiarity(c.authorId(), settings, viewerId, followedAuthors)));
         List<RankingCandidate> sorted = candidates.stream()
                 .sorted(Comparator.comparingDouble((RankingCandidate c) -> scores.get(c.postId())).reversed()
                         .thenComparing(RankingCandidate::createdAt, Comparator.reverseOrder())
@@ -47,6 +53,13 @@ public final class FeedRanker {
         return diversify(sorted, settings.maxPerAuthor(), FeedRankingSettings.DIVERSITY_WINDOW, limit).stream()
                 .map(RankingCandidate::postId)
                 .toList();
+    }
+
+    static double familiarity(UUID authorId, FeedRankingSettings settings, UUID viewerId, Set<UUID> followedAuthors) {
+        if (authorId.equals(viewerId)) {
+            return settings.ownFactor();
+        }
+        return followedAuthors.contains(authorId) ? settings.followedFactor() : 1;
     }
 
     /**

@@ -45,6 +45,10 @@ public interface FollowRepository extends JpaRepository<FollowEntity, UUID> {
             """)
     boolean existsActiveFollow(@Param("followerId") UUID followerId, @Param("followedId") UUID followedId);
 
+    // which of these users the follower follows, for the ranked feeds
+    @Query("SELECT f.followed.id FROM FollowEntity f WHERE f.follower.id = :followerId AND f.followed.id IN :userIds")
+    List<UUID> findFollowedIdsAmong(@Param("followerId") UUID followerId, @Param("userIds") List<UUID> userIds);
+
     @Query("""
             SELECT COUNT(f) FROM FollowEntity f
             WHERE f.followed.id = :followedId

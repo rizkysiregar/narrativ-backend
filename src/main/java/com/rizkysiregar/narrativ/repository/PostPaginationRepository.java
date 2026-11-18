@@ -67,15 +67,13 @@ public interface PostPaginationRepository extends PagingAndSortingRepository<Pos
     // --- keyset variants of the feeds above: the posts strictly after a cursor, no count query ---
 
     /**
-     * Explore by date, where the ranked part of it ends (see {@link #findRankingCandidates}): posts of people the
-     * viewer does not follow, never their own, and no taken down post (there is nothing to discover in it).
+     * Explore by date, where the ranked part of it ends (see {@link #findRankingCandidates}): every post the viewer
+     * may see but taken down ones, so explore is only empty when there is nothing to show at all.
      */
     @Query("""
             SELECT p FROM PostEntity p JOIN FETCH p.user author
             WHERE p.isDeleted = false AND author.isDeleted = false AND author.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE
               AND p.moderationStatus <> com.rizkysiregar.narrativ.model.enums.ModerationStatus.TAKEN_DOWN
-              AND author.id <> :viewerId
-              AND NOT EXISTS (SELECT f.id FROM FollowEntity f WHERE f.follower.id = :viewerId AND f.followed.id = author.id)
               AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = author.id) OR (b.blockerId = author.id AND b.blockedId = :viewerId))
               AND (:mediaOnly = false OR EXISTS (SELECT m.id FROM PostMediaEntity m WHERE m.postId = p.id))
               AND (p.createdAt < :cursorAt OR (p.createdAt = :cursorAt AND p.id < :cursorId))
@@ -118,7 +116,8 @@ public interface PostPaginationRepository extends PagingAndSortingRepository<Pos
     /**
      * What the ranked feeds pick from: the posts since {@code since} that explore may show (same filters as
      * {@link #findExplorePostsAfter}), newest first, with the counts their score is made of. The author's own likes
-     * and comments do not count, so nobody lifts their own post.
+     * and comments do not count, so nobody lifts their own post. {@code onlyUnknown} leaves out the viewer's own
+     * posts and those of the people they follow, for the suggestions under the home feed, which already lists them.
      */
     @Query("""
             SELECT new com.rizkysiregar.narrativ.model.dto.RankingCandidate(p.id, author.id, p.createdAt,
@@ -130,14 +129,15 @@ public interface PostPaginationRepository extends PagingAndSortingRepository<Pos
             WHERE p.createdAt >= :since
               AND p.isDeleted = false AND author.isDeleted = false AND author.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE
               AND p.moderationStatus <> com.rizkysiregar.narrativ.model.enums.ModerationStatus.TAKEN_DOWN
-              AND author.id <> :viewerId
-              AND NOT EXISTS (SELECT f.id FROM FollowEntity f WHERE f.follower.id = :viewerId AND f.followed.id = author.id)
+              AND (:onlyUnknown = false OR (author.id <> :viewerId
+                  AND NOT EXISTS (SELECT f.id FROM FollowEntity f WHERE f.follower.id = :viewerId AND f.followed.id = author.id)))
               AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = author.id) OR (b.blockerId = author.id AND b.blockedId = :viewerId))
               AND (:mediaOnly = false OR EXISTS (SELECT m.id FROM PostMediaEntity m WHERE m.postId = p.id))
             ORDER BY p.createdAt DESC, p.id DESC
             """)
     List<RankingCandidate> findRankingCandidates(@Param("viewerId") UUID viewerId, @Param("since") LocalDateTime since,
-                                                 @Param("mediaOnly") boolean mediaOnly, Pageable limit);
+                                                 @Param("mediaOnly") boolean mediaOnly, @Param("onlyUnknown") boolean onlyUnknown,
+                                                 Pageable limit);
 
     /**
      * The posts of a ranked page, checked again when the page is served: a post deleted, taken down or hidden by a
