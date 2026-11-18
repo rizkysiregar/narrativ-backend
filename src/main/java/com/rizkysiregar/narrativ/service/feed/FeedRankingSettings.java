@@ -15,16 +15,19 @@ import java.util.Map;
  * @param gravity      how fast a post sinks with age
  * @param reportPenalty the score is divided by (1 + reportPenalty x open reports)
  * @param maxPerAuthor at most this many posts of one author in every {@link #DIVERSITY_WINDOW}
+ * @param followedFactor explore multiplies the score of a post of somebody the viewer follows by this: they see it
+ *                       on home already, but it keeps explore from going empty
+ * @param ownFactor    the same for the viewer's own posts
  */
 @Slf4j
 public record FeedRankingSettings(int windowDays, double likeWeight, double commentWeight, double gravity,
-                                  double reportPenalty, int maxPerAuthor) {
+                                  double reportPenalty, int maxPerAuthor, double followedFactor, double ownFactor) {
 
     public static final String PREFIX = "feed.ranking.";
     // the default page size of the feeds, so a page rarely shows one author more than maxPerAuthor times
     public static final int DIVERSITY_WINDOW = 10;
 
-    public static final FeedRankingSettings DEFAULTS = new FeedRankingSettings(7, 1, 2, 1.5, 1, 2);
+    public static final FeedRankingSettings DEFAULTS = new FeedRankingSettings(7, 1, 2, 1.5, 1, 2, 0.5, 0.2);
 
     public static FeedRankingSettings from(Map<String, String> parameters) {
         return new FeedRankingSettings(
@@ -33,7 +36,9 @@ public record FeedRankingSettings(int windowDays, double likeWeight, double comm
                 read(parameters, "comment_weight", DEFAULTS.commentWeight, 0, 100, false),
                 read(parameters, "gravity", DEFAULTS.gravity, 0.5, 3, false),
                 read(parameters, "report_penalty", DEFAULTS.reportPenalty, 0, 10, false),
-                (int) read(parameters, "max_per_author", DEFAULTS.maxPerAuthor, 1, DIVERSITY_WINDOW, true));
+                (int) read(parameters, "max_per_author", DEFAULTS.maxPerAuthor, 1, DIVERSITY_WINDOW, true),
+                read(parameters, "followed_factor", DEFAULTS.followedFactor, 0, 1, false),
+                read(parameters, "own_factor", DEFAULTS.ownFactor, 0, 1, false));
     }
 
     private static double read(Map<String, String> parameters, String name, double fallback,

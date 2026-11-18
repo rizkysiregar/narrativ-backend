@@ -92,12 +92,13 @@ posts after it without duplicates when new posts arrive while scrolling. Each po
 `profileImageUrl`.
 
 - **Home** (`GET /posts`, `/posts/following`) shows your own posts and those of the people you follow, newest first.
-  When they run out, the feed goes on with suggestions from explore, marked `"suggested": true`, so a new account
-  does not start on an empty screen.
-- **Explore** (`/posts/explore`) shows posts of people you do not follow (never your own, no taken down post). The
-  posts of the last 7 days come first, ranked by
-  `(likes + 2 x comments + 1) / (age in hours + 2)^1.5 / (1 + open reports)`, with at most 2 posts of one author in
-  every 10. Older posts follow by date. The ranking of a scroll is kept in Redis for 30 minutes, so the order does not
+  When they run out, the feed goes on with suggestions (ranked posts of people you do not follow), marked
+  `"suggested": true`, so a new account does not start on an empty screen.
+- **Explore** (`/posts/explore`) shows every post you may see except taken down ones, so it is only empty when there
+  is nothing to show. The posts of the last 7 days come first, ranked by
+  `(likes + 2 x comments + 1) / (age in hours + 2)^1.5 / (1 + open reports)`, with posts of people you follow
+  multiplied by 0.5 and your own by 0.2 (new faces first), and at most 2 posts of one author in every 10. Older posts
+  follow by date. The ranking of a scroll is kept in Redis for 30 minutes, so the order does not
   shift between its pages; without Redis explore is by date only.
 - The weights are app parameters under `feed.ranking.*` (seeded by V15) and can be tuned from App management without
   a deploy.

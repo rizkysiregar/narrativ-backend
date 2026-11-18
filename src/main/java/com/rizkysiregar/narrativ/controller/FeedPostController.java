@@ -37,7 +37,7 @@ public class FeedPostController {
         return postService.getFollowingPosts(page, size, cursor, userPrincipal.getUserId());
     }
 
-    @Operation(summary = "Explore feed: posts of people you do not follow, the recent ones ranked by likes, comments and age (at most 2 of one author in every 10), then older ones by date. Totals are -1; page through with nextCursor. mediaOnly=true leaves out caption only posts (grid view).")
+    @Operation(summary = "Explore feed: every post you may see except taken down ones, the recent ones ranked by likes, comments and age (people you follow and your own posts lower, at most 2 of one author in every 10), then older ones by date. Totals are -1; page through with nextCursor. mediaOnly=true leaves out caption only posts (grid view).")
     @GetMapping("/explore")
     public PaginatedResponse<PostFeedResponse> getExplorePosts(
             @RequestParam(defaultValue = "0") int page,

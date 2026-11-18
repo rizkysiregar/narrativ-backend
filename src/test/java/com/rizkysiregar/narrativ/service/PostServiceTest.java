@@ -87,7 +87,7 @@ public class PostServiceTest {
 
     // explore serves these posts from a ranking that holds more after them
     private void rankedPage(PostEntity... posts) {
-        when(rankedFeedService.start(any(), anyBoolean(), anyInt(), anyInt())).thenReturn(Optional.of(
+        when(rankedFeedService.start(any(), any(), anyBoolean(), anyInt(), anyInt())).thenReturn(Optional.of(
                 new RankedFeedService.Slice(List.of(posts), new RankedCursor(UUID.randomUUID(), posts.length, WINDOW_START), WINDOW_START)));
     }
 
@@ -122,7 +122,7 @@ public class PostServiceTest {
                 .createdAt(LocalDateTime.now().minusMinutes(1)).build();
         List<PostEntity> posts = List.of(p1, p2);
         RankedCursor next = new RankedCursor(UUID.randomUUID(), 2, WINDOW_START);
-        when(rankedFeedService.start(userId, false, 0, size))
+        when(rankedFeedService.start(RankedFeedService.Feed.EXPLORE, userId, false, 0, size))
                 .thenReturn(Optional.of(new RankedFeedService.Slice(posts, next, WINDOW_START)));
 
         when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any())).thenReturn(List.of(
@@ -275,7 +275,7 @@ public class PostServiceTest {
         PostEntity ranked = post(author, WINDOW_START.plusDays(1));
         PostEntity older1 = post(author, WINDOW_START.minusDays(1));
         PostEntity older2 = post(author, WINDOW_START.minusDays(2));
-        when(rankedFeedService.start(viewerId, false, 0, 2))
+        when(rankedFeedService.start(RankedFeedService.Feed.EXPLORE, viewerId, false, 0, 2))
                 .thenReturn(Optional.of(new RankedFeedService.Slice(List.of(ranked), null, WINDOW_START)));
         // strictly below the ranked window, one row more than the room left
         when(postPaginationRepository.findExplorePostsAfter(false, viewerId, WINDOW_START, new UUID(0L, 0L), PageRequest.of(0, 2)))
@@ -301,7 +301,7 @@ public class PostServiceTest {
 
         assertEquals(post.getId(), response.getContent().getFirst().getId());
         assertEquals(next.encode(), response.getNextCursor());
-        verify(rankedFeedService, never()).start(any(), anyBoolean(), anyInt(), anyInt());
+        verify(rankedFeedService, never()).start(any(), any(), anyBoolean(), anyInt(), anyInt());
     }
 
     @Test
@@ -321,7 +321,7 @@ public class PostServiceTest {
     void explore_withoutRedisFallsBackToTheDateOrder() {
         UUID viewerId = UUID.randomUUID();
         PostEntity post = post(someone(), LocalDateTime.now());
-        when(rankedFeedService.start(viewerId, false, 0, 10)).thenReturn(Optional.empty());
+        when(rankedFeedService.start(RankedFeedService.Feed.EXPLORE, viewerId, false, 0, 10)).thenReturn(Optional.empty());
         when(postPaginationRepository.findExplorePostsAfter(eq(false), eq(viewerId), any(), any(), eq(PageRequest.of(0, 11))))
                 .thenReturn(List.of(post));
 
@@ -334,12 +334,12 @@ public class PostServiceTest {
     @Test
     void explore_aNumberedPageIsCutFurtherIntoAFreshRanking() {
         UUID viewerId = UUID.randomUUID();
-        when(rankedFeedService.start(viewerId, false, 20, 10))
+        when(rankedFeedService.start(RankedFeedService.Feed.EXPLORE, viewerId, false, 20, 10))
                 .thenReturn(Optional.of(new RankedFeedService.Slice(List.of(), null, WINDOW_START)));
 
         postService.getExplorePosts(2, 10, viewerId, false);
 
-        verify(rankedFeedService).start(viewerId, false, 20, 10);
+        verify(rankedFeedService).start(RankedFeedService.Feed.EXPLORE, viewerId, false, 20, 10);
     }
 
     @Test
@@ -351,7 +351,7 @@ public class PostServiceTest {
         PageRequest pageable = PageRequest.of(0, 10);
         when(postPaginationRepository.findFollowingPosts(pageable, viewerId))
                 .thenReturn(new PageImpl<>(List.of(followed), pageable, 1));
-        when(rankedFeedService.start(viewerId, false, 0, 9))
+        when(rankedFeedService.start(RankedFeedService.Feed.SUGGESTIONS, viewerId, false, 0, 9))
                 .thenReturn(Optional.of(new RankedFeedService.Slice(List.of(suggestion), next, WINDOW_START)));
 
         PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 10, viewerId);
@@ -387,7 +387,7 @@ public class PostServiceTest {
         PostEntity suggestion = post(someone(), LocalDateTime.now());
         when(postPaginationRepository.findFollowingPostsAfter(viewerId, after.createdAt(), after.id(), PageRequest.of(0, 11)))
                 .thenReturn(List.of());
-        when(rankedFeedService.start(viewerId, false, 0, 10))
+        when(rankedFeedService.start(RankedFeedService.Feed.SUGGESTIONS, viewerId, false, 0, 10))
                 .thenReturn(Optional.of(new RankedFeedService.Slice(List.of(suggestion), null, WINDOW_START)));
 
         PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 10, after.encode(), viewerId);
@@ -795,7 +795,7 @@ public class PostServiceTest {
         user.setId(UUID.randomUUID());
         user.setUsername("author");
         when(userRepository.findActiveByUsername("author")).thenReturn(Optional.of(user));
-        when(rankedFeedService.start(viewerId, true, 0, 10))
+        when(rankedFeedService.start(RankedFeedService.Feed.EXPLORE, viewerId, true, 0, 10))
                 .thenReturn(Optional.of(new RankedFeedService.Slice(List.of(), null, WINDOW_START)));
         when(postPaginationRepository.findAllActivePostsByUserId(any(Pageable.class), eq(user.getId()), eq(true), any()))
                 .thenReturn(Page.empty(PageRequest.of(0, 10)));
