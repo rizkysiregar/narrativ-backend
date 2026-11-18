@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -124,7 +123,11 @@ class EmailChangeServiceTest {
         order.verify(authService).revokeRefreshTokens(userId);
         order.verify(authService).startSession(user);
         // no transaction in a unit test, so the notice to the old address goes out right away
-        verify(emailService).sendEmail(eq("old@mail.com"), anyString(), contains("n****w@mail.com"));
+        ArgumentCaptor<java.util.Map<String, Object>> variables = ArgumentCaptor.forClass(java.util.Map.class);
+        verify(emailService).sendEmailTemplate(eq("old@mail.com"), anyString(), eq("email-changed"), variables.capture());
+        assertEquals("rizky", variables.getValue().get("username"));
+        assertEquals("n****w@mail.com", variables.getValue().get("newEmail"));
+        assertTrue(variables.getValue().get("changedAt").toString().endsWith("WIB"));
     }
 
     @Test

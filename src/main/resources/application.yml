@@ -93,7 +93,8 @@ app:
     # header the edge sets with the real client IP (Cloudflare: CF-Connecting-IP). Empty = use socket address
     client-ip-header: ${APP_RATE_LIMIT_CLIENT_IP_HEADER:CF-Connecting-IP}
   storage:
-    # deletes post media that was uploaded but never became part of a post; start with dry-run=true and read the log
+    # deletes uploads that were never used (post media without a post, profile pictures nobody has); start with
+    # dry-run=true and read the log
     orphan-cleanup:
       enabled: ${APP_STORAGE_ORPHAN_CLEANUP_ENABLED:false}
       dry-run: ${APP_STORAGE_ORPHAN_CLEANUP_DRY_RUN:true}

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email changed</title>
+</head>
+<!-- Sent to the OLD address after an email change, in English and Indonesian: the account owner may not use the app
+     language anymore, and this is the mail that tells them somebody else might have taken over the account. -->
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f7;">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+        <td align="center" style="padding: 40px 0;">
+            <table border="0" cellpadding="0" cellspacing="0" width="600"
+                   style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+
+                <tr>
+                    <td style="padding: 20px; text-align: center; color: white; background-color: #1f2937;">
+                        <h2 style="margin: 0; text-transform: uppercase; letter-spacing: 1px;">Email changed</h2>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 40px 30px;">
+                        <p style="font-size: 16px; color: #374151; line-height: 1.6;">
+                            Hi <strong th:text="'@' + ${username}">@user</strong>,
+                        </p>
+                        <p style="font-size: 16px; color: #374151; line-height: 1.6;">
+                            The email of your NARRATIV account was changed. From now on we write to the new address
+                            and you sign in with it.
+                        </p>
+
+                        <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 20px; margin: 25px 0;">
+                            <p style="margin: 0 0 6px 0; font-size: 14px; color: #6b7280;"><strong>New email / Email baru</strong></p>
+                            <p style="margin: 0 0 14px 0; font-size: 18px; color: #111827; font-weight: 600;"
+                               th:text="${newEmail}">n****w@mail.com</p>
+                            <p style="margin: 0 0 6px 0; font-size: 14px; color: #6b7280;"><strong>When / Waktu</strong></p>
+                            <p style="margin: 0; font-size: 16px; color: #111827;" th:text="${changedAt}">18 Nov 2026 10:00 WIB</p>
+                        </div>
+
+                        <div style="border-left: 4px solid #ef4444; background-color: #fef2f2; padding: 14px 16px; margin-bottom: 25px;">
+                            <p style="margin: 0; font-size: 15px; color: #991b1b; line-height: 1.6;">
+                                <strong>Not you?</strong> Somebody else may have access to your account. Reset your
+                                password right away and reply to this email so we can help you get it back.
+                            </p>
+                        </div>
+
+                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+                        <p style="font-size: 16px; color: #374151; line-height: 1.6;">
+                            Halo <strong th:text="'@' + ${username}">@user</strong>,
+                        </p>
+                        <p style="font-size: 16px; color: #374151; line-height: 1.6;">
+                            Email akun NARRATIV Anda telah diubah. Mulai sekarang kami mengirim email ke alamat baru
+                            dan Anda masuk menggunakan alamat tersebut.
+                        </p>
+                        <div style="border-left: 4px solid #ef4444; background-color: #fef2f2; padding: 14px 16px;">
+                            <p style="margin: 0; font-size: 15px; color: #991b1b; line-height: 1.6;">
+                                <strong>Bukan Anda?</strong> Mungkin ada orang lain yang mengakses akun Anda. Segera atur
+                                ulang kata sandi dan balas email ini agar kami dapat membantu memulihkan akun Anda.
+                            </p>
+                        </div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 20px; background-color: #f9fafb; text-align: center; font-size: 12px; color: #9ca3af;">
+                        <p style="margin: 0;">&copy; 2026 NARRATIV. All rights reserved.</p>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

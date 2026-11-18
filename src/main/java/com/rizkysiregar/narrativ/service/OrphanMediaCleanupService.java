@@ -3,6 +3,7 @@ package com.rizkysiregar.narrativ.service;
 import com.rizkysiregar.narrativ.constant.ObjectStorageTypeGroup;
 import com.rizkysiregar.narrativ.model.dto.StoredObject;
 import com.rizkysiregar.narrativ.repository.PostMediaRepository;
+import com.rizkysiregar.narrativ.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -19,9 +20,11 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 /**
- * Removes post media that was uploaded through a presigned URL but never became part of a post (the user gave up,
- * or the post was rejected). An object under {@code owner/POST_FEED/} that no {@code post_media} row uses as media
- * or thumbnail, and that is older than the grace period, is an orphan. The grace period must stay well above the
+ * Removes uploads that never got used: post media that never became part of a post (the user gave up, or the post
+ * was rejected, e.g. too large), and profile pictures that were never confirmed or were refused. An object under
+ * {@code owner/POST_FEED/} that no {@code post_media} row uses as media or thumbnail, or under
+ * {@code owner/PROFILE_PICTURE/} that no user has as profile picture, and that is older than the grace period, is an
+ * orphan. The grace period must stay well above the
  * presigned upload expiry (15 min) and the time the media worker needs for a thumbnail.
  * <p>
  * Off by default. With {@code dry-run} on it only logs what it would delete, and one run never deletes more than
@@ -36,17 +39,20 @@ public class OrphanMediaCleanupService {
 
     private final FileStorageService fileStorageService;
     private final PostMediaRepository postMediaRepository;
+    private final UserRepository userRepository;
     private final Duration grace;
     private final boolean dryRun;
     private final int maxDeletesPerRun;
 
     public OrphanMediaCleanupService(FileStorageService fileStorageService,
                                      PostMediaRepository postMediaRepository,
+                                     UserRepository userRepository,
                                      @Value("${app.storage.orphan-cleanup.grace:PT24H}") Duration grace,
                                      @Value("${app.storage.orphan-cleanup.dry-run:true}") boolean dryRun,
                                      @Value("${app.storage.orphan-cleanup.max-deletes-per-run:1000}") int maxDeletesPerRun) {
         this.fileStorageService = fileStorageService;
         this.postMediaRepository = postMediaRepository;
+        this.userRepository = userRepository;
         this.grace = grace;
         this.dryRun = dryRun;
         this.maxDeletesPerRun = maxDeletesPerRun;
@@ -71,7 +77,7 @@ public class OrphanMediaCleanupService {
             Iterator<StoredObject> it = objects.iterator();
             while (it.hasNext() && found < maxDeletesPerRun) {
                 StoredObject object = it.next();
-                if (isPostMedia(object.key()) && object.lastModified().isBefore(cutoff)) {
+                if (isUpload(object.key()) && object.lastModified().isBefore(cutoff)) {
                     batch.add(object.key());
                 }
                 if (batch.size() >= BATCH_SIZE) {
@@ -90,6 +96,7 @@ public class OrphanMediaCleanupService {
     private int handle(List<String> candidates, int budget) {
         Set<String> used = new HashSet<>(postMediaRepository.findReferencedMediaKeys(candidates));
         used.addAll(postMediaRepository.findReferencedThumbnailKeys(candidates));
+        used.addAll(userRepository.findReferencedProfileImages(candidates));
         int handled = 0;
         for (String key : candidates) {
             if (used.contains(key)) {
@@ -108,9 +115,10 @@ public class OrphanMediaCleanupService {
         return handled;
     }
 
-    // owner/POST_FEED/file
-    private boolean isPostMedia(String key) {
+    // owner/POST_FEED/file or owner/PROFILE_PICTURE/file
+    private boolean isUpload(String key) {
         String[] segments = key.split("/", 3);
-        return segments.length == 3 && ObjectStorageTypeGroup.POST_FEED.equals(segments[1]);
+        return segments.length == 3 && (ObjectStorageTypeGroup.POST_FEED.equals(segments[1])
+                || ObjectStorageTypeGroup.PROFILE_PICTURE.equals(segments[1]));
     }
 }

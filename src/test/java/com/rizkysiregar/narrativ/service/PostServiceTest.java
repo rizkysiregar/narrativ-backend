@@ -302,7 +302,20 @@ public class PostServiceTest {
         assertTrue(response.getObjectKey().startsWith(userId + "/POST_FEED/"));
         assertTrue(response.getObjectKey().endsWith(".mp4"));
         assertEquals(900L, response.getExpiresInSeconds());
+        // a video's POST form is capped at 50 MB by storage itself
+        verify(fileStorageService).getPresignUploadForm(response.getObjectKey(), "video/mp4", 50L * 1024 * 1024);
         verify(fileStorageService).getPresignUploadUrl(eq(response.getObjectKey()), eq("video/mp4"));
+    }
+
+    @Test
+    void createUploadUrl_capsAnImageAtFiveMegabytes() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(author(userId)));
+
+        CreatePostUploadUrlResponse response = postService.createUploadUrl(
+                userId, CreatePostUploadUrlRequest.builder().contentType("image/webp").build());
+
+        verify(fileStorageService).getPresignUploadForm(response.getObjectKey(), "image/webp", 5L * 1024 * 1024);
     }
 
     @Test

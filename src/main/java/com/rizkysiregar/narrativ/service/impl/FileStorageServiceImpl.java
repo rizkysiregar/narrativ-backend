@@ -4,6 +4,7 @@ import com.rizkysiregar.narrativ.constant.GlobalMessage;
 import com.rizkysiregar.narrativ.exception.BusinessException;
 import com.rizkysiregar.narrativ.model.dto.ImageObject;
 import com.rizkysiregar.narrativ.model.dto.ObjectStat;
+import com.rizkysiregar.narrativ.model.dto.PresignedUploadForm;
 import com.rizkysiregar.narrativ.model.dto.StoredObject;
 import com.rizkysiregar.narrativ.service.FileStorageService;
 import io.minio.*;
@@ -17,6 +18,8 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
+import java.time.ZonedDateTime;
+import java.util.LinkedHashMap;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import java.util.Map;
@@ -36,13 +39,17 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     private final MinioClient minioClient;
     private final String bucketName;
+    // where clients send a presigned POST: the same host the presigned urls point at, path-style bucket
+    private final String uploadUrl;
 
 
     public FileStorageServiceImpl(MinioClient minioClient,
-                                  @Value("${minio.bucket}") String bucketName
+                                  @Value("${minio.bucket}") String bucketName,
+                                  @Value("${minio.endpoint}") String endpoint
     ) {
         this.minioClient = minioClient;
         this.bucketName = bucketName;
+        this.uploadUrl = endpoint.replaceAll("/+$", "") + "/" + bucketName;
     }
 
     @Override
@@ -69,6 +76,22 @@ public class FileStorageServiceImpl implements FileStorageService {
                         .extraHeaders(Map.of("Content-Type", contentType))
                         .build()
         );
+    }
+
+    @Override
+    public PresignedUploadForm getPresignUploadForm(String objectName, String contentType, long maxBytes) throws Exception {
+        log.debug("STORAGE.PRESIGN.POST objectKey={} maxBytes={}", objectName, maxBytes);
+        PostPolicy policy = new PostPolicy(bucketName, ZonedDateTime.now().plusMinutes(PRESIGN_UPLOAD_EXPIRY_MINUTES));
+        policy.addEqualsCondition("key", objectName);
+        policy.addEqualsCondition("Content-Type", contentType);
+        policy.addContentLengthRangeCondition(1L, maxBytes);
+
+        // the signed fields, plus the two the policy pins: the client sends them all back as they are
+        Map<String, String> fields = new LinkedHashMap<>();
+        fields.put("key", objectName);
+        fields.put("Content-Type", contentType);
+        fields.putAll(minioClient.getPresignedPostFormData(policy));
+        return new PresignedUploadForm(uploadUrl, fields);
     }
 
     @Override

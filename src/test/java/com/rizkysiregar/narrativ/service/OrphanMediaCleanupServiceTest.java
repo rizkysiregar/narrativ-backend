@@ -2,6 +2,7 @@ package com.rizkysiregar.narrativ.service;
 
 import com.rizkysiregar.narrativ.model.dto.StoredObject;
 import com.rizkysiregar.narrativ.repository.PostMediaRepository;
+import com.rizkysiregar.narrativ.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,15 +31,18 @@ class OrphanMediaCleanupServiceTest {
     private FileStorageService fileStorageService;
     @Mock
     private PostMediaRepository postMediaRepository;
+    @Mock
+    private UserRepository userRepository;
 
     private OrphanMediaCleanupService service(boolean dryRun, int cap) {
-        return new OrphanMediaCleanupService(fileStorageService, postMediaRepository, Duration.ofHours(24), dryRun, cap);
+        return new OrphanMediaCleanupService(fileStorageService, postMediaRepository, userRepository, Duration.ofHours(24), dryRun, cap);
     }
 
     @BeforeEach
     void nothingIsReferencedByDefault() {
         org.mockito.Mockito.lenient().when(postMediaRepository.findReferencedMediaKeys(any())).thenReturn(List.of());
         org.mockito.Mockito.lenient().when(postMediaRepository.findReferencedThumbnailKeys(any())).thenReturn(List.of());
+        org.mockito.Mockito.lenient().when(userRepository.findReferencedProfileImages(any())).thenReturn(List.of());
     }
 
     private void listing(StoredObject... objects) {
@@ -46,20 +50,24 @@ class OrphanMediaCleanupServiceTest {
     }
 
     @Test
-    void deletesOldUnreferencedPostMediaOnly() {
+    void deletesOldUnreferencedUploadsOnly() {
         listing(new StoredObject("alice/POST_FEED/orphan.jpg", OLD),
                 new StoredObject("alice/POST_FEED/used.jpg", OLD),
                 new StoredObject("alice/POST_FEED/used_thumb.jpg", OLD),
                 new StoredObject("alice/POST_FEED/fresh.jpg", FRESH),
                 new StoredObject("alice/PROFILE_PICTURE/avatar.png", OLD),
+                new StoredObject("alice/PROFILE_PICTURE/never-confirmed.jpg", OLD),
                 new StoredObject("stray.txt", OLD));
         when(postMediaRepository.findReferencedMediaKeys(any())).thenReturn(List.of("alice/POST_FEED/used.jpg"));
         when(postMediaRepository.findReferencedThumbnailKeys(any())).thenReturn(List.of("alice/POST_FEED/used_thumb.jpg"));
+        when(userRepository.findReferencedProfileImages(any())).thenReturn(List.of("alice/PROFILE_PICTURE/avatar.png"));
 
         int found = service(false, 100).sweep(NOW);
 
-        assertEquals(1, found);
+        assertEquals(2, found);
         verify(fileStorageService).deleteObject("alice/POST_FEED/orphan.jpg");
+        // a profile picture that was uploaded but never confirmed (or was refused) goes as well
+        verify(fileStorageService).deleteObject("alice/PROFILE_PICTURE/never-confirmed.jpg");
         verify(fileStorageService, never()).deleteObject("alice/POST_FEED/used.jpg");
         verify(fileStorageService, never()).deleteObject("alice/POST_FEED/used_thumb.jpg");
         verify(fileStorageService, never()).deleteObject("alice/POST_FEED/fresh.jpg");

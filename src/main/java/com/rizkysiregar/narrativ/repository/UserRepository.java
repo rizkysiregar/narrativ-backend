@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,6 +26,10 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID>, JpaSpec
     Optional<UserEntity> findActiveByUsername(@Param("username") String username);
 
     Optional<UserEntity> findByGoogleId(String googleId);
+
+    /** Which of the given object keys are still somebody's profile picture (deleted and banned users included). */
+    @Query("SELECT u.profileImage FROM users u WHERE u.profileImage IN :keys")
+    List<String> findReferencedProfileImages(@Param("keys") Collection<String> keys);
 
     @Query("SELECT u FROM users u WHERE lower(u.email) = lower(:email)")
     Optional<UserEntity> findByEmail(@Param("email") String email);
