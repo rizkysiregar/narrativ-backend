@@ -41,6 +41,10 @@ public class CommentEntity {
     @Column(nullable = false)
     private String content;
 
+    // the words of the post's caption this top-level comment answers, null for a plain comment
+    @Column(name = "quote_text", length = 300)
+    private String quoteText;
+
     @Column(nullable = false)
     @CreationTimestamp
     private LocalDateTime createdAt;

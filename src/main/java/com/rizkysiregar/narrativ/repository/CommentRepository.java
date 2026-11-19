@@ -23,14 +23,16 @@ public interface CommentRepository extends JpaRepository<CommentEntity, UUID>, J
                 c.id, c.user.id, c.user.username, c.user.profileImage, c.content,
                 c.moderationStatus, c.moderationReason, c.moderatedAt,
                 c.parent.id, rt.id, ru.username, c.createdAt,
-                (SELECT COUNT(r) FROM CommentEntity r WHERE r.parent.id = c.id AND r.user.isDeleted = false AND r.user.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = r.user.id) OR (b.blockerId = r.user.id AND b.blockedId = :viewerId))))
+                (SELECT COUNT(r) FROM CommentEntity r WHERE r.parent.id = c.id AND r.user.isDeleted = false AND r.user.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = r.user.id) OR (b.blockerId = r.user.id AND b.blockedId = :viewerId))),
+                c.quoteText, CASE WHEN c.post.pinnedCommentId = c.id THEN true ELSE false END)
             FROM CommentEntity c LEFT JOIN c.replyTo rt LEFT JOIN rt.user ru
             WHERE c.post.id = :postId AND c.parent IS NULL AND c.user.isDeleted = false AND c.user.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = c.user.id) OR (b.blockerId = c.user.id AND b.blockedId = :viewerId))
-            ORDER BY c.createdAt ASC, c.id ASC
+            ORDER BY CASE WHEN c.post.pinnedCommentId = c.id THEN 0 ELSE 1 END, c.createdAt ASC, c.id ASC
             """, countQuery = """
             SELECT COUNT(c) FROM CommentEntity c
             WHERE c.post.id = :postId AND c.parent IS NULL AND c.user.isDeleted = false AND c.user.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = c.user.id) OR (b.blockerId = c.user.id AND b.blockedId = :viewerId))
             """)
+    // the pinned comment comes first, on the first page only; the rest oldest first
     Page<CommentResponse> findTopLevelCommentResponses(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable pageable);
 
     @Query("""
@@ -44,7 +46,7 @@ public interface CommentRepository extends JpaRepository<CommentEntity, UUID>, J
             SELECT new com.rizkysiregar.narrativ.model.response.CommentResponse(
                 c.id, c.user.id, c.user.username, c.user.profileImage, c.content,
                 c.moderationStatus, c.moderationReason, c.moderatedAt,
-                c.parent.id, rt.id, ru.username, c.createdAt, 0L)
+                c.parent.id, rt.id, ru.username, c.createdAt, 0L, c.quoteText, false)
             FROM CommentEntity c LEFT JOIN c.replyTo rt LEFT JOIN rt.user ru
             WHERE c.parent.id = :parentId AND c.user.isDeleted = false AND c.user.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = c.user.id) OR (b.blockerId = c.user.id AND b.blockedId = :viewerId))
               AND c.post.isDeleted = false AND c.post.user.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE
@@ -58,7 +60,7 @@ public interface CommentRepository extends JpaRepository<CommentEntity, UUID>, J
             SELECT new com.rizkysiregar.narrativ.model.response.CommentResponse(
                 c.id, c.user.id, c.user.username, c.user.profileImage, c.content,
                 c.moderationStatus, c.moderationReason, c.moderatedAt,
-                c.parent.id, rt.id, ru.username, c.createdAt, 0L)
+                c.parent.id, rt.id, ru.username, c.createdAt, 0L, c.quoteText, false)
             FROM CommentEntity c LEFT JOIN c.replyTo rt LEFT JOIN rt.user ru
             WHERE c.parent.id = :parentId AND c.user.isDeleted = false AND c.user.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = c.user.id) OR (b.blockerId = c.user.id AND b.blockedId = :viewerId))
               AND c.post.isDeleted = false AND c.post.user.status = com.rizkysiregar.narrativ.model.enums.UserStatus.ACTIVE

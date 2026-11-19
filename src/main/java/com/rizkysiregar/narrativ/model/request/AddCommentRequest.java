@@ -16,4 +16,8 @@ public class AddCommentRequest {
     @NotBlank(message = "{validation.comment.empty}")
     @Size(max = 255, message = "{validation.comment.max255}")
     String content;
+
+    // words of the post's caption the comment answers; the service checks they are in the caption
+    @Size(max = 300, message = "{validation.comment.quoteMax300}")
+    String quoteText;
 }
