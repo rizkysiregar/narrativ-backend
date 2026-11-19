@@ -1,5 +1,8 @@
 package com.rizkysiregar.narrativ.service;
 
+import com.rizkysiregar.narrativ.messaging.event.ActivityEvent;
+import com.rizkysiregar.narrativ.messaging.publisher.ActivityEventPublisher;
+import com.rizkysiregar.narrativ.model.enums.NotificationType;
 import com.rizkysiregar.narrativ.repository.UserBlockRepository;
 import com.rizkysiregar.narrativ.constant.GlobalMessage;
 import com.rizkysiregar.narrativ.exception.BusinessException;
@@ -46,6 +49,10 @@ class FollowServiceTest {
     private UserBlockRepository userBlockRepository;
     @Mock
     private ProfileImageUrlResolver profileImageUrlResolver;
+    @Mock
+    private NotificationInboxService inboxService;
+    @Mock
+    private ActivityEventPublisher activityEventPublisher;
 
     @InjectMocks
     private FollowServiceImpl followService;
@@ -210,5 +217,42 @@ class FollowServiceTest {
     private void activeUsers() {
         when(userRepository.findActiveById(requesterId)).thenReturn(Optional.of(new UserEntity()));
         when(userRepository.findActiveById(targetId)).thenReturn(Optional.of(new UserEntity()));
+    }
+
+    @Test
+    void aNewFollowTellsTheFollowedUserThroughAnActivityEvent() {
+        UserEntity requester = new UserEntity();
+        requester.setUsername("ani");
+        when(userRepository.findActiveById(requesterId)).thenReturn(Optional.of(requester));
+        when(userRepository.findActiveById(targetId)).thenReturn(Optional.of(new UserEntity()));
+        when(followRepository.insertIfAbsent(any(UUID.class), org.mockito.ArgumentMatchers.eq(requesterId),
+                org.mockito.ArgumentMatchers.eq(targetId))).thenReturn(1);
+
+        followService.follow(targetId, requesterId);
+
+        ArgumentCaptor<ActivityEvent> event = ArgumentCaptor.forClass(ActivityEvent.class);
+        verify(activityEventPublisher).publish(event.capture());
+        assertEquals(NotificationType.FOLLOWED, event.getValue().getType());
+        assertEquals(targetId, event.getValue().getRecipientId());
+        assertEquals(requesterId, event.getValue().getActorId());
+        assertEquals("ani", event.getValue().getActorUsername());
+    }
+
+    @Test
+    void anExistingFollowTellsNobody() {
+        activeUsers();
+
+        followService.follow(targetId, requesterId);
+
+        verifyNoInteractions(activityEventPublisher);
+    }
+
+    @Test
+    void unfollowTakesTheFollowOutOfTheInbox() {
+        activeUsers();
+
+        followService.unfollow(targetId, requesterId);
+
+        verify(inboxService).removeFollow(targetId, requesterId);
     }
 }

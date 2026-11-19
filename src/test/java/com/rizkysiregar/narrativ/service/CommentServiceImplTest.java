@@ -1,5 +1,8 @@
 package com.rizkysiregar.narrativ.service;
 
+import com.rizkysiregar.narrativ.messaging.event.ActivityEvent;
+import com.rizkysiregar.narrativ.messaging.publisher.ActivityEventPublisher;
+import com.rizkysiregar.narrativ.model.enums.NotificationType;
 import com.rizkysiregar.narrativ.repository.UserBlockRepository;
 import com.rizkysiregar.narrativ.model.entity.CommentEntity;
 import com.rizkysiregar.narrativ.messaging.event.CommentRepliedEvent;
@@ -59,6 +62,8 @@ class CommentServiceImplTest {
     private CommentEventPublisher commentEventPublisher;
     @Mock
     private ProfileImageUrlResolver profileImageUrlResolver;
+    @Mock
+    private ActivityEventPublisher activityEventPublisher;
 
     @InjectMocks
     private CommentServiceImpl commentService;
@@ -442,6 +447,25 @@ class CommentServiceImplTest {
 
         assertEquals(root.getId(), post.getPinnedCommentId());
         verify(postCrudRepository).save(post);
+        ArgumentCaptor<ActivityEvent> event = ArgumentCaptor.forClass(ActivityEvent.class);
+        verify(activityEventPublisher).publish(event.capture());
+        assertEquals(NotificationType.COMMENT_PINNED, event.getValue().getType());
+        assertEquals(root.getUser().getId(), event.getValue().getRecipientId());
+        assertEquals(owner.getId(), event.getValue().getActorId());
+        assertEquals(root.getId(), event.getValue().getCommentId());
+    }
+
+    @Test
+    void pinComment_ofTheAuthorsOwnCommentTellsNobody() {
+        UserEntity owner = user("owner");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(owner).build();
+        CommentEntity own = comment(post, owner, null);
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+        when(commentRepository.findById(own.getId())).thenReturn(Optional.of(own));
+
+        commentService.pinComment(post.getId(), own.getId(), owner.getId());
+
+        verifyNoInteractions(activityEventPublisher);
     }
 
     @Test

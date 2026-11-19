@@ -1,5 +1,6 @@
 package com.rizkysiregar.narrativ.service.impl;
 
+import com.rizkysiregar.narrativ.service.NotificationInboxService;
 import com.rizkysiregar.narrativ.constant.GlobalMessage;
 import com.rizkysiregar.narrativ.exception.BusinessException;
 import com.rizkysiregar.narrativ.messaging.event.PostLikedEvent;
@@ -35,6 +36,7 @@ public class LikeDislikeServiceImpl implements LikeDislikeService {
     private final PostCrudRepository postCrudRepository;
     private final UserBlockRepository userBlockRepository;
     private final PostEventPublisher postEventPublisher;
+    private final NotificationInboxService inboxService;
 
     @Override
     public Operation likePost(UUID postId, UUID userId) {
@@ -84,6 +86,8 @@ public class LikeDislikeServiceImpl implements LikeDislikeService {
         if (deletedCount == 0) {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
+        // an unliked post no longer says so in the owner's inbox
+        inboxService.removeLike(postId, userId);
         return Operation.DISLIKED;
     }
 

@@ -1,5 +1,7 @@
 package com.rizkysiregar.narrativ.messaging.consumer;
 
+import com.rizkysiregar.narrativ.service.NotificationInboxService;
+import com.rizkysiregar.narrativ.model.enums.NotificationType;
 import com.rizkysiregar.narrativ.config.RabbitMQConfig;
 import com.rizkysiregar.narrativ.messaging.event.CommentRepliedEvent;
 import com.rizkysiregar.narrativ.messaging.idempotency.EventDeduplicator;
@@ -49,6 +51,8 @@ class CommentReplyConsumerTest {
     private IEmailService emailService;
     @Mock
     private EventDeduplicator deduplicator;
+    @Mock
+    private NotificationInboxService inboxService;
 
     @InjectMocks
     private CommentReplyConsumer consumer;
@@ -209,5 +213,20 @@ class CommentReplyConsumerTest {
 
         verify(notificationService).sendNotificationToUserDevices(eq(answeredOwnerId), any(),
                 eq(data("COMMENT_REPLIED", replierId)));
+    }
+
+    @Test
+    void bothRecipientsGetTheCommentInTheirInboxEvenWithoutADevice() {
+        user(answeredOwnerId, UserStatus.ACTIVE);
+        user(postOwnerId, UserStatus.ACTIVE);
+        devices(answeredOwnerId, false);
+        devices(postOwnerId, false);
+
+        consumer.handleCommentReplied(event);
+
+        verify(inboxService).recordComment(answeredOwnerId, NotificationType.COMMENT_REPLIED, replierId, postId,
+                commentId, "setuju banget");
+        verify(inboxService).recordComment(postOwnerId, NotificationType.POST_COMMENTED, replierId, postId,
+                commentId, "setuju banget");
     }
 }

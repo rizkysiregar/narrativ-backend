@@ -25,6 +25,7 @@ public class RabbitMQConfig {
     public static final String EMAIL_QUEUE = "email.queue";
     public static final String COMMENT_REPLY_QUEUE = "comment.reply.queue";
     public static final String POST_LIKED_QUEUE = "post.liked.queue";
+    public static final String ACTIVITY_QUEUE = "activity.queue";
     public static final String VIDEO_THUMBNAIL_REQUEST_QUEUE = "video.thumbnail.request.queue";
     public static final String VIDEO_THUMBNAIL_RESULT_QUEUE = "video.thumbnail.result.queue";
 
@@ -33,6 +34,7 @@ public class RabbitMQConfig {
     public static final String EMAIL_DLQ = "email.dlq";
     public static final String COMMENT_REPLY_DLQ = "comment.reply.dlq";
     public static final String POST_LIKED_DLQ = "post.liked.dlq";
+    public static final String ACTIVITY_DLQ = "activity.dlq";
     public static final String VIDEO_THUMBNAIL_REQUEST_DLQ = "video.thumbnail.request.dlq";
     public static final String VIDEO_THUMBNAIL_RESULT_DLQ = "video.thumbnail.result.dlq";
 
@@ -40,6 +42,7 @@ public class RabbitMQConfig {
     public static final String POST_CREATED_ROUTING_KEY = "post.created";
     public static final String COMMENT_REPLIED_ROUTING_KEY = "comment.replied";
     public static final String POST_LIKED_ROUTING_KEY = "post.liked";
+    public static final String ACTIVITY_ROUTING_KEY = "activity.created";
     public static final String VIDEO_THUMBNAIL_REQUESTED_ROUTING_KEY = "video.thumbnail.requested";
     public static final String VIDEO_THUMBNAIL_GENERATED_ROUTING_KEY = "video.thumbnail.generated";
 
@@ -48,6 +51,7 @@ public class RabbitMQConfig {
     public static final String EMAIL_CONSUMER = "email";
     public static final String COMMENT_REPLY_CONSUMER = "comment-reply";
     public static final String POST_LIKE_CONSUMER = "post-like";
+    public static final String ACTIVITY_CONSUMER = "activity";
 
     public static final int LISTENER_PREFETCH_COUNT = 10;
     public static final int LISTENER_MAX_RETRIES = 3;
@@ -181,6 +185,36 @@ public class RabbitMQConfig {
                 .bind(postLikedDlq())
                 .to(deadLetterExchange())
                 .with(POST_LIKED_DLQ);
+    }
+
+    // --- Activity without an event of its own: a follow, a pinned comment (inbox + push to the user it is about) ---
+    @Bean
+    public Queue activityQueue() {
+        return QueueBuilder.durable(ACTIVITY_QUEUE)
+                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", ACTIVITY_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Binding activityBinding() {
+        return BindingBuilder
+                .bind(activityQueue())
+                .to(postExchange())
+                .with(ACTIVITY_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue activityDlq() {
+        return QueueBuilder.durable(ACTIVITY_DLQ).build();
+    }
+
+    @Bean
+    public Binding activityDlqBinding() {
+        return BindingBuilder
+                .bind(activityDlq())
+                .to(deadLetterExchange())
+                .with(ACTIVITY_DLQ);
     }
 
     // --- Comment on a post (push to the post owner and to the owner of a comment that was answered) ---

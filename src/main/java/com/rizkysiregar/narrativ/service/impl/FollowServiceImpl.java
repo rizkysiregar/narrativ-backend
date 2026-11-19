@@ -1,5 +1,11 @@
 package com.rizkysiregar.narrativ.service.impl;
 
+import com.rizkysiregar.narrativ.messaging.event.ActivityEvent;
+import com.rizkysiregar.narrativ.messaging.publisher.ActivityEventPublisher;
+import com.rizkysiregar.narrativ.model.entity.UserEntity;
+import com.rizkysiregar.narrativ.model.enums.NotificationType;
+import com.rizkysiregar.narrativ.service.NotificationInboxService;
+import com.rizkysiregar.narrativ.util.AfterCommit;
 import com.rizkysiregar.narrativ.constant.GlobalMessage;
 import com.rizkysiregar.narrativ.exception.BusinessException;
 import com.rizkysiregar.narrativ.model.response.FollowStatusResponse;
@@ -28,6 +34,8 @@ public class FollowServiceImpl implements FollowService {
     private final UserRepository userRepository;
     private final UserBlockRepository userBlockRepository;
     private final ProfileImageUrlResolver profileImageUrlResolver;
+    private final NotificationInboxService inboxService;
+    private final ActivityEventPublisher activityEventPublisher;
 
     // follower lists are cheap rows, so they may be paged wider than the feeds
     private static final int MAX_PAGE_SIZE = 100;
@@ -38,8 +46,18 @@ public class FollowServiceImpl implements FollowService {
         if (userId.equals(requesterId)) {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
-        requireActiveUsers(userId, requesterId);
-        followRepository.insertIfAbsent(UUID.randomUUID(), requesterId, userId);
+        UserEntity requester = requireActiveUsers(userId, requesterId);
+        int added = followRepository.insertIfAbsent(UUID.randomUUID(), requesterId, userId);
+        // only a follow that was really added tells the followed user
+        if (added > 0) {
+            ActivityEvent event = ActivityEvent.builder()
+                    .type(NotificationType.FOLLOWED)
+                    .recipientId(userId)
+                    .actorId(requesterId)
+                    .actorUsername(requester.getUsername())
+                    .build();
+            AfterCommit.run("follow activity " + requesterId + "->" + userId, () -> activityEventPublisher.publish(event));
+        }
         return Operation.CREATED;
     }
 
@@ -48,6 +66,7 @@ public class FollowServiceImpl implements FollowService {
     public Operation unfollow(UUID userId, UUID requesterId) {
         requireActiveUsers(userId, requesterId);
         followRepository.deleteByFollowerIdAndFollowedId(requesterId, userId);
+        inboxService.removeFollow(userId, requesterId);
         return Operation.DELETED;
     }
 
@@ -76,8 +95,9 @@ public class FollowServiceImpl implements FollowService {
         );
     }
 
-    private void requireActiveUsers(UUID userId, UUID requesterId) {
-        userRepository.findActiveById(requesterId)
+    /** Returns the requester. */
+    private UserEntity requireActiveUsers(UUID userId, UUID requesterId) {
+        UserEntity requester = userRepository.findActiveById(requesterId)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
         userRepository.findActiveById(userId)
                 .orElseThrow(() -> new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
@@ -85,6 +105,7 @@ public class FollowServiceImpl implements FollowService {
         if (userBlockRepository.existsBetween(requesterId, userId)) {
             throw new BusinessException(GlobalMessage.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
+        return requester;
     }
 
     private PageRequest pageable(int page, int size) {

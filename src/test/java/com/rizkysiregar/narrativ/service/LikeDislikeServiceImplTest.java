@@ -1,5 +1,6 @@
 package com.rizkysiregar.narrativ.service;
 
+import com.rizkysiregar.narrativ.service.NotificationInboxService;
 import com.rizkysiregar.narrativ.exception.BusinessException;
 import com.rizkysiregar.narrativ.messaging.event.PostLikedEvent;
 import com.rizkysiregar.narrativ.messaging.publisher.PostEventPublisher;
@@ -43,6 +44,8 @@ class LikeDislikeServiceImplTest {
     private UserBlockRepository userBlockRepository;
     @Mock
     private PostEventPublisher postEventPublisher;
+    @Mock
+    private NotificationInboxService inboxService;
 
     @InjectMocks
     private LikeDislikeServiceImpl service;
@@ -133,5 +136,14 @@ class LikeDislikeServiceImplTest {
         assertThrows(BusinessException.class, () -> service.likePost(postId, liker));
 
         verifyNoInteractions(postEventPublisher);
+    }
+
+    @Test
+    void unlikeTakesTheLikeOutOfTheOwnersInbox() {
+        when(likeRepository.deleteDirectly(liker, postId)).thenReturn(1);
+
+        service.dislikePost(postId, liker);
+
+        verify(inboxService).removeLike(postId, liker);
     }
 }
