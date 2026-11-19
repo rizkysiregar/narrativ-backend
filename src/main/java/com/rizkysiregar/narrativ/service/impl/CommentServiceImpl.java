@@ -44,14 +44,20 @@ public class CommentServiceImpl implements CommentService {
     private final ProfileImageUrlResolver profileImageUrlResolver;
 
     private static final int NOTIFICATION_PREVIEW_LENGTH = 100;
+    private static final int MAX_QUOTE_LENGTH = 300;
 
     @Override
-    public Operation addComment(UUID postId, UUID userId, String rawContent, UUID parentId) {
+    public Operation addComment(UUID postId, UUID userId, String rawContent, UUID parentId, String rawQuote) {
         // the controller validates the request; this keeps a blank comment out for any other caller too
         if (rawContent == null || rawContent.isBlank()) {
             throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
         }
         String content = rawContent.trim();
+        String quote = rawQuote == null || rawQuote.isBlank() ? null : rawQuote.trim();
+        // a quote answers the post, so only a top-level comment carries one
+        if (quote != null && (parentId != null || quote.length() > MAX_QUOTE_LENGTH)) {
+            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        }
 
         // add new comment
         PostEntity post = postCrudRepository.findInteractableById(postId)
@@ -78,6 +84,11 @@ public class CommentServiceImpl implements CommentService {
             parentComment = replyTo.getParent() != null ? replyTo.getParent() : replyTo;
         }
 
+        // the words must really be in the caption, so a quote can never put words in the author's mouth
+        if (quote != null && (post.getCaption() == null || !post.getCaption().contains(quote))) {
+            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        }
+
         UserEntity user = userRepository.findById(userId).orElseThrow(() -> new EntityNotFoundException("User not found"));
         CommentEntity comment = CommentEntity.builder()
                 .post(post)
@@ -85,6 +96,7 @@ public class CommentServiceImpl implements CommentService {
                 .content(content)
                 .parent(parentComment)
                 .replyTo(replyTo)
+                .quoteText(quote)
                 .build();
 
         commentRepository.save(comment);
@@ -180,6 +192,43 @@ public class CommentServiceImpl implements CommentService {
         commentRepository.flush();
         log.info("COMMENT.DELETED commentId={} requesterId={} asPostOwner={}", commentId, requesterId, !isAuthor);
         return Operation.DELETED;
+    }
+
+    @Override
+    @Transactional
+    public Operation pinComment(UUID postId, UUID commentId, UUID requesterId) {
+        PostEntity post = ownPost(postId, requesterId);
+        CommentEntity comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new EntityNotFoundException("Comment not found"));
+        // a reply sits under its comment, so only a top-level comment that is still shown can go on top
+        if (!post.getId().equals(comment.getPost().getId()) || comment.getParent() != null
+                || comment.getModerationStatus() != ModerationStatus.ACTIVE) {
+            throw new BusinessException(GlobalMessage.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+        }
+        // one pin per post: pinning another comment replaces it
+        post.setPinnedCommentId(comment.getId());
+        postCrudRepository.save(post);
+        log.info("COMMENT.PINNED postId={} commentId={}", postId, commentId);
+        return Operation.UPDATED;
+    }
+
+    @Override
+    @Transactional
+    public Operation unpinComment(UUID postId, UUID requesterId) {
+        PostEntity post = ownPost(postId, requesterId);
+        post.setPinnedCommentId(null);
+        postCrudRepository.save(post);
+        log.info("COMMENT.UNPINNED postId={}", postId);
+        return Operation.UPDATED;
+    }
+
+    private PostEntity ownPost(UUID postId, UUID requesterId) {
+        PostEntity post = postCrudRepository.findInteractableById(postId)
+                .orElseThrow(() -> new EntityNotFoundException("Post Not Found"));
+        if (!post.getUser().getId().equals(requesterId)) {
+            throw new BusinessException(GlobalMessage.ACCESS_DENIED, HttpStatus.FORBIDDEN);
+        }
+        return post;
     }
 
     @Override

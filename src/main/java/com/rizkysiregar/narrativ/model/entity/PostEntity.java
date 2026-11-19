@@ -50,4 +50,8 @@ public class PostEntity {
 
     @Column(name = "moderation_reason", length = 500)
     private String moderationReason;
+
+    // the comment the author pinned on top of the comments, null when none is
+    @Column(name = "pinned_comment_id")
+    private UUID pinnedCommentId;
 }

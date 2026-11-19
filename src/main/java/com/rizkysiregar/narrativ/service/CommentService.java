@@ -9,7 +9,17 @@ import java.util.List;
 import java.util.UUID;
 
 public interface CommentService {
-    Operation addComment(UUID postId, UUID userId, String content, UUID parentId);
+    default Operation addComment(UUID postId, UUID userId, String content, UUID parentId) {
+        return addComment(postId, userId, content, parentId, null);
+    }
+
+    /** [quoteText] is words of the post's caption a top-level comment answers, null for a plain comment. */
+    Operation addComment(UUID postId, UUID userId, String content, UUID parentId, String quoteText);
+
+    /** Pins a top-level comment of the post on top of its comments; only the post's author may. */
+    Operation pinComment(UUID postId, UUID commentId, UUID requesterId);
+
+    Operation unpinComment(UUID postId, UUID requesterId);
     PaginatedResponse<CommentResponse> getComment(UUID postId, int page, int size, UUID viewerId);
     List<CommentResponse> getReplies(UUID commentId, UUID viewerId);
     PaginatedResponse<CommentResponse> getRepliesPage(UUID commentId, int page, int size, UUID viewerId);

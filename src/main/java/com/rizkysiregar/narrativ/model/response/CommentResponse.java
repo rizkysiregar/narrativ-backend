@@ -33,6 +33,10 @@ public class CommentResponse {
     private Instant takenDownAt;
     // true for the author of the comment and for the owner of the post it is on
     private boolean canDelete;
+    // the words of the caption this comment answers, null for a plain comment
+    private String quoteText;
+    // pinned on top of the comments by the author of the post; listed first
+    private boolean pinned;
 
     public CommentResponse(UUID id, UUID authorId, String username, String profileImageUrl, String commentContent,
                            ModerationStatus moderationStatus, String moderationReason, Instant moderatedAt,
@@ -52,6 +56,16 @@ public class CommentResponse {
         // the column is a zone-less local date time written in the JVM default zone
         this.createdAt = createdAt == null ? null : createdAt.atZone(ZoneId.systemDefault()).toInstant();
         this.replyCount = replyCount == null ? 0 : replyCount;
+    }
+
+    public CommentResponse(UUID id, UUID authorId, String username, String profileImageUrl, String commentContent,
+                           ModerationStatus moderationStatus, String moderationReason, Instant moderatedAt,
+                           UUID parentId, UUID replyToCommentId, String replyToUsername,
+                           LocalDateTime createdAt, Long replyCount, String quoteText, Boolean pinned) {
+        this(id, authorId, username, profileImageUrl, commentContent, moderationStatus, moderationReason, moderatedAt,
+                parentId, replyToCommentId, replyToUsername, createdAt, replyCount);
+        this.quoteText = quoteText;
+        this.pinned = Boolean.TRUE.equals(pinned);
     }
 
     public CommentResponse withDeletePermission(UUID viewerId, UUID postOwnerId) {

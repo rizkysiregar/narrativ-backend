@@ -4,6 +4,7 @@ import com.rizkysiregar.narrativ.model.UserPrincipal;
 import com.rizkysiregar.narrativ.model.response.CommentResponse;
 import com.rizkysiregar.narrativ.model.entity.CommentEntity;
 import com.rizkysiregar.narrativ.model.request.AddCommentRequest;
+import com.rizkysiregar.narrativ.model.request.PinCommentRequest;
 import com.rizkysiregar.narrativ.model.response.PaginatedResponse;
 import com.rizkysiregar.narrativ.service.CommentService;
 import com.rizkysiregar.narrativ.util.Operation;
@@ -29,7 +30,26 @@ public class CommentController {
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable UUID postId) {
         UUID userId = userPrincipal.getUserId();
-        return commentService.addComment(postId, userId, request.getContent(), request.getParentId());
+        return commentService.addComment(postId, userId, request.getContent(), request.getParentId(), request.getQuoteText());
+    }
+
+    @io.swagger.v3.oas.annotations.Operation(summary = "Pin a top-level comment on top of the comments of your own post")
+    @PutMapping("/posts/{postId}/pinned-comment")
+    @PreAuthorize("hasRole('USER')")
+    public Operation pinComment(
+            @PathVariable UUID postId,
+            @Valid @RequestBody PinCommentRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return commentService.pinComment(postId, request.getCommentId(), userPrincipal.getUserId());
+    }
+
+    @io.swagger.v3.oas.annotations.Operation(summary = "Unpin the pinned comment of your own post")
+    @DeleteMapping("/posts/{postId}/pinned-comment")
+    @PreAuthorize("hasRole('USER')")
+    public Operation unpinComment(
+            @PathVariable UUID postId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return commentService.unpinComment(postId, userPrincipal.getUserId());
     }
 
 

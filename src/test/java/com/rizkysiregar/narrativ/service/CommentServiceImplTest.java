@@ -399,4 +399,88 @@ class CommentServiceImplTest {
         verify(commentRepository, never()).save(any());
         verifyNoInteractions(commentEventPublisher);
     }
+
+    @Test
+    void addComment_savesAQuoteThatIsInTheCaption() {
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(user("owner"))
+                .caption("Hari itu hujan turun pelan sekali.").build();
+        UserEntity ani = user("ani");
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+        when(userRepository.findById(ani.getId())).thenReturn(Optional.of(ani));
+
+        commentService.addComment(post.getId(), ani.getId(), "indah", null, "  hujan turun pelan ");
+
+        assertEquals("hujan turun pelan", savedComment().getQuoteText());
+    }
+
+    @Test
+    void addComment_rejectsAQuoteThatIsNotInTheCaption() {
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(user("owner"))
+                .caption("Hari itu hujan turun pelan sekali.").build();
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+
+        assertBadRequest(() -> commentService.addComment(post.getId(), UUID.randomUUID(), "indah", null, "salju turun"));
+        verify(commentRepository, never()).save(any());
+    }
+
+    @Test
+    void addComment_rejectsAQuoteOnAReply() {
+        assertBadRequest(() -> commentService.addComment(UUID.randomUUID(), UUID.randomUUID(), "indah",
+                UUID.randomUUID(), "hujan"));
+        verifyNoInteractions(commentRepository);
+    }
+
+    @Test
+    void pinComment_pinsATopLevelCommentOfTheAuthorsOwnPost() {
+        UserEntity owner = user("owner");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(owner).build();
+        CommentEntity root = comment(post, user("ani"), null);
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+        when(commentRepository.findById(root.getId())).thenReturn(Optional.of(root));
+
+        commentService.pinComment(post.getId(), root.getId(), owner.getId());
+
+        assertEquals(root.getId(), post.getPinnedCommentId());
+        verify(postCrudRepository).save(post);
+    }
+
+    @Test
+    void pinComment_isForbiddenForSomeoneElse() {
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(user("owner")).build();
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> commentService.pinComment(post.getId(), UUID.randomUUID(), UUID.randomUUID()));
+
+        assertEquals(HttpStatus.FORBIDDEN, error.getHttpStatus());
+        verify(postCrudRepository, never()).save(any());
+    }
+
+    @Test
+    void pinComment_rejectsAReplyAndATakenDownComment() {
+        UserEntity owner = user("owner");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(owner).build();
+        CommentEntity root = comment(post, user("ani"), null);
+        CommentEntity reply = comment(post, user("budi"), root);
+        CommentEntity takenDown = comment(post, user("citra"), null);
+        takenDown.setModerationStatus(ModerationStatus.TAKEN_DOWN);
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+        when(commentRepository.findById(reply.getId())).thenReturn(Optional.of(reply));
+        when(commentRepository.findById(takenDown.getId())).thenReturn(Optional.of(takenDown));
+
+        assertBadRequest(() -> commentService.pinComment(post.getId(), reply.getId(), owner.getId()));
+        assertBadRequest(() -> commentService.pinComment(post.getId(), takenDown.getId(), owner.getId()));
+        assertNull(post.getPinnedCommentId());
+    }
+
+    @Test
+    void unpinComment_clearsThePin() {
+        UserEntity owner = user("owner");
+        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(owner).pinnedCommentId(UUID.randomUUID()).build();
+        when(postCrudRepository.findInteractableById(post.getId())).thenReturn(Optional.of(post));
+
+        commentService.unpinComment(post.getId(), owner.getId());
+
+        assertNull(post.getPinnedCommentId());
+    }
 }
