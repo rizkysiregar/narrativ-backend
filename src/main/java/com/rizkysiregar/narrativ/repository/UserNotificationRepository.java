@@ -34,8 +34,6 @@ public interface UserNotificationRepository extends JpaRepository<UserNotificati
                                  OR (b.blocker_id = n.actor_id AND b.blocked_id = :recipientId))
             """;
 
-    String LAST_AT_MICROS = "CAST(EXTRACT(EPOCH FROM MAX(n.created_at)) * 1000000 AS BIGINT)";
-
     /** One inbox entry: the rows that share a group key, newest entry first. */
     interface GroupRow {
         String getGroupKey();
@@ -55,22 +53,25 @@ public interface UserNotificationRepository extends JpaRepository<UserNotificati
     /**
      * A page of inbox entries strictly after the cursor ([beforeMicros], [beforeKey]), newest first. The first page
      * passes Long.MAX_VALUE and an empty key.
+     *
+     * <p>The groups are built in a subquery so the cursor can compare the aliases; every text block here begins and
+     * ends on its own line, because a text block drops the spaces at the end of a line ("HAVING " + x became
+     * "HAVINGx").
      */
     @Query(nativeQuery = true, value = """
-            SELECT n.group_key AS "groupKey",
-                   """ + LAST_AT_MICROS + """
-                    AS "lastAtMicros",
-                   COUNT(*) AS "actorCount",
-                   BOOL_OR(n.read_at IS NULL) AS "unread",
-                   (ARRAY_AGG(n.id ORDER BY n.created_at DESC, n.id DESC))[1] AS "latestId",
-                   (ARRAY_AGG(n.id ORDER BY n.created_at DESC, n.id DESC))[2] AS "secondId"
+            SELECT g.* FROM (
+                SELECT n.group_key AS "groupKey",
+                       CAST(EXTRACT(EPOCH FROM MAX(n.created_at)) * 1000000 AS BIGINT) AS "lastAtMicros",
+                       COUNT(*) AS "actorCount",
+                       BOOL_OR(n.read_at IS NULL) AS "unread",
+                       (ARRAY_AGG(n.id ORDER BY n.created_at DESC, n.id DESC))[1] AS "latestId",
+                       (ARRAY_AGG(n.id ORDER BY n.created_at DESC, n.id DESC))[2] AS "secondId"
             """ + VISIBLE + """
-            GROUP BY n.group_key
-            HAVING """ + LAST_AT_MICROS + """
-                    < :beforeMicros
-                OR (""" + LAST_AT_MICROS + """
-                     = :beforeMicros AND n.group_key < :beforeKey)
-            ORDER BY "lastAtMicros" DESC, "groupKey" DESC
+                GROUP BY n.group_key
+            ) g
+            WHERE g."lastAtMicros" < :beforeMicros
+               OR (g."lastAtMicros" = :beforeMicros AND g."groupKey" < :beforeKey)
+            ORDER BY g."lastAtMicros" DESC, g."groupKey" DESC
             LIMIT :limit
             """)
     List<GroupRow> findGroups(@Param("recipientId") UUID recipientId,
