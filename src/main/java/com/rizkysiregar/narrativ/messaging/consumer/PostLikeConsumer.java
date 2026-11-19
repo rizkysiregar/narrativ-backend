@@ -1,5 +1,7 @@
 package com.rizkysiregar.narrativ.messaging.consumer;
 
+import com.rizkysiregar.narrativ.repository.LikeRepository;
+import com.rizkysiregar.narrativ.service.NotificationInboxService;
 import com.rizkysiregar.narrativ.config.RabbitMQConfig;
 import com.rizkysiregar.narrativ.constant.Constants;
 import com.rizkysiregar.narrativ.messaging.event.PostLikedEvent;
@@ -31,6 +33,8 @@ public class PostLikeConsumer {
     private final FirebaseNotificationService notificationService;
     private final PushTextResolver textResolver;
     private final EventDeduplicator deduplicator;
+    private final LikeRepository likeRepository;
+    private final NotificationInboxService inboxService;
 
     @Value("${app.messaging.like-dedup-ttl-seconds:86400}")
     private long likeDedupTtlSeconds;
@@ -50,6 +54,14 @@ public class PostLikeConsumer {
             log.debug("POST.LIKE.PUSH.SKIPPED reason=owner_unavailable ownerId={}", event.getPostOwnerId());
             return;
         }
+
+        // unliked before the event arrived: nothing to tell
+        if (!likeRepository.existsByUserIdAndPostId(event.getLikerId(), event.getPostId())) {
+            log.debug("POST.LIKE.PUSH.SKIPPED reason=like_undone postId={} likerId={}", event.getPostId(), event.getLikerId());
+            return;
+        }
+        // the inbox keeps every like, the push below only the first one in a while
+        inboxService.recordLike(owner.getId(), event.getLikerId(), event.getPostId());
 
         String eventKey = event.getPostId() + ":" + event.getLikerId();
         if (!deduplicator.tryReserve(RabbitMQConfig.POST_LIKE_CONSUMER, eventKey, Duration.ofSeconds(likeDedupTtlSeconds))) {

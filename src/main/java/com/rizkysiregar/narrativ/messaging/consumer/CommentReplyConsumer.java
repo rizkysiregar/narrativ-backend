@@ -1,5 +1,7 @@
 package com.rizkysiregar.narrativ.messaging.consumer;
 
+import com.rizkysiregar.narrativ.model.enums.NotificationType;
+import com.rizkysiregar.narrativ.service.NotificationInboxService;
 import com.rizkysiregar.narrativ.config.RabbitMQConfig;
 import com.rizkysiregar.narrativ.constant.Constants;
 import com.rizkysiregar.narrativ.messaging.event.CommentRepliedEvent;
@@ -38,16 +40,18 @@ public class CommentReplyConsumer {
 
     private enum Kind {
         /** your comment was answered */
-        REPLIED(Constants.NOTIFICATION_TYPE_COMMENT_REPLIED, "commentReplied"),
+        REPLIED(Constants.NOTIFICATION_TYPE_COMMENT_REPLIED, "commentReplied", NotificationType.COMMENT_REPLIED),
         /** someone commented on your post */
-        COMMENTED(Constants.NOTIFICATION_TYPE_POST_COMMENTED, "postCommented");
+        COMMENTED(Constants.NOTIFICATION_TYPE_POST_COMMENTED, "postCommented", NotificationType.POST_COMMENTED);
 
         private final String type;
         private final String textKey;
+        private final NotificationType inboxType;
 
-        Kind(String type, String textKey) {
+        Kind(String type, String textKey, NotificationType inboxType) {
             this.type = type;
             this.textKey = textKey;
+            this.inboxType = inboxType;
         }
     }
 
@@ -57,6 +61,7 @@ public class CommentReplyConsumer {
     private final PushTextResolver textResolver;
     private final IEmailService emailService;
     private final EventDeduplicator deduplicator;
+    private final NotificationInboxService inboxService;
 
     @RabbitListener(queues = RabbitMQConfig.COMMENT_REPLY_QUEUE)
     public void handleCommentReplied(CommentRepliedEvent event) {
@@ -104,6 +109,9 @@ public class CommentReplyConsumer {
             log.debug("COMMENT.REPLY.SKIPPED reason=recipient_unavailable recipientId={}", recipientId);
             return;
         }
+        // the inbox holds it whether a push, an email or nothing goes out below
+        inboxService.recordComment(recipient.getId(), kind.inboxType, event.getReplierId(), event.getPostId(),
+                event.getCommentId(), event.getContentPreview());
 
         if (!userDeviceService.getActiveDevice(recipient.getId()).isEmpty()) {
             Map<String, String> data = Map.of(

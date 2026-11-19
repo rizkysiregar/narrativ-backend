@@ -1,5 +1,8 @@
 package com.rizkysiregar.narrativ.service.impl;
 
+import com.rizkysiregar.narrativ.messaging.event.ActivityEvent;
+import com.rizkysiregar.narrativ.messaging.publisher.ActivityEventPublisher;
+import com.rizkysiregar.narrativ.model.enums.NotificationType;
 import com.rizkysiregar.narrativ.model.response.CommentResponse;
 import com.rizkysiregar.narrativ.model.entity.CommentEntity;
 import com.rizkysiregar.narrativ.model.entity.PostEntity;
@@ -42,6 +45,7 @@ public class CommentServiceImpl implements CommentService {
     private final UserRepository userRepository;
     private final CommentEventPublisher commentEventPublisher;
     private final ProfileImageUrlResolver profileImageUrlResolver;
+    private final ActivityEventPublisher activityEventPublisher;
 
     private static final int NOTIFICATION_PREVIEW_LENGTH = 100;
     private static final int MAX_QUOTE_LENGTH = 300;
@@ -209,6 +213,19 @@ public class CommentServiceImpl implements CommentService {
         post.setPinnedCommentId(comment.getId());
         postCrudRepository.save(post);
         log.info("COMMENT.PINNED postId={} commentId={}", postId, commentId);
+        UUID commenterId = comment.getUser().getId();
+        if (!commenterId.equals(requesterId)) {
+            ActivityEvent event = ActivityEvent.builder()
+                    .type(NotificationType.COMMENT_PINNED)
+                    .recipientId(commenterId)
+                    .actorId(requesterId)
+                    .actorUsername(post.getUser().getUsername())
+                    .postId(postId)
+                    .commentId(commentId)
+                    .preview(preview(comment.getContent()))
+                    .build();
+            AfterCommit.run("pin activity " + commentId, () -> activityEventPublisher.publish(event));
+        }
         return Operation.UPDATED;
     }
 
