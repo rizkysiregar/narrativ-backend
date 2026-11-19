@@ -55,4 +55,6 @@ public class Constants {
     public static final String NOTIFICATION_TYPE_POST_COMMENTED = "POST_COMMENTED";
     public static final String NOTIFICATION_TYPE_COMMENT_REPLIED = "COMMENT_REPLIED";
     public static final String NOTIFICATION_TYPE_NEW_POST = "NEW_POST";
+    public static final String NOTIFICATION_TYPE_FOLLOWED = "FOLLOWED";
+    public static final String NOTIFICATION_TYPE_COMMENT_PINNED = "COMMENT_PINNED";
 }

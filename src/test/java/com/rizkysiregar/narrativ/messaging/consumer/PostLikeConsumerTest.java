@@ -1,5 +1,8 @@
 package com.rizkysiregar.narrativ.messaging.consumer;
 
+import com.rizkysiregar.narrativ.repository.LikeRepository;
+import com.rizkysiregar.narrativ.service.NotificationInboxService;
+import static org.mockito.Mockito.lenient;
 import com.rizkysiregar.narrativ.config.RabbitMQConfig;
 import com.rizkysiregar.narrativ.messaging.event.PostLikedEvent;
 import com.rizkysiregar.narrativ.messaging.idempotency.EventDeduplicator;
@@ -41,6 +44,10 @@ class PostLikeConsumerTest {
     private PushTextResolver textResolver;
     @Mock
     private EventDeduplicator deduplicator;
+    @Mock
+    private LikeRepository likeRepository;
+    @Mock
+    private NotificationInboxService inboxService;
 
     @InjectMocks
     private PostLikeConsumer consumer;
@@ -60,6 +67,7 @@ class PostLikeConsumerTest {
         owner = new UserEntity();
         owner.setId(ownerId);
         owner.setStatus(UserStatus.ACTIVE);
+        lenient().when(likeRepository.existsByUserIdAndPostId(likerId, postId)).thenReturn(true);
     }
 
     private void reserve(boolean first) {
@@ -128,5 +136,26 @@ class PostLikeConsumerTest {
 
         verify(notificationService, never()).sendNotificationToUserDevices(any(), any(), any());
         verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void theInboxKeepsTheLikeEvenWhenThePushWasAlreadySent() {
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+        reserve(false);
+
+        consumer.handlePostLiked(event);
+
+        verify(inboxService).recordLike(ownerId, likerId, postId);
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void aLikeUndoneBeforeTheEventArrivedTellsNobody() {
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+        when(likeRepository.existsByUserIdAndPostId(likerId, postId)).thenReturn(false);
+
+        consumer.handlePostLiked(event);
+
+        verifyNoInteractions(inboxService, notificationService, deduplicator);
     }
 }
