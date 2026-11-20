@@ -1,12 +1,11 @@
 package com.rizkysiregar.narrativ.model.request;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.ToString;
 
 @Data
 public class RefreshTokenRequest {
-    @NotBlank
+    // optional: a web client sends no body and uses the refresh cookie instead (see WebSessionCookie)
     @ToString.Exclude
     private String refreshToken;
 }

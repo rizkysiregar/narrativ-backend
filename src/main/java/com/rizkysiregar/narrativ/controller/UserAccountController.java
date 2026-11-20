@@ -13,9 +13,12 @@ import com.rizkysiregar.narrativ.model.response.LoginResponse;
 import com.rizkysiregar.narrativ.model.response.ProfileImageUploadUrlResponse;
 import com.rizkysiregar.narrativ.service.ProfileImageService;
 import com.rizkysiregar.narrativ.service.UserManagementService;
+import com.rizkysiregar.narrativ.service.auth.WebSessionCookie;
 import com.rizkysiregar.narrativ.service.otp.EmailChangeService;
 
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,6 +32,7 @@ public class UserAccountController {
     private final UserManagementService userManagementService;
     private final ProfileImageService profileImageService;
     private final EmailChangeService emailChangeService;
+    private final WebSessionCookie webSessionCookie;
 
     @Operation(summary = "Get current logged-in user profile")
     @GetMapping
@@ -94,12 +98,14 @@ public class UserAccountController {
     }
 
     @Operation(summary = "Change the email of the account",
-            description = "Step 2: the OTP sent to the new email plus the current password, or a fresh Google id token for an account that signs in with Google. Every other session is ended; the answer is a new token pair for this device")
+            description = "Step 2: the OTP sent to the new email plus the current password, or a fresh Google id token for an account that signs in with Google. Every other session is ended; the answer is a new token pair for this device (a web client gets the refresh token as an HttpOnly cookie)")
     @PostMapping("/email")
     public LoginResponse confirmEmailChange(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @Valid @RequestBody ConfirmEmailChangeRequest request
+            @Valid @RequestBody ConfirmEmailChangeRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse
     ) {
-        return emailChangeService.confirm(currentUser.getUserId(), request);
+        return webSessionCookie.deliver(emailChangeService.confirm(currentUser.getUserId(), request), httpRequest, httpResponse);
     }
 }

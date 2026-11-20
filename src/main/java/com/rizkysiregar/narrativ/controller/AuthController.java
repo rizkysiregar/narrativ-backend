@@ -3,15 +3,21 @@ package com.rizkysiregar.narrativ.controller;
 import com.rizkysiregar.narrativ.model.dto.*;
 import com.rizkysiregar.narrativ.model.request.*;
 import com.rizkysiregar.narrativ.model.response.LoginResponse;
+import com.rizkysiregar.narrativ.constant.GlobalMessage;
+import com.rizkysiregar.narrativ.exception.BusinessException;
 import com.rizkysiregar.narrativ.service.AuthService;
+import com.rizkysiregar.narrativ.service.auth.WebSessionCookie;
 import com.rizkysiregar.narrativ.service.otp.IOtpService;
 import com.rizkysiregar.narrativ.service.otp.IRegistrationOtpService;
 import com.rizkysiregar.narrativ.util.EmailNormalizer;
 import com.rizkysiregar.narrativ.util.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -24,15 +30,19 @@ import org.springframework.web.bind.annotation.*;
 @SecurityRequirement(name = "Bearer Authentication")
 public class AuthController {
 
+    static final String WEB_SESSION_NOTE = "A web client (X-Client-Platform: web) gets the refresh token as an HttpOnly cookie instead of the refreshToken field";
+
     final AuthService authService;
     private final IOtpService otpService;
     private final IRegistrationOtpService registrationOtpService;
+    private final WebSessionCookie webSessionCookie;
 
     public AuthController(AuthService authService, IOtpService otpService,
-                          IRegistrationOtpService registrationOtpService) {
+                          IRegistrationOtpService registrationOtpService, WebSessionCookie webSessionCookie) {
         this.authService = authService;
         this.otpService = otpService;
         this.registrationOtpService = registrationOtpService;
+        this.webSessionCookie = webSessionCookie;
     }
 
 
@@ -69,29 +79,41 @@ public class AuthController {
         return authService.adminLogin(userLoginRequest);
     }
 
-    @io.swagger.v3.oas.annotations.Operation(summary = "User login", description = "use this to gain jwt credentials for user validity")
+    @io.swagger.v3.oas.annotations.Operation(summary = "User login", description = "use this to gain jwt credentials for user validity. " + WEB_SESSION_NOTE)
     @PostMapping("auth/login")
-    public LoginResponse login(@Valid @RequestBody UserLoginRequest userLoginRequest) {
+    public LoginResponse login(@Valid @RequestBody UserLoginRequest userLoginRequest,
+                               HttpServletRequest request, HttpServletResponse response) {
         log.debug("AUTH.LOGIN username={}", userLoginRequest.getUsername());
-        return authService.login(userLoginRequest);
+        return webSessionCookie.deliver(authService.login(userLoginRequest), request, response);
     }
 
-    @io.swagger.v3.oas.annotations.Operation(summary = "Login with Google Account- Token ID")
+    @io.swagger.v3.oas.annotations.Operation(summary = "Login with Google Account- Token ID", description = WEB_SESSION_NOTE)
     @PostMapping("auth/google")
-    public LoginResponse googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
-        return authService.googleLogin(request);
+    public LoginResponse googleLogin(@Valid @RequestBody GoogleLoginRequest googleLoginRequest,
+                                     HttpServletRequest request, HttpServletResponse response) {
+        return webSessionCookie.deliver(authService.googleLogin(googleLoginRequest), request, response);
     }
 
-    @io.swagger.v3.oas.annotations.Operation(summary = "Refresh access token", description = "Exchange a valid refresh token for a new access token and a new (rotated) refresh token")
+    @io.swagger.v3.oas.annotations.Operation(summary = "Refresh access token", description = "Exchange a valid refresh token for a new access token and a new (rotated) refresh token. A web client (X-Client-Platform: web) may send no body: the token is then read from the refresh cookie, and the rotated one is written back to it")
     @PostMapping("auth/refresh")
-    public LoginResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
-        return authService.refreshToken(request.getRefreshToken());
+    public LoginResponse refresh(@RequestBody(required = false) RefreshTokenRequest refreshTokenRequest,
+                                 HttpServletRequest request, HttpServletResponse response) {
+        String refreshToken = webSessionCookie.refreshToken(bodyToken(refreshTokenRequest), request);
+        if (refreshToken == null) {
+            throw new BusinessException(GlobalMessage.UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
+        }
+        return webSessionCookie.deliver(authService.refreshToken(refreshToken), request, response);
     }
 
-    @io.swagger.v3.oas.annotations.Operation(summary = "Logout", description = "Revokes the given refresh token. Always succeeds, also for an unknown or expired token")
+    @io.swagger.v3.oas.annotations.Operation(summary = "Logout", description = "Revokes the given refresh token (for a web client: the one in the refresh cookie, which is then cleared). Always succeeds, also for an unknown, expired or missing token")
     @PostMapping("auth/logout")
-    public Operation logout(@Valid @RequestBody RefreshTokenRequest request) {
-        authService.logout(request.getRefreshToken());
+    public Operation logout(@RequestBody(required = false) RefreshTokenRequest refreshTokenRequest,
+                            HttpServletRequest request, HttpServletResponse response) {
+        String refreshToken = webSessionCookie.refreshToken(bodyToken(refreshTokenRequest), request);
+        if (refreshToken != null) {
+            authService.logout(refreshToken);
+        }
+        webSessionCookie.clear(request, response);
         return Operation.DELETED;
     }
 
@@ -113,4 +135,7 @@ public class AuthController {
         return authService.confirmResetPassword(resetPasswordRequest);
     }
 
+    private static String bodyToken(RefreshTokenRequest refreshTokenRequest) {
+        return refreshTokenRequest == null ? null : refreshTokenRequest.getRefreshToken();
+    }
 }

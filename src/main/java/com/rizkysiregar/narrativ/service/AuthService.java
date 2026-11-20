@@ -52,7 +52,7 @@ public class AuthService {
     private static final String REFRESH_TOKEN_PREFIX = "refresh_token:";
     // set of the refresh tokens a user currently holds, so they can all be revoked at once (ban, force logout)
     private static final String USER_REFRESH_TOKENS_PREFIX = "user_refresh_tokens:";
-    private static final long REFRESH_TOKEN_TTL_SECONDS = 60L * 60 * 24 * 30; // 30 days
+    public static final long REFRESH_TOKEN_TTL_SECONDS = 60L * 60 * 24 * 30; // 30 days
 
     final UserRepository userRepository;
     final AuthenticationManager authManager;

@@ -61,12 +61,19 @@ follow each other, like and comment, and receive push notifications. The same se
 ### Cross-cutting
 
 - **Uniform response envelope** (`BaseResponse`: `code`, `message`, `data`, plus `errorCode`/`args` on errors),
-  applied by `CustomResponseAdvise`; errors are mapped centrally in `RestErrorHandlerControllerAdviser`.
+  applied by `CustomResponseAdvise`; errors are mapped centrally in `RestErrorHandlerControllerAdviser`. The
+  OpenAPI document shows the same envelope (`ResponseEnvelopeCustomizer`) plus an `ErrorResponse` schema, so clients
+  can generate their types from `/v3/api-docs`.
+- **Web client session**: a request with `X-Client-Platform: web` gets its refresh token as an HttpOnly,
+  `SameSite=Strict` cookie scoped to `/api/v1/auth` instead of the `refreshToken` field (login, Google login,
+  refresh, email change); `/auth/refresh` and `/auth/logout` then take no body. Mobile clients are unchanged
+  (`WebSessionCookie`).
 - **i18n**: messages in English and Indonesian, chosen from the `Accept-Language` header (`LocaleFilter`).
 - **Rate limiting** per user (or per client IP for anonymous `/auth/**`), with separate buckets for feed, post
   creation, uploads, interactions and auth.
 - **Firebase App Check** on mobile endpoints, in `off` / `log` / `enforce` mode.
-- **Request tracing**: every request gets a trace id and a single access log line with a redacted body.
+- **Request tracing**: every request gets a trace id and a single access log line with a redacted body and the
+  caller's `X-Client-Platform`/`X-App-Version` (`client=web/1.0.0`).
 - **Scheduled jobs**: a casual-push broadcast every 8 hours (`FirebaseSchedulerService`) and an orphan media
   cleanup (`OrphanMediaCleanupService`, off by default, supports dry-run).
 
