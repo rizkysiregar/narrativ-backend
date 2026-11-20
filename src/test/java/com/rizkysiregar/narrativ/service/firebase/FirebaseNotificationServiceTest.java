@@ -1,5 +1,6 @@
 package com.rizkysiregar.narrativ.service.firebase;
 
+import com.rizkysiregar.narrativ.config.WebPushProperties;
 import com.rizkysiregar.narrativ.model.entity.UserDeviceEntity;
 import com.rizkysiregar.narrativ.service.UserDeviceService;
 import org.springframework.http.HttpStatus;
@@ -46,7 +47,8 @@ public class FirebaseNotificationServiceTest {
         when(webClientBuilder.baseUrl("https://fcm.googleapis.com/v1")).thenReturn(webClientBuilder);
         when(webClientBuilder.build()).thenReturn(webClient);
         // Manually construct service after stubbing builder
-        notificationService = new FirebaseNotificationService(webClientBuilder, firebaseTokenService, userDeviceService);
+        notificationService = new FirebaseNotificationService(webClientBuilder, firebaseTokenService, userDeviceService,
+                new WebPushProperties("https://app.test/", "", "", "", "", ""));
     }
     
     @Test
@@ -101,6 +103,63 @@ public class FirebaseNotificationServiceTest {
         Assertions.assertEquals(Map.of("postId", "42"), message.get("data"));
         Assertions.assertEquals("T", message.get("token"));
         Assertions.assertEquals(Map.of("priority", "HIGH"), message.get("android"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void sendToUserDevices_webDevicesGetALinkToOpen_appsDoNot() {
+        UUID userId = UUID.randomUUID();
+        UserDeviceEntity web = device("web-token", "en");
+        web.setPlatform("WEB");
+        UserDeviceEntity phone = device("phone-token", "en");
+        phone.setPlatform("ANDROID");
+        when(userDeviceService.getActiveDevice(userId)).thenReturn(List.of(web, phone));
+        FirebaseNotificationService spy = Mockito.spy(notificationService);
+        Mockito.doReturn(Mono.just("OK")).when(spy)
+                .sendNotificationToToken(anyString(), anyString(), anyString(), any(), any());
+        Mockito.doReturn(Mono.just("OK")).when(spy)
+                .sendNotificationToToken(eq("phone-token"), anyString(), anyString(), any());
+
+        spy.sendNotificationToUserDevices(userId, locale -> new FirebaseNotificationService.PushText("t", "b"),
+                Map.of("type", "POST_COMMENTED", "postId", "p-1"));
+
+        Mockito.verify(spy).sendNotificationToToken("web-token", "t", "b",
+                Map.of("type", "POST_COMMENTED", "postId", "p-1"), "https://app.test/p/p-1#comments");
+        Mockito.verify(spy).sendNotificationToToken(eq("phone-token"), anyString(), anyString(), any());
+    }
+
+    @Test
+    void webLink_profilePostOrHome() {
+        Assertions.assertEquals("https://app.test/u/ani.w",
+                FirebaseNotificationService.webLink("https://app.test", Map.of("type", "FOLLOWED", "actorUsername", "ani.w")));
+        Assertions.assertEquals("https://app.test/p/p-1",
+                FirebaseNotificationService.webLink("https://app.test", Map.of("type", "POST_LIKED", "postId", "p-1")));
+        Assertions.assertEquals("https://app.test/",
+                FirebaseNotificationService.webLink("https://app.test", Map.of("type", "BROADCAST")));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void sendNotificationToToken_webLinkAddsTheWebpushBlock() {
+        when(firebaseTokenService.getAccessToken()).thenReturn(Mono.just("ACCESS_TOKEN"));
+        when(firebaseTokenService.getProjectId()).thenReturn("narrativ");
+        WebClient.RequestBodyUriSpec postSpec = Mockito.mock(WebClient.RequestBodyUriSpec.class);
+        WebClient.RequestHeadersSpec<?> headersSpec = Mockito.mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec responseSpec = Mockito.mock(WebClient.ResponseSpec.class);
+        when(webClient.post()).thenReturn(postSpec);
+        when(postSpec.uri("/projects/{projectId}/messages:send", "narrativ")).thenReturn(postSpec);
+        when(postSpec.header(anyString(), anyString())).thenReturn(postSpec);
+        when(postSpec.bodyValue(any())).thenReturn((WebClient.RequestHeadersSpec) headersSpec);
+        when(headersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.bodyToMono(String.class)).thenReturn(Mono.just("OK"));
+
+        notificationService.sendNotificationToToken("T", "Hello", "World", Map.of(), "https://app.test/p/1").block();
+
+        ArgumentCaptor<Object> body = ArgumentCaptor.forClass(Object.class);
+        Mockito.verify(postSpec).bodyValue(body.capture());
+        Map<String, Object> message = (Map<String, Object>) ((Map<String, Object>) body.getValue()).get("message");
+        Assertions.assertEquals(Map.of("fcm_options", Map.of("link", "https://app.test/p/1"),
+                "notification", Map.of("icon", "https://app.test/icon-192.png")), message.get("webpush"));
     }
 
     private UserDeviceEntity device(String token, String locale) {

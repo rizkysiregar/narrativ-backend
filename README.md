@@ -89,7 +89,7 @@ All paths are under the context path `/api/v1` (port `9091` by default). Swagger
 | Users         | `GET /users`, `GET /users/by-username/{username}`, `GET /users/{userId}`, `POST/DELETE /users/{userId}/follow`, `GET /users/{userId}/followers`, `/following`, `/follow-status`, `POST/DELETE /users/{userId}/block` |
 | Posts         | `GET /posts`, `/posts/explore`, `/posts/following`, `/posts/{postId}`, `/posts/users/{username}/posts`, `POST /posts/upload-url`, `POST /posts`, `DELETE /posts/{postId}` |
 | Interactions  | `POST /posts/{postId}/like`, `DELETE /posts/{postId}/dislike`, `GET /posts/{postId}/likes/count`, `GET/POST /posts/{postId}/comments`, `DELETE /comments/{commentId}`, `GET /comments/{commentId}/replies` |
-| Others        | `POST /reports`, `POST /devices`, `POST /devices/deactivate`, `GET /files/presign-url`, `GET /legal/{privacy-policy,terms,delete-account}` |
+| Others        | `POST /reports`, `POST /devices`, `POST /devices/deactivate`, `GET /devices/web-push-config`, `GET /files/presign-url`, `GET /legal/{privacy-policy,terms,delete-account}` |
 | Admin         | `/admin/users`, `/admin/admins`, `/admin/posts`, `/admin/comments`, `/admin/reports`, `/admin/metrics`, `/admin/notifications`, `/admin/notification-templates`, `/admin/parameters`, `/admin/audit-logs` |
 | Actuator      | `/actuator/health`, `/info`, `/metrics`, `/prometheus` (separate port when `MANAGEMENT_SERVER_PORT` is set) |
 

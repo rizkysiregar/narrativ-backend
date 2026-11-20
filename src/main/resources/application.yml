@@ -109,6 +109,17 @@ app:
     auth: ${APP_RATE_LIMIT_AUTH:10}
     # header the edge sets with the real client IP (Cloudflare: CF-Connecting-IP). Empty = use socket address
     client-ip-header: ${APP_RATE_LIMIT_CLIENT_IP_HEADER:CF-Connecting-IP}
+  web:
+    # the web client's address: a web push opens a page of it when clicked (e.g. https://app-dev-narrativ.rizkysiregar.my.id)
+    origin: ${APP_WEB_ORIGIN:}
+  # the Firebase web app of this environment, handed to the web client (GET /devices/web-push-config). Public values,
+  # not secrets: Firebase console > Project settings > Your apps (web) and Cloud Messaging > Web Push certificates
+  web-push:
+    api-key: ${APP_WEB_PUSH_API_KEY:}
+    project-id: ${APP_WEB_PUSH_PROJECT_ID:}
+    messaging-sender-id: ${APP_WEB_PUSH_MESSAGING_SENDER_ID:}
+    app-id: ${APP_WEB_PUSH_APP_ID:}
+    vapid-key: ${APP_WEB_PUSH_VAPID_KEY:}
   storage:
     # deletes uploads that were never used (post media without a post, profile pictures nobody has); start with
     # dry-run=true and read the log

@@ -26,7 +26,7 @@ public class UserDeviceService {
 
         deviceEntity.setUserId(userId);
         deviceEntity.setDeviceId(request.getDeviceId());
-        deviceEntity.setPlatform(request.getPlatform());
+        deviceEntity.setPlatform(request.getPlatform().toUpperCase(java.util.Locale.ROOT));
         deviceEntity.setPushToken(request.getPushToken());
         deviceEntity.setAppVersion(request.getAppVersion());
         deviceEntity.setOsVersion(request.getOsVersion());
