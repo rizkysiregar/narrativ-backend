@@ -1,6 +1,7 @@
 package com.rizkysiregar.narrativ.model.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 import lombok.ToString;
 
@@ -10,7 +11,9 @@ public class RegisterDeviceRequest {
     @ToString.Exclude
     private String pushToken;
 
+    // ANDROID and WEB today; the web client's pushes carry a link to open (see FirebaseNotificationService)
     @NotBlank
+    @Pattern(regexp = "(?i)android|ios|web", message = "{validation.platform.invalid}")
     private String platform;
 
     private String deviceId;

@@ -1,5 +1,9 @@
 package com.rizkysiregar.narrativ.service.firebase;
 
+import java.nio.charset.StandardCharsets;
+import org.springframework.web.util.UriUtils;
+import com.rizkysiregar.narrativ.constant.Constants;
+import com.rizkysiregar.narrativ.config.WebPushProperties;
 
 import com.rizkysiregar.narrativ.model.entity.UserDeviceEntity;
 import com.rizkysiregar.narrativ.service.UserDeviceService;
@@ -27,14 +31,17 @@ public class FirebaseNotificationService {
     private final WebClient webClient;
     private final FirebaseTokenService tokenService;
     private final UserDeviceService userDeviceService;
+    private final String webOrigin;
 
     public FirebaseNotificationService(WebClient.Builder webClientBuilder,
                                        FirebaseTokenService tokenService,
-                                       UserDeviceService userDeviceService
+                                       UserDeviceService userDeviceService,
+                                       WebPushProperties webPushProperties
                                        ) {
         this.webClient = webClientBuilder.baseUrl("https://fcm.googleapis.com/v1").build();
         this.tokenService = tokenService;
         this.userDeviceService = userDeviceService;
+        this.webOrigin = webPushProperties.origin();
     }
 
 
@@ -47,6 +54,14 @@ public class FirebaseNotificationService {
      *             them to open the right screen when the notification is tapped
      */
     public Mono<String> sendNotificationToToken(String token, String title, String body, Map<String, String> data) {
+        return sendNotificationToToken(token, title, body, data, null);
+    }
+
+    /**
+     * @param webLink for a browser (a WEB device): the absolute page a click on the notification opens; null for apps
+     */
+    public Mono<String> sendNotificationToToken(String token, String title, String body, Map<String, String> data,
+                                                String webLink) {
         return tokenService.getAccessToken().flatMap(accessToken -> {
 
             Map<String, Object> message = new HashMap<>();
@@ -61,6 +76,11 @@ public class FirebaseNotificationService {
             // high priority so the push is delivered at once, also while the phone is dozing, and may pop up
             // on screen instead of waiting in the shade
             message.put("android", Map.of("priority", "HIGH"));
+            if (webLink != null) {
+                message.put("webpush", Map.of(
+                        "fcm_options", Map.of("link", webLink),
+                        "notification", Map.of("icon", webOrigin + "/icon-192.png")));
+            }
 
             return webClient.post()
                     .uri("/projects/{projectId}/messages:send", tokenService.getProjectId())
@@ -151,7 +171,10 @@ public class FirebaseNotificationService {
 
     private Mono<Outcome> sendToDevice(UUID userId, UserDeviceEntity device, String title, String body,
                                        Map<String, String> data) {
-        return sendNotificationToToken(device.getPushToken(), title, body, data)
+        Mono<String> send = "WEB".equalsIgnoreCase(device.getPlatform()) && !webOrigin.isEmpty()
+                ? sendNotificationToToken(device.getPushToken(), title, body, data, webLink(webOrigin, data))
+                : sendNotificationToToken(device.getPushToken(), title, body, data);
+        return send
                 .timeout(SEND_TIMEOUT)
                 .map(response -> Outcome.SENT)
                 .defaultIfEmpty(Outcome.SENT)
@@ -164,6 +187,26 @@ public class FirebaseNotificationService {
                     log.error("FCM.SEND.FAILED userId={} deviceId={}", userId, device.getDeviceId(), ex);
                     return Mono.just(Outcome.FAILED);
                 });
+    }
+
+    /**
+     * The page of the web client a push is about: the follower's profile, the post (its comments for comment events),
+     * or the home page when the push names neither.
+     */
+    static String webLink(String origin, Map<String, String> data) {
+        String type = data.getOrDefault("type", "");
+        String actor = data.get("actorUsername");
+        if (Constants.NOTIFICATION_TYPE_FOLLOWED.equals(type) && actor != null) {
+            return origin + "/u/" + UriUtils.encodePathSegment(actor, StandardCharsets.UTF_8);
+        }
+        String postId = data.get("postId");
+        if (postId != null && !postId.isBlank() && !"null".equals(postId)) {
+            boolean comments = Constants.NOTIFICATION_TYPE_POST_COMMENTED.equals(type)
+                    || Constants.NOTIFICATION_TYPE_COMMENT_REPLIED.equals(type)
+                    || Constants.NOTIFICATION_TYPE_COMMENT_PINNED.equals(type);
+            return origin + "/p/" + UriUtils.encodePathSegment(postId, StandardCharsets.UTF_8) + (comments ? "#comments" : "");
+        }
+        return origin + "/";
     }
 
     /** FCM answers 404 / UNREGISTERED once the app was uninstalled or its token rotated: the token is dead for good. */
