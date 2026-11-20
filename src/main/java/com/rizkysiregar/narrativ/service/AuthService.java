@@ -395,6 +395,15 @@ public class AuthService {
         }
     }
 
+    /** Like {@link #getUserById}, by username (case-insensitive). Blocked either way reads as not found. */
+    public PublicUserDTO getUserByUsername(String username, UUID viewerId) {
+        log.debug("USER.GET username={}", username);
+        return userRepository.findActiveByUsername(username)
+                .filter(user -> !userBlockRepository.existsBetween(viewerId, user.getId()))
+                .map(this::toPublicUser)
+                .orElseThrow(() -> new BusinessException(GlobalMessage.NOT_FOUND, HttpStatus.NOT_FOUND));
+    }
+
     public PaginatedResponse<PublicUserDTO> search(UserSearchRequest request, UUID viewerId, Pageable pageable) {
         log.debug("USER.SEARCH request={}", request);
 
