@@ -93,6 +93,11 @@ app:
   cors:
     # comma separated origins. default is local development only, deployed envs set APP_CORS_ALLOWED_ORIGINS
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8083,http://localhost:53375}
+  auth:
+    # the refresh cookie of the web client (X-Client-Platform: web) is Secure. Only a backend reached over plain http
+    # by a browser that refuses Secure cookies there (Safari on http://localhost) needs false
+    web-cookie:
+      secure: ${APP_AUTH_WEB_COOKIE_SECURE:true}
   rate-limit:
     feed: ${APP_RATE_LIMIT_FEED}
     post-create: ${APP_RATE_LIMIT_POST_CREATE}
