@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.rizkysiregar.narrativ.util.ClientPlatform;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,7 +30,8 @@ import java.util.UUID;
 
 /**
  * One access log line per request, written when the request finishes:
- * {@code HTTP.REQUEST id= method= path= status= durationMs= ip= userId= body=}.
+ * {@code HTTP.REQUEST id= method= path= status= durationMs= ip= userId= client= body=}.
+ * {@code client} is the self-declared {@code platform/version} of the caller (see {@link ClientPlatform}).
  * <p>
  * The headers and the forwarding chain are only added to requests that failed (status 400+), where they help to
  * debug. {@code app.logging.request-body} decides when the (redacted) JSON body is included:
@@ -91,12 +93,13 @@ public class RequestTraceFilter extends OncePerRequestFilter {
         String userId = MDC.get(USER_ID_MDC_KEY);
         String body = withBody ? body(request) : "[not logged]";
         String query = sanitizeQuery(request.getQueryString());
+        String client = ClientPlatform.describe(request);
 
         if (failed) {
-            String message = "HTTP.REQUEST id={} method={} path={} query={} status={} durationMs={} ip={} userId={} body={} "
+            String message = "HTTP.REQUEST id={} method={} path={} query={} status={} durationMs={} ip={} userId={} client={} body={} "
                     + "forwardedFor={} realIp={} forwarded={} headers={}";
             Object[] args = {requestId, request.getMethod(), safe(request.getRequestURI(), 1024), query, status,
-                    durationMs, safe(request.getRemoteAddr(), 128), userId, body,
+                    durationMs, safe(request.getRemoteAddr(), 128), userId, client, body,
                     safe(request.getHeader("X-Forwarded-For"), MAX_HEADER_VALUE_LENGTH),
                     safe(request.getHeader("X-Real-IP"), MAX_HEADER_VALUE_LENGTH),
                     safe(request.getHeader("Forwarded"), MAX_HEADER_VALUE_LENGTH), headers(request)};
@@ -109,11 +112,11 @@ public class RequestTraceFilter extends OncePerRequestFilter {
         }
 
         Object[] args = {requestId, request.getMethod(), safe(request.getRequestURI(), 1024), query, status,
-                durationMs, safe(request.getRemoteAddr(), 128), userId, body};
+                durationMs, safe(request.getRemoteAddr(), 128), userId, client, body};
         if (durationMs >= SLOW_REQUEST_MS) {
-            log.warn("HTTP.REQUEST.SLOW id={} method={} path={} query={} status={} durationMs={} ip={} userId={} body={}", args);
+            log.warn("HTTP.REQUEST.SLOW id={} method={} path={} query={} status={} durationMs={} ip={} userId={} client={} body={}", args);
         } else {
-            log.info("HTTP.REQUEST id={} method={} path={} query={} status={} durationMs={} ip={} userId={} body={}", args);
+            log.info("HTTP.REQUEST id={} method={} path={} query={} status={} durationMs={} ip={} userId={} client={} body={}", args);
         }
     }
 
