@@ -23,8 +23,9 @@ import java.util.List;
  * Makes the OpenAPI document describe what clients really receive. {@link CustomResponseAdvise} wraps a controller's
  * answer in {@code {code, message, data}} after the method returned, which springdoc cannot see, so every success
  * response is wrapped here the same way. Errors are always a {@code BaseResponse} without data, documented once as
- * the {@code ErrorResponse} schema and attached as the {@code default} response. Clients generate their types from
- * this document, so it has to match the wire format.
+ * the {@code ErrorResponse} schema: it replaces the bodies springdoc derives from the exception handlers (which return
+ * {@code ResponseEntity<?>}, so springdoc only sees an empty object) and is attached as the {@code default} response.
+ * Clients generate their types from this document, so it has to match the wire format.
  */
 @Component
 public class ResponseEnvelopeCustomizer implements OperationCustomizer {
@@ -36,18 +37,25 @@ public class ResponseEnvelopeCustomizer implements OperationCustomizer {
         if (!advised(handlerMethod) || operation.getResponses() == null) {
             return operation;
         }
-        if (wrapped(handlerMethod)) {
-            operation.getResponses().forEach((status, response) -> {
-                if (status.startsWith("2") && response.getContent() != null) {
-                    response.getContent().values().forEach(media -> media.setSchema(envelope(media.getSchema())));
-                }
-            });
-        }
-        operation.getResponses().addApiResponse("default", new ApiResponse()
-                .description("Error")
-                .content(new Content().addMediaType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE,
-                        new MediaType().schema(new Schema<>().$ref(ERROR_SCHEMA)))));
+        boolean wrapped = wrapped(handlerMethod);
+        operation.getResponses().forEach((status, response) -> {
+            if (isError(status)) {
+                response.setContent(errorContent());
+            } else if (wrapped && status.startsWith("2") && response.getContent() != null) {
+                response.getContent().values().forEach(media -> media.setSchema(envelope(media.getSchema())));
+            }
+        });
+        operation.getResponses().addApiResponse("default", new ApiResponse().description("Error").content(errorContent()));
         return operation;
+    }
+
+    private static boolean isError(String status) {
+        return status.startsWith("4") || status.startsWith("5");
+    }
+
+    private static Content errorContent() {
+        return new Content().addMediaType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE,
+                new MediaType().schema(new Schema<>().$ref(ERROR_SCHEMA)));
     }
 
     /** The schema of every error body, registered as a component by {@link SwaggerConfig}. */
