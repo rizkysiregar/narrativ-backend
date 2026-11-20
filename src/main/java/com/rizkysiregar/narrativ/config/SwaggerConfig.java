@@ -17,6 +17,7 @@ public class SwaggerConfig {
                 .info(new Info().title("NARRATIV API").version("1.0"))
                 .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"))
                 .components(new Components()
+                        .addSchemas(ResponseEnvelopeCustomizer.ERROR_SCHEMA, ResponseEnvelopeCustomizer.errorSchema())
                         .addSecuritySchemes("Bearer Authentication", new SecurityScheme()
                                 .name("Bearer Authentication")
                                 .type(SecurityScheme.Type.HTTP)

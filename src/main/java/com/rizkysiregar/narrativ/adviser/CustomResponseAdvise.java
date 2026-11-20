@@ -19,9 +19,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-@RestControllerAdvice(basePackages = {"com.rizkysiregar.narrativ.controller"})
+@RestControllerAdvice(basePackages = {CustomResponseAdvise.CONTROLLER_PACKAGE})
 @Slf4j
 public class CustomResponseAdvise extends BaseController implements ResponseBodyAdvice<Object> {
+
+    // ResponseEnvelopeCustomizer shows the same wrapping in the OpenAPI document, keep the two in step
+    public static final String CONTROLLER_PACKAGE = "com.rizkysiregar.narrativ.controller";
 
     @Override
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
