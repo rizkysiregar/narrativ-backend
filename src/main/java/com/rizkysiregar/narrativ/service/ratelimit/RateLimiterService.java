@@ -32,6 +32,10 @@ public class RateLimiterService {
     @Value("${app.rate-limit.auth}")
     private int authLimit;
 
+    // anonymous reads of shared links (/public/**), per client IP
+    @Value("${app.rate-limit.public:120}")
+    private int publicLimit;
+
     // endpoints that prove ownership with a password (account deletion): few tries, slowly refilled, so a stolen
     // access token cannot be used to guess the password
     @Value("${app.rate-limit.sensitive:5}")
@@ -68,6 +72,7 @@ public class RateLimiterService {
             case "post-upload" -> postUploadLimit;
             case "interaction" -> interactionLimit;
             case "auth" -> authLimit;
+            case "public" -> publicLimit;
             case SENSITIVE -> sensitiveLimit;
             default -> defaultLimit;
         };

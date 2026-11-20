@@ -77,6 +77,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(request -> {
                     request.requestMatchers(Constants.JWT_WHITELIST.toArray(String[]::new)).permitAll();
                     request.requestMatchers(HttpMethod.GET, Constants.LEGAL_PAGES.toArray(String[]::new)).permitAll();
+                    request.requestMatchers(HttpMethod.GET, Constants.PUBLIC_PAGES.toArray(String[]::new)).permitAll();
                     if (swaggerUiEnabled) {
                         request.requestMatchers(Constants.SWAGGER_WHITELIST.toArray(String[]::new)).permitAll();
                     }

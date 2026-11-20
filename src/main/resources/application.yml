@@ -107,6 +107,8 @@ app:
     default: ${APP_RATE_LIMIT_DEFAULT}
     # anonymous /auth/** calls (login, register, otp, ...), per client IP per minute
     auth: ${APP_RATE_LIMIT_AUTH:10}
+    # anonymous /public/** reads (shared links, link previews), per client IP per minute
+    public: ${APP_RATE_LIMIT_PUBLIC:120}
     # header the edge sets with the real client IP (Cloudflare: CF-Connecting-IP). Empty = use socket address
     client-ip-header: ${APP_RATE_LIMIT_CLIENT_IP_HEADER:CF-Connecting-IP}
   storage:

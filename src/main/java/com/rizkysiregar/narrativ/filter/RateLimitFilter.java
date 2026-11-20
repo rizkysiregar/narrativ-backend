@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final String AUTH_ENDPOINT_TYPE = "auth";
+    private static final String PUBLIC_ENDPOINT_TYPE = "public";
 
     private final RateLimiterService rateLimiterService;
     private final HandlerExceptionResolver handlerExceptionResolver;
@@ -53,10 +54,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (userId != null) {
             String endpointType = resolveEndpointType(request);
             bucket = rateLimiterService.resolveBucket(userId, endpointType);
-        } else if (isAuthEndpoint(request)) {
+        } else if (path(request).startsWith("/auth/")) {
             // anonymous caller on login/register/otp/...: there is no user yet, so limit per client IP
-            String ip = clientIpResolver.resolve(request);
-            bucket = rateLimiterService.resolveIpBucket(ip, AUTH_ENDPOINT_TYPE);
+            bucket = rateLimiterService.resolveIpBucket(clientIpResolver.resolve(request), AUTH_ENDPOINT_TYPE);
+        } else if (path(request).startsWith("/public/")) {
+            // shared links opened without an account (and the web client's server rendering them, which passes the
+            // visitor's CF-Connecting-IP along): per client IP as well, in a bucket of their own
+            bucket = rateLimiterService.resolveIpBucket(clientIpResolver.resolve(request), PUBLIC_ENDPOINT_TYPE);
         } else {
             filterChain.doFilter(request, response);
             return;
@@ -93,11 +97,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return auth.getPrincipal() instanceof UserPrincipal principal ? principal.getUserId().toString() : auth.getName();
     }
 
-    private boolean isAuthEndpoint(HttpServletRequest request) {
+    private static String path(HttpServletRequest request) {
         String uri = request.getRequestURI();
         String contextPath = request.getContextPath();
-        String path = contextPath != null && uri.startsWith(contextPath) ? uri.substring(contextPath.length()) : uri;
-        return path.startsWith("/auth/");
+        return contextPath != null && uri.startsWith(contextPath) ? uri.substring(contextPath.length()) : uri;
     }
 
     private String resolveEndpointType(HttpServletRequest request) {

@@ -30,6 +30,9 @@ public class Constants {
             "/legal/delete-account"
     );
 
+    // shared links (posts, profiles and their images), readable without signing in; GET only
+    public static final List<String> PUBLIC_PAGES = List.of("/public/**");
+
     public static final List<String> SWAGGER_WHITELIST = List.of(
             "/v3/api-docs/**",
             "/swagger-ui/**",

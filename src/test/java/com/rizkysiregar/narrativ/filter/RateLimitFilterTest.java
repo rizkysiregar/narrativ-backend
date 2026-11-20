@@ -137,6 +137,19 @@ class RateLimitFilterTest {
     }
 
     @Test
+    void anonymousPublicPages_AreLimitedPerClientIp_InTheirOwnBucket() throws Exception {
+        for (int i = 0; i < LIMIT; i++) {
+            assertNotNull(call(request("/public/posts/p1", "203.0.113.9"), new MockHttpServletResponse()).getRequest());
+        }
+
+        MockHttpServletResponse blocked = new MockHttpServletResponse();
+        assertNull(call(request("/public/users/ani", "203.0.113.9"), blocked).getRequest());
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS.value(), blocked.getStatus());
+        // the sign-in budget of the same IP is untouched
+        assertNotNull(call(request("/auth/login", "203.0.113.9"), new MockHttpServletResponse()).getRequest());
+    }
+
+    @Test
     void anonymousNonAuthEndpoint_IsNotLimited() throws Exception {
         for (String path : List.of("/res/photo", "/hello", "/actuator/health", "/v3/api-docs")) {
             MockFilterChain chain = call(request(path, "203.0.113.9"), new MockHttpServletResponse());
