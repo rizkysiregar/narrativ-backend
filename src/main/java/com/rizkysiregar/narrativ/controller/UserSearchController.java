@@ -7,6 +7,7 @@ import com.rizkysiregar.narrativ.service.AuthService;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import com.rizkysiregar.narrativ.model.UserPrincipal;
@@ -26,13 +27,21 @@ public class UserSearchController {
     public PaginatedResponse<PublicUserDTO> searchUsers(
             @RequestParam(required = false) String username,
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal currentUser,
-            @Parameter(hidden = true) Pageable pageable
+            @ParameterObject Pageable pageable
     ) {
         return authService.search(
                 new UserSearchRequest(username),
                 currentUser.getUserId(),
                 pageable
         );
+    }
+
+    @Operation(summary = "Get active user details by username",
+            description = "Case-insensitive. 404 when the user is deleted or banned, or either side blocked the other, like GET /users/{userId}. Profile links of the web client carry the username.")
+    @GetMapping("by-username/{username}")
+    public PublicUserDTO getUserByUsername(@PathVariable @NotBlank String username,
+                                           @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal currentUser) {
+        return authService.getUserByUsername(username, currentUser.getUserId());
     }
 
     @Operation(summary = "Get active user details by userId")

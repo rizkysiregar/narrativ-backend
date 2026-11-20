@@ -433,6 +433,38 @@ public class AuthServiceTest {
     }
 
     @Test
+    void getUserByUsername_FindsTheActiveUser() {
+        UUID id = UUID.randomUUID();
+        UserEntity user = new UserEntity();
+        user.setId(id);
+        user.setUsername("john");
+        user.setFirstName("John");
+        user.setLastName("Doe");
+        when(userRepository.findActiveByUsername("John")).thenReturn(Optional.of(user));
+
+        PublicUserDTO dto = authService.getUserByUsername("John", UUID.randomUUID());
+
+        assertEquals(id.toString(), dto.id());
+        assertEquals("john", dto.username());
+    }
+
+    @Test
+    void getUserByUsername_NotFound_WhenMissingOrBlocked() {
+        UUID viewer = UUID.randomUUID();
+        UserEntity blocked = new UserEntity();
+        blocked.setId(UUID.randomUUID());
+        blocked.setUsername("blocked");
+        when(userRepository.findActiveByUsername("ghost")).thenReturn(Optional.empty());
+        when(userRepository.findActiveByUsername("blocked")).thenReturn(Optional.of(blocked));
+        when(userBlockRepository.existsBetween(viewer, blocked.getId())).thenReturn(true);
+
+        BusinessException missing = assertThrows(BusinessException.class, () -> authService.getUserByUsername("ghost", viewer));
+        BusinessException hidden = assertThrows(BusinessException.class, () -> authService.getUserByUsername("blocked", viewer));
+        assertEquals(HttpStatus.NOT_FOUND, missing.getHttpStatus());
+        assertEquals(HttpStatus.NOT_FOUND, hidden.getHttpStatus());
+    }
+
+    @Test
     void testGetUserById_InvalidUUID() {
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.getUserById("invalid-uuid", UUID.randomUUID()));
