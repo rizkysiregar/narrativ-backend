@@ -2,6 +2,7 @@ package com.rizkysiregar.narrativ.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rizkysiregar.narrativ.adviser.RestErrorHandlerControllerAdviser;
 import com.rizkysiregar.narrativ.annotation.IgnoreResponseBinding;
 import com.rizkysiregar.narrativ.config.ResponseEnvelopeCustomizer;
 import com.rizkysiregar.narrativ.config.SwaggerConfig;
@@ -53,7 +54,7 @@ class OpenApiResponseEnvelopeTest {
 
     @SpringBootConfiguration
     @EnableAutoConfiguration
-    @Import({SwaggerConfig.class, ResponseEnvelopeCustomizer.class, Api.class})
+    @Import({SwaggerConfig.class, ResponseEnvelopeCustomizer.class, RestErrorHandlerControllerAdviser.class, Api.class})
     static class TestApp {
     }
 
@@ -124,6 +125,18 @@ class OpenApiResponseEnvelopeTest {
     void errorsAreDocumentedOnce() {
         assertThat(doc.at("/paths/~1thing/get/responses/default/content/application~1json/schema/$ref").asText())
                 .isEqualTo("#/components/schemas/" + ResponseEnvelopeCustomizer.ERROR_SCHEMA);
+        // the statuses springdoc derives from the exception handlers carry the error body too, not an empty object
+        JsonNode responses = doc.at("/paths/~1thing/get/responses");
+        assertThat(responses.has("400")).as("springdoc lists the handlers' statuses").isTrue();
+        responses.fieldNames().forEachRemaining(status -> {
+            if (status.startsWith("4") || status.startsWith("5")) {
+                assertThat(responses.at("/" + status + "/content/application~1json/schema/$ref").asText())
+                        .as("schema of %s", status)
+                        .isEqualTo("#/components/schemas/" + ResponseEnvelopeCustomizer.ERROR_SCHEMA);
+                assertThat(responses.at("/" + status + "/content").size()).as("media types of %s", status).isEqualTo(1);
+            }
+        });
+
         JsonNode error = doc.at("/components/schemas/" + ResponseEnvelopeCustomizer.ERROR_SCHEMA);
         assertThat(error.at("/properties/errorCode").isObject()).isTrue();
         assertThat(error.at("/properties/args/items").isObject()).isTrue();
