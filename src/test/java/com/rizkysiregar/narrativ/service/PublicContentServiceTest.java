@@ -90,8 +90,8 @@ class PublicContentServiceTest {
         assertThat(response.caption()).isEqualTo("Hello");
         assertThat(response.likeCount()).isEqualTo(3);
         assertThat(response.commentCount()).isEqualTo(2);
-        assertThat(response.author()).isEqualTo(new PublicPostResponse.Author("ani", "Ani Wijaya", "/public/users/ani/avatar"));
-        assertThat(response.media()).extracting(PublicPostResponse.Media::imagePath)
+        assertThat(response.author()).isEqualTo(new PublicPostResponse.PublicAuthor("ani", "Ani Wijaya", "/public/users/ani/avatar"));
+        assertThat(response.media()).extracting(PublicPostResponse.PublicMedia::imagePath)
                 .containsExactly("/public/media/" + photo.getId(), "/public/media/" + video.getId(), null);
     }
 

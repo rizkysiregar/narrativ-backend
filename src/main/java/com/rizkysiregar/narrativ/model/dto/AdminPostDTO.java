@@ -15,7 +15,7 @@ public record AdminPostDTO(
         String authorUsername,
         UserStatus authorStatus,
         String caption,
-        List<Media> media,
+        List<PublicMedia> media,
         LocalDateTime createdAt,
         boolean deleted,
         ModerationStatus moderationStatus,
@@ -25,7 +25,7 @@ public record AdminPostDTO(
         Stats stats
 ) {
     /** One image or video of the post, in display order; {@code url} and {@code thumbnailUrl} are presigned. */
-    public record Media(String id, MediaType type, String url, String thumbnailUrl) {}
+    public record PublicMedia(String id, MediaType type, String url, String thumbnailUrl) {}
 
     /** Raw row counts for the admin detail view; null in list responses. */
     public record Stats(long likeCount, long commentCount) {}

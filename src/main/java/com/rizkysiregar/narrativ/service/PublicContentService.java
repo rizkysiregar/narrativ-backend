@@ -53,8 +53,8 @@ public class PublicContentService {
         // no viewer: the block filters of these queries match nobody
         long likes = likeRepository.countByPostIds(ids).stream().mapToLong(PostCountDTO::count).sum();
         long comments = commentRepository.countByPostIds(ids, null).stream().mapToLong(PostCountDTO::count).sum();
-        List<PublicPostResponse.Media> media = postMediaRepository.findByPostIdOrderByPositionAsc(postId).stream()
-                .map(m -> new PublicPostResponse.Media(m.getId(), m.getMediaType(), imagePath(m)))
+        List<PublicPostResponse.PublicMedia> media = postMediaRepository.findByPostIdOrderByPositionAsc(postId).stream()
+                .map(m -> new PublicPostResponse.PublicMedia(m.getId(), m.getMediaType(), imagePath(m)))
                 .toList();
         UserEntity author = post.getUser();
         return new PublicPostResponse(
@@ -63,7 +63,7 @@ public class PublicContentService {
                 post.getCreatedAt() == null ? null : post.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant(),
                 likes,
                 comments,
-                new PublicPostResponse.Author(author.getUsername(), fullName(author), avatarPath(author)),
+                new PublicPostResponse.PublicAuthor(author.getUsername(), fullName(author), avatarPath(author)),
                 media
         );
     }
