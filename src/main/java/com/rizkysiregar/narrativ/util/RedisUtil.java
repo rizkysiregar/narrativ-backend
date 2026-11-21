@@ -43,6 +43,11 @@ public class RedisUtil implements CommandLineRunner {
         return redisTemplate.opsForValue().get(key);
     }
 
+    // Read and remove a value in one step (GETDEL), so only one caller ever gets it
+    public Object getAndDelete(String key) {
+        return redisTemplate.opsForValue().getAndDelete(key);
+    }
+
     // Set value only if the key does not exist yet (atomic SETNX + TTL).
     // Returns true when this caller created the key.
     public boolean setIfAbsent(String key, Object value, long timeoutSeconds) {
