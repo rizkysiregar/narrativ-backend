@@ -11,6 +11,7 @@ public enum GlobalMessage {
     BAD_REQUEST("400", "Sorry, we could not process your data. Please check your input."),
     TOO_MANY_REQUEST("429", "Too many requests. Please take a short break before trying again."),
     RATE_LIMIT("429", "Hang on, we are very busy right now. Please try again in {0} seconds!"),
+    LOGIN_LOCKED("429", "Too many wrong passwords for this account. Please try again in {0} minutes, or reset your password."),
     TOO_MANY_REQUEST_OTP("429", "You have reached the attempt limit. Please request a new OTP code in 5 minutes."),
     BAD_REQUEST_FILE_TO_LARGE("400", "The file is too large. Please upload a smaller file."),
     UPLOAD_NOT_VERIFIED("503", "We could not check your upload right now. Please try again in a moment."),

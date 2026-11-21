@@ -17,6 +17,7 @@ import com.rizkysiregar.narrativ.model.request.*;
 import com.rizkysiregar.narrativ.model.response.PaginatedResponse;
 import com.rizkysiregar.narrativ.repository.UserRepository;
 import com.rizkysiregar.narrativ.service.auth.GoogleTokenVerifierService;
+import com.rizkysiregar.narrativ.service.auth.LoginAttemptGuard;
 import com.rizkysiregar.narrativ.util.Operation;
 import com.rizkysiregar.narrativ.util.RedisUtil;
 import com.rizkysiregar.narrativ.util.UsernameGenerator;
@@ -83,6 +84,8 @@ public class AuthServiceTest {
     private ProfileImageUrlResolver profileImageUrlResolver;
     @Mock
     private IRegistrationOtpService registrationOtpService;
+    @Mock
+    private LoginAttemptGuard loginAttemptGuard;
 
     @InjectMocks
     private AuthService authService;
@@ -318,6 +321,55 @@ public class AuthServiceTest {
     }
 
     @Test
+    void login_WrongPassword_CountsAFailureForTheAccount() {
+        UserLoginRequest loginRequest = new UserLoginRequest();
+        loginRequest.setUsername("testuser");
+        loginRequest.setPassword("wrong");
+        when(authenticationManager.authenticate(any())).thenThrow(new org.springframework.security.authentication.BadCredentialsException("bad"));
+
+        assertThrows(org.springframework.security.authentication.BadCredentialsException.class, () -> authService.login(loginRequest));
+
+        verify(loginAttemptGuard).assertNotLocked("testuser");
+        verify(loginAttemptGuard).recordFailure("testuser");
+        verify(loginAttemptGuard, never()).reset(anyString());
+    }
+
+    @Test
+    void login_AccountPaused_RefusesBeforeCheckingThePassword() {
+        UserLoginRequest loginRequest = new UserLoginRequest();
+        loginRequest.setUsername("testuser");
+        loginRequest.setPassword("password");
+        doThrow(new BusinessException(GlobalMessage.LOGIN_LOCKED, HttpStatus.TOO_MANY_REQUESTS, 15L))
+                .when(loginAttemptGuard).assertNotLocked("testuser");
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> authService.login(loginRequest));
+
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, exception.getHttpStatus());
+        verify(authenticationManager, never()).authenticate(any());
+    }
+
+    @Test
+    void login_RightPassword_StartsTheCountOver() {
+        UserLoginRequest loginRequest = new UserLoginRequest();
+        loginRequest.setUsername("testuser");
+        loginRequest.setPassword("password");
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+        UserEntity userEntity = new UserEntity();
+        userEntity.setId(UUID.randomUUID());
+        userEntity.setUsername("testuser");
+        userEntity.setRole(Role.USER);
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(userEntity));
+        when(jwtService.generateToken(anyString(), any(UUID.class), any(Role.class))).thenReturn("token");
+
+        authService.login(loginRequest);
+
+        verify(loginAttemptGuard).reset("testuser");
+        verify(loginAttemptGuard, never()).recordFailure(anyString());
+    }
+
+    @Test
     void testConfirmResetPassword_Success() {
         // Arrange
         ResetPasswordRequest request = resetRequest("user@example.com", "token-123");
@@ -340,6 +392,8 @@ public class AuthServiceTest {
         verify(userRepository).save(user);
         // one time use
         verify(redisUtil).delete("reset_token:user@example.com");
+        // proven through the email: a pause from wrong passwords ends
+        verify(loginAttemptGuard).reset(user.getUsername());
         // every session of the account is logged out
         verify(redisUtil).membersOfSet("user_refresh_tokens:" + userId);
         verify(redisUtil).delete("user_refresh_tokens:" + userId);

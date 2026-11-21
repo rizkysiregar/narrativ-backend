@@ -94,6 +94,11 @@ app:
     # comma separated origins. default is local development only, deployed envs set APP_CORS_ALLOWED_ORIGINS
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8083,http://localhost:53375}
   auth:
+    # wrong passwords per account (any IP): after max-failures within window-minutes the username is paused until the
+    # window ends. Next to the per-IP rate limit, which does not stop guessing one account from many IPs
+    login-lock:
+      max-failures: ${APP_AUTH_LOGIN_LOCK_MAX_FAILURES:5}
+      window-minutes: ${APP_AUTH_LOGIN_LOCK_WINDOW_MINUTES:15}
     # the refresh cookie of the web client (X-Client-Platform: web) is Secure. Only a backend reached over plain http
     # by a browser that refuses Secure cookies there (Safari on http://localhost) needs false
     web-cookie:

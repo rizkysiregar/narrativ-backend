@@ -7,6 +7,7 @@ import com.rizkysiregar.narrativ.model.enums.Role;
 import com.rizkysiregar.narrativ.model.enums.UserStatus;
 import com.rizkysiregar.narrativ.model.request.*;
 import com.rizkysiregar.narrativ.service.auth.GoogleTokenVerifierService;
+import com.rizkysiregar.narrativ.service.auth.LoginAttemptGuard;
 import com.rizkysiregar.narrativ.service.otp.IRegistrationOtpService;
 import com.rizkysiregar.narrativ.util.RedisUtil;
 import com.rizkysiregar.narrativ.constant.GlobalMessage;
@@ -75,6 +76,7 @@ public class AuthService {
     private final ProfileImageUrlResolver profileImageUrlResolver;
     private final UserBlockRepository userBlockRepository;
     private final IRegistrationOtpService registrationOtpService;
+    private final LoginAttemptGuard loginAttemptGuard;
 
     public AuthService(UserRepository userRepository,
                        AuthenticationManager authManager,
@@ -85,7 +87,8 @@ public class AuthService {
                        AuditLogService auditLogService,
                        ProfileImageUrlResolver profileImageUrlResolver,
                        UserBlockRepository userBlockRepository,
-                       IRegistrationOtpService registrationOtpService
+                       IRegistrationOtpService registrationOtpService,
+                       LoginAttemptGuard loginAttemptGuard
     ) {
         this.userRepository = userRepository;
         this.authManager = authManager;
@@ -97,6 +100,7 @@ public class AuthService {
         this.profileImageUrlResolver = profileImageUrlResolver;
         this.userBlockRepository = userBlockRepository;
         this.registrationOtpService = registrationOtpService;
+        this.loginAttemptGuard = loginAttemptGuard;
     }
 
     @Transactional
@@ -158,9 +162,17 @@ public class AuthService {
     }
 
     private UserEntity authenticate(UserLoginRequest userLoginRequest) {
-        Authentication authentication =
-                authManager.authenticate(new UsernamePasswordAuthenticationToken(userLoginRequest.getUsername(), userLoginRequest.getPassword()));
-
+        // per account, from any IP: the per-IP rate limit alone does not stop guessing from many IPs
+        loginAttemptGuard.assertNotLocked(userLoginRequest.getUsername());
+        Authentication authentication;
+        try {
+            authentication = authManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(userLoginRequest.getUsername(), userLoginRequest.getPassword()));
+        } catch (BadCredentialsException e) {
+            loginAttemptGuard.recordFailure(userLoginRequest.getUsername());
+            throw e;
+        }
+        loginAttemptGuard.reset(userLoginRequest.getUsername());
 
         if (!authentication.isAuthenticated()) {
             throw new BadCredentialsException("Bad Credentials!");
@@ -387,6 +399,8 @@ public class AuthService {
 
         // whoever knew the old password (or stole a session) must not stay logged in after the reset
         revokeRefreshTokens(user.getId());
+        // the owner proved themselves through their email: a pause from wrong passwords ends here
+        loginAttemptGuard.reset(user.getUsername());
 
         return Operation.UPDATED;
     }
