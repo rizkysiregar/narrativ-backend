@@ -34,13 +34,13 @@ and applies Kubernetes manifests to RKE2
 Client
   → https://api-dev-narrativ.rizkysiregar.my.id
   → Cloudflare edge
-  → Cloudflare Tunnel on infra VM 192.168.1.50
-  → ingress-nginx NodePort on 192.168.1.71:30080
+  → Cloudflare Tunnel on infra VM 192.168.x.x
+  → ingress-nginx NodePort on 192.168.y.y:30080
   → NARRATIV Ingress and ClusterIP Service
   → NARRATIV Pod on port 9091
 ```
 
-Application dependencies remain outside Kubernetes on the development infrastructure VM `192.168.1.50`: PostgreSQL, Redis, RabbitMQ, Zipkin, and MinIO.
+Application dependencies remain outside Kubernetes on the development infrastructure VM `192.168.x.x`: PostgreSQL, Redis, RabbitMQ, Zipkin, and MinIO.
 
 ## 2. Why the application is not exposed on port 9091
 
@@ -64,12 +64,12 @@ The RKE2 cluster already has the required ingress controller:
 | Controller namespace | `kube-system` |
 | HTTP NodePort | `30080` |
 | HTTPS NodePort | `30443` |
-| Worker node | `192.168.1.71` |
-| Cloudflare Tunnel VM | `192.168.1.50` |
+| Worker node | `192.168.y.y` |
+| Cloudflare Tunnel VM | `192.168.x.x` |
 | Application namespace | `narrativ` |
 | Kubernetes profile | `dev` |
 
-The initial Cloudflare Tunnel origin will be `http://192.168.1.71:30080`.
+The initial Cloudflare Tunnel origin will be `http://192.168.y.y:30080`.
 
 ## 4. Responsibilities
 
@@ -92,7 +92,7 @@ Create `narrativ-config` in GitOps for non-sensitive values, including:
 
 ```dotenv
 SPRING_PROFILES_ACTIVE=dev
-DEV_INFRA_HOST=192.168.1.50
+DEV_INFRA_HOST=192.168.x.x
 POSTGRES_PORT=5433
 POSTGRES_DATABASE=narrativ
 REDIS_PORT=6379
@@ -128,15 +128,15 @@ Detailed secret lifecycle instructions are in [deployment-secrets.md](deployment
 Complete these before creating the Argo CD application:
 
 1. Verify the RKE2 API is accessible to the administrator running `kubectl`.
-2. Verify the infra VM can reach `192.168.1.71:30080`:
+2. Verify the infra VM can reach `192.168.y.y:30080`:
 
    ```bash
-   curl -I http://192.168.1.71:30080
+   curl -I http://192.168.y.y:30080
    ```
 
    A `404` response before the NARRATIV Ingress exists is acceptable; it proves the controller is reachable.
 
-3. Confirm the worker node can reach `192.168.1.50` on all dependency ports: PostgreSQL `5433`, Redis `6379`, RabbitMQ `5672`, and Zipkin `9411`.
+3. Confirm the worker node can reach `192.168.x.x` on all dependency ports: PostgreSQL `5433`, Redis `6379`, RabbitMQ `5672`, and Zipkin `9411`.
 4. Ensure the GHCR package `ghcr.io/rizkysiregar/narrativ-service` is available to the cluster. If it becomes private, create an `imagePullSecret` and reference it in the Deployment.
 5. Store the GitHub PAT credential (`github-all-repo-pat`, used for GHCR and GitOps) in Jenkins.
 6. Revoke any token that has been committed in documentation or source history, and store replacement credentials only in Jenkins or the private environment file.
@@ -164,7 +164,7 @@ Verify that endpoints are now populated and that the NodePort responds. A `404` 
 ```bash
 kubectl -n kube-system describe svc ingress-nginx-external
 kubectl -n kube-system get endpointslice -l kubernetes.io/service-name=ingress-nginx-external
-curl -I http://192.168.1.71:30080
+curl -I http://192.168.y.y:30080
 ```
 
 ## 7. Prepare the private development environment file
@@ -210,7 +210,7 @@ For the `dev` profile:
 
 - Copy non-sensitive variables from `.env.example` to `narrativ-config`.
 - Set `SPRING_PROFILES_ACTIVE=dev`, not `local-dev`.
-- Set `DEV_INFRA_HOST=192.168.1.50`.
+- Set `DEV_INFRA_HOST=192.168.x.x`.
 - Move the sensitive keys listed in section 5 to `narrativ-secrets` only.
 
 Before the first deployment, compare the ConfigMap and Secret key names against `.env.example`. Never copy the private `.env` file itself into a Pod or image.
@@ -331,7 +331,7 @@ Create this manually in the Argo CD dashboard, mirroring the portfolio applicati
 | --- | --- |
 | Application name | `narrativ-dev` |
 | Project | `default`, unless you already use a dedicated AppProject |
-| Repository | `https://github.com/rizkysiregar/homelabs-gitops.git` |
+| Repository | `<private homelabs-gitops repository URL>` |
 | Revision | `main` |
 | Path | `apps/narrativ-dev` |
 | Cluster destination | `https://kubernetes.default.svc` |
@@ -358,13 +358,13 @@ In the Cloudflare Zero Trust dashboard, add a public hostname route:
 | --- | --- |
 | Public hostname | `api-dev-narrativ.rizkysiregar.my.id` |
 | Service type | `HTTP` |
-| Service URL | `http://192.168.1.71:30080` |
+| Service URL | `http://192.168.y.y:30080` |
 
 The request has this route:
 
 ```text
-Cloudflare edge HTTPS → encrypted Cloudflare Tunnel → cloudflared on 192.168.1.50
-→ private LAN HTTP to 192.168.1.71:30080 → ingress-nginx → NARRATIV
+Cloudflare edge HTTPS → encrypted Cloudflare Tunnel → cloudflared on 192.168.x.x
+→ private LAN HTTP to 192.168.y.y:30080 → ingress-nginx → NARRATIV
 ```
 
 No Cloudflare route should point to Pod port `9091`.
@@ -434,15 +434,15 @@ For a secret rollback, restore the previous protected `.env` version manually, r
 
 Do not create the Argo CD Application until every required item is checked:
 
-- [ ] The ingress NodePort Service has populated endpoints and is reachable from `192.168.1.50` at `192.168.1.71:30080`.
+- [ ] The ingress NodePort Service has populated endpoints and is reachable from `192.168.x.x` at `192.168.y.y:30080`.
 - [ ] `narrativ-secrets` exists in namespace `narrativ-dev`; its key names match section 5.
 - [ ] `narrativ-config` provides every required non-sensitive variable from `.env.example` for profile `dev`.
 - [ ] `application-dev.yml` uses `spring.jpa.hibernate.ddl-auto: validate`.
-- [ ] The worker node can reach every external development dependency on `192.168.1.50`.
+- [ ] The worker node can reach every external development dependency on `192.168.x.x`.
 - [ ] A specific immutable image tag has been pushed to GHCR and is pullable by the cluster.
 - [ ] The GitOps manifests render successfully with `kubectl kustomize apps/narrativ-dev`.
 - [ ] The Ingress hostname is exactly `api-dev-narrativ.rizkysiregar.my.id`.
-- [ ] The Cloudflare Tunnel public hostname routes to `http://192.168.1.71:30080`.
+- [ ] The Cloudflare Tunnel public hostname routes to `http://192.168.y.y:30080`.
 - [ ] Jenkins has no Kubernetes credentials and updates only the GitOps image tag.
 
 ### Logging note
@@ -530,7 +530,7 @@ Confirm that the expected key names appear. Do not run commands that print the s
 Clone the GitOps repository and create the application directory:
 
 ```bash
-git clone https://github.com/rizkysiregar/homelabs-gitops.git
+git clone <private homelabs-gitops repository URL>
 cd homelabs-gitops
 mkdir -p apps/narrativ-dev
 ```
@@ -582,7 +582,7 @@ Important values include:
 
 ```dotenv
 SPRING_PROFILES_ACTIVE=dev
-DEV_INFRA_HOST=192.168.1.50
+DEV_INFRA_HOST=192.168.x.x
 SERVER_PORT=9091
 SERVER_SERVLET_CONTEXT_PATH=/api/v1
 POSTGRES_PORT=5433
@@ -678,7 +678,7 @@ In the Argo CD dashboard, create an Application with:
 
 ```text
 Name:        narrativ-dev
-Repository:  https://github.com/rizkysiregar/homelabs-gitops.git
+Repository:  <private homelabs-gitops repository URL>
 Revision:    main
 Path:        apps/narrativ-dev
 Destination: https://kubernetes.default.svc
@@ -716,7 +716,7 @@ In Cloudflare Zero Trust, create a public hostname:
 ```text
 Public hostname: api-dev-narrativ.rizkysiregar.my.id
 Service type:    HTTP
-Service URL:     http://192.168.1.71:30080
+Service URL:     http://192.168.y.y:30080
 ```
 
 Then test the health endpoint:

@@ -1,6 +1,6 @@
 # NARRATIV Jenkins pipeline setup
 
-This pipeline implements CI plus GitOps delivery. Jenkins builds and publishes an image, then commits the image tag to [`homelabs-gitops`](https://github.com/rizkysiregar/homelabs-gitops). Argo CD observes that GitOps commit and deploys it to RKE2. Jenkins does not receive a kubeconfig and must never run `kubectl`, Helm, or Argo CD commands.
+This pipeline implements CI plus GitOps delivery. Jenkins builds and publishes an image, then commits the image tag to the private `homelabs-gitops` repository. Argo CD observes that GitOps commit and deploys it to RKE2. Jenkins does not receive a kubeconfig and must never run `kubectl`, Helm, or Argo CD commands.
 
 ## What the Jenkins agent needs
 
