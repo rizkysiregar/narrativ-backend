@@ -10,6 +10,11 @@ follow each other, like and comment, and receive push notifications. The same se
 - Side effects such as pushes, emails and thumbnails run asynchronously over RabbitMQ, so a slow broker never fails
   an HTTP request.
 
+> The source is public for review only. It is not open source: see [LICENSE](LICENSE).
+
+**Related repositories:** [narrativ-android](https://github.com/rizkysiregar/narrativ-android) (the native Android
+client) and [narrativ-media-worker](https://github.com/rizkysiregar/narrativ-media-worker) (video thumbnails).
+
 ---
 
 ## Tech stack
@@ -39,13 +44,16 @@ follow each other, like and comment, and receive push notifications. The same se
 - **Posts and feed**: create a post with up to 5 media (presigned upload URL per media), delete your own post, global
   feed, explore, following feed, a user's posts, open one post by id.
 - **Social**: follow/unfollow, followers/following lists, follow status, like/unlike with like counts, comments and
-  threaded replies.
+  threaded replies. The author of a post can pin one comment on top, and a comment can quote part of the caption.
 - **Safety**: block/unblock users (blocked users disappear from feeds, comments and notifications), report posts,
   comments or users.
 - **Search**: search users and view public profiles.
 - **Devices and notifications**: register/deactivate an FCM device token. You get a push when someone you follow
-  posts, when someone likes or comments on your post, and when someone replies to your comment (email if you have no
-  active device).
+  posts, when someone likes or comments on your post, replies to your comment, follows you or pins your comment
+  (email for replies if you have no active device).
+- **Notification inbox**: the same events land in an in-app inbox, grouped ("ani and 3 others liked your post"), with
+  an unread count and mark read / mark all read. Redelivered events never create a duplicate entry, and entries
+  older than 90 days are cleaned up.
 - **Legal pages**: public HTML privacy policy, terms and account deletion pages (EN/ID).
 
 ### Admin panel (role `ADMIN`)
@@ -74,8 +82,63 @@ follow each other, like and comment, and receive push notifications. The same se
 - **Firebase App Check** on mobile endpoints, in `off` / `log` / `enforce` mode.
 - **Request tracing**: every request gets a trace id and a single access log line with a redacted body and the
   caller's `X-Client-Platform`/`X-App-Version` (`client=web/1.0.0`).
-- **Scheduled jobs**: a casual-push broadcast every 8 hours (`FirebaseSchedulerService`) and an orphan media
-  cleanup (`OrphanMediaCleanupService`, off by default, supports dry-run).
+- **Scheduled jobs**: a casual-push broadcast every 8 hours (`FirebaseSchedulerService`), inbox retention
+  (`NotificationRetentionJob`, 90 days by default) and an orphan media cleanup (`OrphanMediaCleanupService`, off by
+  default, supports dry-run).
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Clients
+        Android["Android app"]
+        Web["Web client / admin panel"]
+    end
+
+    Edge["Cloudflare Tunnel<br/>+ ingress-nginx"]
+
+    subgraph Service["narrativ-service (Spring Boot)"]
+        direction TB
+        Filters["Filters<br/>RequestTrace → AppCheck → JWT → RateLimit"]
+        Controllers["Controllers<br/>(REST, response envelope)"]
+        Services["Services<br/>(business logic)"]
+        Repos["Spring Data JPA<br/>repositories"]
+        Publishers["Event publishers<br/>(after commit)"]
+        Consumers["Consumers<br/>(idempotent)"]
+        Filters --> Controllers --> Services
+        Services --> Repos
+        Services --> Publishers
+    end
+
+    Postgres[("PostgreSQL<br/>Flyway")]
+    Redis[("Redis<br/>OTP, refresh tokens,<br/>rate limits, dedup")]
+    MinIO[("MinIO<br/>media")]
+    Rabbit{{"RabbitMQ<br/>post.exchange + DLQs"}}
+    Worker["narrativ-media-worker"]
+    FCM["Firebase<br/>FCM, App Check"]
+    SMTP["SMTP"]
+
+    Android & Web --> Edge --> Filters
+    Android & Web -. "presigned upload" .-> MinIO
+    Repos --> Postgres
+    Services --> Redis
+    Services -. "presign URLs" .-> MinIO
+    Publishers --> Rabbit --> Consumers
+    Rabbit <--> Worker
+    Worker --> MinIO
+    Consumers --> Postgres
+    Consumers --> FCM
+    Consumers --> SMTP
+```
+
+- **Synchronous path:** every request passes the servlet filters (trace id and access log, App Check, JWT, rate
+  limit), then `controller` → `service` → `repository`. Responses are wrapped in one envelope (`BaseResponse`) and
+  errors are mapped in one place.
+- **Asynchronous path:** side effects (pushes, emails, inbox entries, thumbnails) are published to RabbitMQ only
+  after the database transaction commits, so a rolled-back request never notifies anyone and a slow broker never
+  fails a request. Consumers deduplicate redeliveries through Redis, and every queue has a dead-letter queue.
+- **Media never passes through the service:** clients upload straight to MinIO with presigned URLs, and the
+  service only stores object keys.
 
 ## API overview
 
@@ -86,9 +149,10 @@ All paths are under the context path `/api/v1` (port `9091` by default). Swagger
 |---------------|--------------------------------------------------------------------------------------------------------|
 | Auth          | `POST /auth/register`, `/auth/register/otp`, `/auth/register/verify-otp`, `/auth/login`, `/auth/google`, `/auth/refresh`, `/auth/logout`, `/auth/forgot-password`, `/auth/verify-otp`, `/auth/reset-password`, `/auth/admin/login`, `/auth/register-admin` |
 | Me            | `GET/PATCH /users/me`, `POST /users/me/profile-image/upload-url`, `PUT/DELETE /users/me/profile-image`, `POST /users/me/email/otp`, `POST /users/me/email`, `POST /users/me/deletion`, `GET /users/me/blocks` |
+| Inbox         | `GET /users/me/notifications`, `GET /users/me/notifications/unread-count`, `POST /users/me/notifications/read`, `POST /users/me/notifications/read-all` |
 | Users         | `GET /users`, `GET /users/by-username/{username}`, `GET /users/{userId}`, `POST/DELETE /users/{userId}/follow`, `GET /users/{userId}/followers`, `/following`, `/follow-status`, `POST/DELETE /users/{userId}/block` |
 | Posts         | `GET /posts`, `/posts/explore`, `/posts/following`, `/posts/{postId}`, `/posts/users/{username}/posts`, `POST /posts/upload-url`, `POST /posts`, `DELETE /posts/{postId}` |
-| Interactions  | `POST /posts/{postId}/like`, `DELETE /posts/{postId}/dislike`, `GET /posts/{postId}/likes/count`, `GET/POST /posts/{postId}/comments`, `DELETE /comments/{commentId}`, `GET /comments/{commentId}/replies` |
+| Interactions  | `POST /posts/{postId}/like`, `DELETE /posts/{postId}/dislike`, `GET /posts/{postId}/likes/count`, `GET/POST /posts/{postId}/comments`, `PUT/DELETE /posts/{postId}/pinned-comment`, `DELETE /comments/{commentId}`, `GET /comments/{commentId}/replies` |
 | Others        | `POST /reports`, `POST /devices`, `POST /devices/deactivate`, `GET /devices/web-push-config`, `GET /files/presign-url`, `GET /legal/{privacy-policy,terms,delete-account}` |
 | Admin         | `/admin/users`, `/admin/admins`, `/admin/posts`, `/admin/comments`, `/admin/reports`, `/admin/metrics`, `/admin/notifications`, `/admin/notification-templates`, `/admin/parameters`, `/admin/audit-logs` |
 | Actuator      | `/actuator/health`, `/info`, `/metrics`, `/prometheus` (separate port when `MANAGEMENT_SERVER_PORT` is set) |
@@ -126,8 +190,9 @@ consumers deduplicate redeliveries through Redis (`EventDeduplicator`).
 |-----------------------------|----------------------------------|--------------------------------|---------------------------------------------------|
 | `post.created`              | `notification.queue`             | `NotificationConsumer`         | Push to the author's followers (skips blocks)     |
 | `post.created`              | `email.queue`                    | `EmailConsumer`                | "Your post status" email to the author            |
-| `post.liked`                | `post.liked.queue`               | `PostLikeConsumer`             | "X liked your post" push, at most once per liker  |
-| `comment.replied`           | `comment.reply.queue`            | `CommentReplyConsumer`         | Push/email to the replied-to user and post owner  |
+| `post.liked`                | `post.liked.queue`               | `PostLikeConsumer`             | Inbox entry + "X liked your post" push, at most once per liker |
+| `comment.replied`           | `comment.reply.queue`            | `CommentReplyConsumer`         | Inbox entry + push/email to the replied-to user and post owner |
+| `activity.created`          | `activity.queue`                 | `ActivityConsumer`             | Inbox entry + push for a new follower or a pinned comment |
 | `video.thumbnail.requested` | `video.thumbnail.request.queue`  | `narrativ-media-worker` (ext.) | Generates a thumbnail for an uploaded video       |
 | `video.thumbnail.generated` | `video.thumbnail.result.queue`   | `VideoThumbnailResultConsumer` | Stores the thumbnail key on the post media        |
 
@@ -153,7 +218,7 @@ narrativ-backend/
 ├── src/main/resources/
 │   ├── application.yml              # shared config, every value read from env vars
 │   ├── application-{local-dev,dev,prod}.yml
-│   ├── db/migration/                # Flyway migrations V1..V12
+│   ├── db/migration/                # Flyway migrations V1..V18
 │   ├── i18n/messages*.properties    # EN (default) and ID messages
 │   ├── legal/                       # privacy policy, terms, delete-account pages (EN/ID)
 │   ├── templates/email/             # OTP, comment reply and post status emails
@@ -267,14 +332,13 @@ Rolling back means changing `newTag` back to an earlier SHA in the GitOps reposi
 
 ### GitOps repository
 
-Kubernetes manifests live in [rizkysiregar/homelabs-gitops](https://github.com/rizkysiregar/homelabs-gitops), not in
-this repository:
+Kubernetes manifests live in a separate, private GitOps repository (`homelabs-gitops`), not in this repository:
 
-| Path                                                                                                   | Content                                                        |
-|--------------------------------------------------------------------------------------------------------|----------------------------------------------------------------|
-| [`apps/narrativ-dev`](https://github.com/rizkysiregar/homelabs-gitops/tree/main/apps/narrativ-dev)     | Dev: backend + media worker, ConfigMap, Service, Ingress (tag updated by Jenkins) |
-| [`apps/narrativ`](https://github.com/rizkysiregar/homelabs-gitops/tree/main/apps/narrativ)             | Prod: same resources, tags promoted manually                   |
-| [`apps/monitoring`](https://github.com/rizkysiregar/homelabs-gitops/tree/main/apps/monitoring)         | Grafana Alloy DaemonSet: pod logs to Loki, metrics to VictoriaMetrics |
+| Path                 | Content                                                                            |
+|----------------------|------------------------------------------------------------------------------------|
+| `apps/narrativ-dev`  | Dev: backend + media worker, ConfigMap, Service, Ingress (tag updated by Jenkins)  |
+| `apps/narrativ`      | Prod: same resources, tags promoted manually                                       |
+| `apps/monitoring`    | Grafana Alloy DaemonSet: pod logs to Loki, metrics to VictoriaMetrics              |
 
 Credentials are not in Git: they are Kubernetes Secrets created by the cluster operator (see
 [`docs/deployment-secrets.md`](docs/deployment-secrets.md)).
@@ -291,3 +355,25 @@ The image is built by Jenkins from the `Dockerfile`, which copies the JAR from t
 | [`docs/jenkins-pipeline-setup.md`](docs/jenkins-pipeline-setup.md)       | Jenkins agent and credentials setup            |
 | [`docs/rke2-gitops-deployment-guide.md`](docs/rke2-gitops-deployment-guide.md) | One-time RKE2 + Argo CD + Cloudflare setup |
 | [`docs/deployment-secrets.md`](docs/deployment-secrets.md)               | How secrets and config reach the pods          |
+
+## Security notes
+
+- **No secrets in the repository.** Every credential (database, Redis, RabbitMQ, mail, MinIO, JWT key, Firebase
+  service account) is read from environment variables. Locally they come from a git-ignored `.env`, and in Kubernetes
+  from Secrets created by the cluster operator. `.env.example` and `deploy/*.secrets.env.example` only list the
+  names.
+- **Authentication:** JWT access tokens valid for 15 minutes, with single-use (rotated) refresh tokens stored hashed
+  in Redis. Admin endpoints and the actuator need the `ADMIN` role. Passwords are hashed with BCrypt (cost 12).
+- **Abuse protection:** Firebase App Check on mobile endpoints (`off` / `log` / `enforce`), per-user rate limits, a
+  per-IP limit on anonymous `/auth/**` calls (login, register, OTP), and a strict 15-minute bucket for
+  password-confirmed actions such as account deletion and email change.
+- **Privacy in logs:** request bodies are logged with `password`, `token` and similar fields redacted, only for
+  failed requests by default, and sensitive DTO fields are excluded from `toString()`.
+- **Production hardening:** Swagger UI and the OpenAPI document are disabled, email verification is enforced, the
+  service refuses to start without a legal contact address, and the container runs as a non-root user.
+- **Dependencies:** `./mvnw verify` runs the OWASP Dependency-Check.
+
+## License
+
+Copyright (c) 2024-2026 Habib Rizky Almajid Siregar. All rights reserved. The code is public for review only; see
+[LICENSE](LICENSE).
