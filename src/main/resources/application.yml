@@ -107,6 +107,9 @@ app:
     default: ${APP_RATE_LIMIT_DEFAULT}
     # anonymous /auth/** calls (login, register, otp, ...), per client IP per minute
     auth: ${APP_RATE_LIMIT_AUTH:10}
+    # anonymous session upkeep: /auth/refresh, /auth/logout and /auth/google-config, per client IP per minute. Apart
+    # from the login bucket above, because the web client refreshes on every page load
+    auth-session: ${APP_RATE_LIMIT_AUTH_SESSION:60}
     # header the edge sets with the real client IP (Cloudflare: CF-Connecting-IP). Empty = use socket address
     client-ip-header: ${APP_RATE_LIMIT_CLIENT_IP_HEADER:CF-Connecting-IP}
   web:

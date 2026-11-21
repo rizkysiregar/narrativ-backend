@@ -22,6 +22,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import java.io.IOException;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -29,6 +30,12 @@ import java.util.concurrent.TimeUnit;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final String AUTH_ENDPOINT_TYPE = "auth";
+    /**
+     * What a client does on every start rather than an attempt to get in: renewing or ending its session and reading
+     * the Google sign-in config. The web client calls refresh on each page load, so sharing the strict login bucket
+     * would lock out someone who reloaded a few times before typing their password.
+     */
+    static final Set<String> SESSION_PATHS = Set.of("/auth/refresh", "/auth/logout", "/auth/google-config");
 
     private final RateLimiterService rateLimiterService;
     private final HandlerExceptionResolver handlerExceptionResolver;
@@ -56,7 +63,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         } else if (isAuthEndpoint(request)) {
             // anonymous caller on login/register/otp/...: there is no user yet, so limit per client IP
             String ip = clientIpResolver.resolve(request);
-            bucket = rateLimiterService.resolveIpBucket(ip, AUTH_ENDPOINT_TYPE);
+            String type = SESSION_PATHS.contains(pathOf(request)) ? RateLimiterService.AUTH_SESSION : AUTH_ENDPOINT_TYPE;
+            bucket = rateLimiterService.resolveIpBucket(ip, type);
         } else {
             filterChain.doFilter(request, response);
             return;
@@ -94,10 +102,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private boolean isAuthEndpoint(HttpServletRequest request) {
+        return pathOf(request).startsWith("/auth/");
+    }
+
+    private static String pathOf(HttpServletRequest request) {
         String uri = request.getRequestURI();
         String contextPath = request.getContextPath();
-        String path = contextPath != null && uri.startsWith(contextPath) ? uri.substring(contextPath.length()) : uri;
-        return path.startsWith("/auth/");
+        return contextPath != null && uri.startsWith(contextPath) ? uri.substring(contextPath.length()) : uri;
     }
 
     private String resolveEndpointType(HttpServletRequest request) {
