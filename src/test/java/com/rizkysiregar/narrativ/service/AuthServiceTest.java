@@ -663,6 +663,54 @@ public class AuthServiceTest {
         verify(redisUtil).removeFromSet("user_refresh_tokens:" + userId, AuthService.hashToken("old-token"));
         verify(redisUtil).set(eq("refresh_token:" + AuthService.hashToken(result.getRefreshToken())), eq(userId.toString()), anyLong());
         verify(redisUtil).addToSet(eq("user_refresh_tokens:" + userId), eq(AuthService.hashToken(result.getRefreshToken())), anyLong());
+        // the old token can be retried once for a few seconds, in case this answer gets lost
+        verify(redisUtil).set("refresh_token_retry:" + AuthService.hashToken("old-token"), userId.toString(),
+                AuthService.REFRESH_RETRY_SECONDS);
+    }
+
+    @Test
+    void refreshToken_AnswerLost_TheOldTokenWorksOnceMore() {
+        UUID userId = UUID.randomUUID();
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setUsername("testuser");
+        user.setRole(Role.USER);
+        String hash = AuthService.hashToken("old-token");
+        when(redisUtil.get("refresh_token:" + hash)).thenReturn(null);
+        when(redisUtil.getAndDelete("refresh_token_retry:" + hash)).thenReturn(userId.toString()).thenReturn(null);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(jwtService.generateToken("testuser", userId, Role.USER)).thenReturn("newAccess");
+
+        LoginResponse retried = authService.refreshToken("old-token");
+
+        assertEquals("newAccess", retried.getToken());
+        assertNotNull(retried.getRefreshToken());
+        // no second window: the retry itself is the last use
+        verify(redisUtil, never()).set(eq("refresh_token_retry:" + hash), any(), anyLong());
+        assertThrows(BusinessException.class, () -> authService.refreshToken("old-token"));
+    }
+
+    @Test
+    void refreshToken_RetryAfterAllSessionsWereRevoked_IsRefused() {
+        UUID userId = UUID.randomUUID();
+        String hash = AuthService.hashToken("old-token");
+        when(redisUtil.get("refresh_token:" + hash)).thenReturn(null);
+        when(redisUtil.getAndDelete("refresh_token_retry:" + hash)).thenReturn(userId.toString());
+        when(redisUtil.hasKey("refresh_revoked:" + userId)).thenReturn(true);
+
+        assertThrows(BusinessException.class, () -> authService.refreshToken("old-token"));
+        verify(jwtService, never()).generateToken(any(), any(), any());
+    }
+
+    @Test
+    void revokingAllSessionsClosesTheRetryWindows() {
+        UUID userId = UUID.randomUUID();
+        when(redisUtil.membersOfSet("user_refresh_tokens:" + userId)).thenReturn(java.util.Set.of("h1"));
+
+        authService.revokeRefreshTokens(userId);
+
+        verify(redisUtil).delete("refresh_token:h1");
+        verify(redisUtil).set("refresh_revoked:" + userId, "1", AuthService.REFRESH_RETRY_SECONDS);
     }
 
     @Test

@@ -53,6 +53,16 @@ public class AuthService {
     // set of the refresh tokens a user currently holds, so they can all be revoked at once (ban, force logout)
     private static final String USER_REFRESH_TOKENS_PREFIX = "user_refresh_tokens:";
     public static final long REFRESH_TOKEN_TTL_SECONDS = 60L * 60 * 24 * 30; // 30 days
+    /**
+     * A rotated refresh token is accepted once more for a few seconds. The answer of a refresh can get lost after the
+     * backend rotated the token (a browser that reloads or navigates while the call is under way drops it, a mobile
+     * connection breaks): the client still holds the old token, and without this window its next refresh would end a
+     * perfectly valid session.
+     */
+    static final String REFRESH_RETRY_PREFIX = "refresh_token_retry:";
+    static final long REFRESH_RETRY_SECONDS = 20;
+    // set when all of a user's sessions are revoked, so a retry window opened just before cannot bring one back
+    static final String REFRESH_REVOKED_PREFIX = "refresh_revoked:";
 
     final UserRepository userRepository;
     final AuthenticationManager authManager;
@@ -209,8 +219,14 @@ public class AuthService {
         String tokenHash = hashToken(refreshToken);
         String key = REFRESH_TOKEN_PREFIX.concat(tokenHash);
         Object storedUserId = redisUtil.get(key);
+        boolean retry = false;
 
         if (storedUserId == null) {
+            // just rotated and the answer may never have arrived: one more use within the retry window
+            storedUserId = redisUtil.getAndDelete(REFRESH_RETRY_PREFIX.concat(tokenHash));
+            retry = true;
+        }
+        if (storedUserId == null || (retry && redisUtil.hasKey(REFRESH_REVOKED_PREFIX.concat(storedUserId.toString())))) {
             throw new BusinessException(GlobalMessage.UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
         }
 
@@ -233,9 +249,12 @@ public class AuthService {
         // The tokens are revoked on unban, so a session from before the ban never silently comes back.
         assertNotBanned(user);
 
-        // rotation: a refresh token can only be used once
-        redisUtil.delete(key);
-        redisUtil.removeFromSet(USER_REFRESH_TOKENS_PREFIX.concat(storedUserId.toString()), tokenHash);
+        // rotation: a refresh token can only be used once, apart from the short retry window
+        if (!retry) {
+            redisUtil.delete(key);
+            redisUtil.removeFromSet(USER_REFRESH_TOKENS_PREFIX.concat(storedUserId.toString()), tokenHash);
+            redisUtil.set(REFRESH_RETRY_PREFIX.concat(tokenHash), storedUserId.toString(), REFRESH_RETRY_SECONDS);
+        }
 
         return issueSession(user);
     }
@@ -249,6 +268,7 @@ public class AuthService {
         String key = REFRESH_TOKEN_PREFIX.concat(tokenHash);
         Object storedUserId = redisUtil.get(key);
         redisUtil.delete(key);
+        redisUtil.delete(REFRESH_RETRY_PREFIX.concat(tokenHash));
         if (storedUserId != null) {
             redisUtil.removeFromSet(USER_REFRESH_TOKENS_PREFIX.concat(storedUserId.toString()), tokenHash);
         }
@@ -309,6 +329,8 @@ public class AuthService {
             redisUtil.delete(REFRESH_TOKEN_PREFIX.concat(tokenHash));
         }
         redisUtil.delete(indexKey);
+        // tokens rotated in the last seconds are no longer in the index; their retry window closes too
+        redisUtil.set(REFRESH_REVOKED_PREFIX.concat(userId.toString()), "1", REFRESH_RETRY_SECONDS);
     }
 
     private void assertNotBanned(UserEntity user) {
