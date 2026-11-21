@@ -32,12 +32,18 @@ public class RateLimiterService {
     @Value("${app.rate-limit.auth}")
     private int authLimit;
 
+    // anonymous session upkeep (refresh, logout, Google sign-in config), per client IP per minute: a client does it on
+    // every start, so it gets more room than the login attempts of the "auth" bucket
+    @Value("${app.rate-limit.auth-session:60}")
+    private int authSessionLimit;
+
     // endpoints that prove ownership with a password (account deletion): few tries, slowly refilled, so a stolen
     // access token cannot be used to guess the password
     @Value("${app.rate-limit.sensitive:5}")
     private int sensitiveLimit;
 
     public static final String SENSITIVE = "sensitive";
+    public static final String AUTH_SESSION = "auth-session";
     private static final Duration SENSITIVE_WINDOW = Duration.ofMinutes(15);
 
     private final ProxyManager<String> proxyManager;
@@ -68,6 +74,7 @@ public class RateLimiterService {
             case "post-upload" -> postUploadLimit;
             case "interaction" -> interactionLimit;
             case "auth" -> authLimit;
+            case AUTH_SESSION -> authSessionLimit;
             case SENSITIVE -> sensitiveLimit;
             default -> defaultLimit;
         };

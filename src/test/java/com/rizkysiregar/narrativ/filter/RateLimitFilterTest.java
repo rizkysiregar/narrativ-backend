@@ -117,6 +117,33 @@ class RateLimitFilterTest {
     }
 
     @Test
+    void sessionUpkeep_HasItsOwnBucket_SoReloadsNeverUseUpTheLoginAttempts() throws Exception {
+        // the web client refreshes on every page load and reads the Google config on the login page
+        for (String path : List.of("/auth/refresh", "/auth/google-config", "/auth/logout")) {
+            call(request(path, "203.0.113.9"), new MockHttpServletResponse());
+        }
+
+        MockFilterChain login = call(request("/auth/login", "203.0.113.9"), new MockHttpServletResponse());
+
+        assertNotNull(login.getRequest(), "the login attempts are untouched by the session calls");
+        verify(rateLimiterService, times(3)).resolveIpBucket("203.0.113.9", RateLimiterService.AUTH_SESSION);
+        verify(rateLimiterService).resolveIpBucket("203.0.113.9", "auth");
+    }
+
+    @Test
+    void sessionUpkeep_IsStillLimited() throws Exception {
+        for (int i = 0; i < LIMIT; i++) {
+            call(request("/auth/refresh", "203.0.113.9"), new MockHttpServletResponse());
+        }
+
+        MockHttpServletResponse blocked = new MockHttpServletResponse();
+        MockFilterChain chain = call(request("/auth/refresh", "203.0.113.9"), blocked);
+
+        assertNull(chain.getRequest());
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS.value(), blocked.getStatus());
+    }
+
+    @Test
     void anonymousAuthEndpoint_DifferentIpsDoNotAffectEachOther() throws Exception {
         for (int i = 0; i < LIMIT; i++) {
             call(request("/auth/login", "203.0.113.9"), new MockHttpServletResponse());
