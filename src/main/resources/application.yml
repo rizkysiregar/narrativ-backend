@@ -86,6 +86,7 @@ app:
           - /notifications/**
           - /devices/**
           - /files/**
+          - /chat/**
         mode: log
   legal:
     # shown on the public privacy policy, terms and account deletion pages; prod refuses to start without it
@@ -122,6 +123,14 @@ app:
     origin: ${APP_WEB_ORIGIN:}
   # the Firebase web app of this environment, handed to the web client (GET /devices/web-push-config). Public values,
   # not secrets: Firebase console > Project settings > Your apps (web) and Cloud Messaging > Web Push certificates
+  # Marpokat, the chat service: Narrativ is one of its tenants. The api key is public (it goes to the apps), the api
+  # secret signs the tokens and stays here. Chat answers 503 CHAT_UNAVAILABLE while any of the three is empty
+  marpokat:
+    base-url: ${APP_MARPOKAT_BASE_URL:}
+    api-key: ${APP_MARPOKAT_API_KEY:}
+    api-secret: ${APP_MARPOKAT_API_SECRET:}
+    # how long a user token from POST /chat/token is valid; the apps ask for a new one before it ends
+    user-token-ttl: ${APP_MARPOKAT_USER_TOKEN_TTL:PT1H}
   web-push:
     api-key: ${APP_WEB_PUSH_API_KEY:}
     project-id: ${APP_WEB_PUSH_PROJECT_ID:}

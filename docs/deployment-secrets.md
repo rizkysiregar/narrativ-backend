@@ -59,7 +59,13 @@ GOOGLE_CLIENT_ID=
 SECRET_KEY=
 MINIO_ACCESS_KEY=
 MINIO_SECRET_KEY=
+# api secret of the Narrativ tenant in Marpokat (chat). Shown once by `marpokat tenant create` / `rotate-secret`
+APP_MARPOKAT_API_SECRET=
 ```
+
+The Marpokat base URL and api key are public and live in the ConfigMap (`APP_MARPOKAT_BASE_URL`,
+`APP_MARPOKAT_API_KEY`). Without all three, `POST /chat/token` answers `503 CHAT_UNAVAILABLE` and the rest of the
+app is unaffected.
 
 Keep non-sensitive settings such as `DEV_INFRA_HOST`, ports, resource limits, and replica count in GitOps ConfigMaps instead. This makes normal configuration changes auditable in Git without exposing credentials.
 
