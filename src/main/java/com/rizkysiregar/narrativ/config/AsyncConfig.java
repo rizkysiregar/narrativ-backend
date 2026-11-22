@@ -32,6 +32,20 @@ public class AsyncConfig {
         return executor;
     }
 
+    /** Freezes and unfreezes chats after a block changes; see ChatBlockSync. Failures are logged, not retried. */
+    @Bean(name = "chatSyncExecutor")
+    public Executor chatSyncExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("chat-sync-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(AWAIT_TERMINATION_SECONDS);
+        executor.initialize();
+        return executor;
+    }
+
     /**
      * Publishes the RabbitMQ events (notifications, video thumbnail requests) after the request returned. A video
      * whose thumbnail request is dropped keeps no thumbnail, so a pending publish is waited for on shutdown.
