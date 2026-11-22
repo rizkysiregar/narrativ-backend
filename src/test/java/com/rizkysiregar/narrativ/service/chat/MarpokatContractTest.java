@@ -41,5 +41,18 @@ class MarpokatContractTest {
 
         assertThat(me.statusCode()).as(me.body()).isEqualTo(200);
         assertThat(me.body()).contains("\"external_id\":\"" + externalId + "\"").contains("\"name\":\"Contract Test\"");
+
+        // a DM made through the server API shows up in the channel list of its members, with the other one as peer
+        String otherId = "contract-" + UUID.randomUUID();
+        client.upsertUser(otherId, new MarpokatClient.UserProfile("Other Person", null, Map.of("username", "other")));
+        String channelId = client.getOrCreateDirectMessage(externalId, otherId);
+        assertThat(client.getOrCreateDirectMessage(otherId, externalId)).isEqualTo(channelId);
+
+        HttpResponse<String> channels = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(baseUrl + "/v1/channels"))
+                .header("X-Api-Key", apiKey)
+                .header("Authorization", "Bearer " + client.userToken(externalId).token())
+                .build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(channels.statusCode()).as(channels.body()).isEqualTo(200);
+        assertThat(channels.body()).contains("\"id\":\"" + channelId + "\"").contains("\"external_id\":\"" + otherId + "\"");
     }
 }
