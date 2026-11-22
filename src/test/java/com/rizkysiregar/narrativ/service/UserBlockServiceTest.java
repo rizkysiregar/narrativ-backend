@@ -37,6 +37,8 @@ class UserBlockServiceTest {
     private FollowRepository followRepository;
     @Mock
     private ProfileImageUrlResolver profileImageUrlResolver;
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher events;
 
     @InjectMocks
     private UserBlockService service;
@@ -53,6 +55,7 @@ class UserBlockServiceTest {
         verify(userBlockRepository).insertIfAbsent(any(UUID.class), eq(blockerId), eq(targetId));
         verify(followRepository).deleteByFollowerIdAndFollowedId(blockerId, targetId);
         verify(followRepository).deleteByFollowerIdAndFollowedId(targetId, blockerId);
+        verify(events).publishEvent(new com.rizkysiregar.narrativ.service.chat.ChatBlockSync.BlockChanged(blockerId, targetId));
     }
 
     @Test

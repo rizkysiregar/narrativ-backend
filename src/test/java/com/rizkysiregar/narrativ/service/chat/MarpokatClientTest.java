@@ -31,6 +31,7 @@ class MarpokatClientTest {
     private HttpServer server;
     private final AtomicReference<String> method = new AtomicReference<>();
     private final AtomicReference<String> path = new AtomicReference<>();
+    private final AtomicReference<String> query = new AtomicReference<>();
     private final AtomicReference<String> apiKey = new AtomicReference<>();
     private final AtomicReference<String> authorization = new AtomicReference<>();
     private final AtomicReference<String> body = new AtomicReference<>();
@@ -43,13 +44,16 @@ class MarpokatClientTest {
         server.createContext("/", exchange -> {
             method.set(exchange.getRequestMethod());
             path.set(exchange.getRequestURI().getRawPath());
+            query.set(exchange.getRequestURI().getRawQuery());
             apiKey.set(exchange.getRequestHeaders().getFirst("X-Api-Key"));
             authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
             body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            byte[] out = (status == 200 ? responseBody : "{\"error\":{\"code\":\"unauthenticated\"}}").getBytes(StandardCharsets.UTF_8);
+            byte[] out = (status == 200 || status == 204 ? responseBody : "{\"error\":{\"code\":\"unauthenticated\"}}").getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
-            exchange.sendResponseHeaders(status, out.length);
-            exchange.getResponseBody().write(out);
+            exchange.sendResponseHeaders(status, status == 204 ? -1 : out.length);
+            if (status != 204) {
+                exchange.getResponseBody().write(out);
+            }
             exchange.close();
         });
         server.start();
@@ -134,5 +138,43 @@ class MarpokatClientTest {
                 new MarpokatProperties("http://127.0.0.1:1", "mpk_key", SECRET, Duration.ofHours(1)), Clock.systemUTC());
         assertThatThrownBy(() -> unreachable.upsertUser("u_1", new MarpokatClient.UserProfile("x", null, Map.of())))
                 .isInstanceOf(MarpokatClient.MarpokatException.class);
+    }
+
+    @Test
+    void findDirectMessage_AsksWithoutCreatingAndReadsTheId() {
+        responseBody = "{\"id\":\"chan-9\"}";
+
+        assertThat(client().findDirectMessage("u1", "u2")).contains("chan-9");
+
+        assertThat(method.get()).isEqualTo("GET");
+        assertThat(path.get()).isEqualTo("/v1/server/channels/dm");
+        assertThat(query.get()).isEqualTo("user_a=u1&user_b=u2");
+    }
+
+    @Test
+    void findDirectMessage_NotFoundIsEmptyNotAnError() {
+        status = 404;
+
+        assertThat(client().findDirectMessage("u1", "u2")).isEmpty();
+    }
+
+    @Test
+    void findDirectMessage_OtherErrorsAreFailures() {
+        status = 401;
+
+        assertThatThrownBy(() -> client().findDirectMessage("u1", "u2"))
+                .isInstanceOf(MarpokatClient.MarpokatException.class);
+    }
+
+    @Test
+    void setFrozen_PostsToFreezeAndDeletesToUnfreeze() {
+        status = 204;
+        client().setFrozen("chan-9", true);
+        assertThat(method.get()).isEqualTo("POST");
+        assertThat(path.get()).isEqualTo("/v1/server/channels/chan-9/freeze");
+
+        client().setFrozen("chan-9", false);
+        assertThat(method.get()).isEqualTo("DELETE");
+        assertThat(path.get()).isEqualTo("/v1/server/channels/chan-9/freeze");
     }
 }

@@ -7,11 +7,13 @@ import com.rizkysiregar.narrativ.model.response.PaginatedResponse;
 import com.rizkysiregar.narrativ.repository.FollowRepository;
 import com.rizkysiregar.narrativ.repository.UserBlockRepository;
 import com.rizkysiregar.narrativ.repository.UserRepository;
+import com.rizkysiregar.narrativ.service.chat.ChatBlockSync;
 import com.rizkysiregar.narrativ.util.Operation;
 import com.rizkysiregar.narrativ.util.Paging;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,7 @@ public class UserBlockService {
     private final UserRepository userRepository;
     private final FollowRepository followRepository;
     private final ProfileImageUrlResolver profileImageUrlResolver;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public Operation block(UUID blockerId, UUID targetId) {
@@ -46,6 +49,7 @@ public class UserBlockService {
         userBlockRepository.insertIfAbsent(UUID.randomUUID(), blockerId, targetId);
         followRepository.deleteByFollowerIdAndFollowedId(blockerId, targetId);
         followRepository.deleteByFollowerIdAndFollowedId(targetId, blockerId);
+        events.publishEvent(new ChatBlockSync.BlockChanged(blockerId, targetId));
         log.info("USER.BLOCKED blockerId={} blockedId={}", blockerId, targetId);
         return Operation.CREATED;
     }
@@ -53,6 +57,7 @@ public class UserBlockService {
     @Transactional
     public Operation unblock(UUID blockerId, UUID targetId) {
         userBlockRepository.deleteByPair(blockerId, targetId);
+        events.publishEvent(new ChatBlockSync.BlockChanged(blockerId, targetId));
         return Operation.DELETED;
     }
 

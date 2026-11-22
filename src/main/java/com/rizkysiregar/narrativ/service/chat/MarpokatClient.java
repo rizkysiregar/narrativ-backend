@@ -3,6 +3,7 @@ package com.rizkysiregar.narrativ.service.chat;
 import com.rizkysiregar.narrativ.config.MarpokatProperties;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -19,6 +20,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Server API of Marpokat (spec: marpokat/spec/openapi.yaml, /v1/server/*) and the tokens Narrativ signs for it.
@@ -98,6 +100,46 @@ public class MarpokatClient {
             return channelId;
         } catch (RestClientException e) {
             throw new MarpokatException("create dm failed: " + e.getMessage(), e);
+        }
+    }
+
+    /** The DM of two users, or empty when they have none. Never creates one: a block must not start a chat. */
+    public Optional<String> findDirectMessage(String userA, String userB) {
+        try {
+            Map<?, ?> channel = http.get()
+                    .uri(uri -> uri.path("/v1/server/channels/dm").queryParam("user_a", userA).queryParam("user_b", userB).build())
+                    .header("Authorization", "Bearer " + serverToken())
+                    .exchange((req, res) -> {
+                        if (res.getStatusCode().value() == 404) {
+                            return null;
+                        }
+                        if (res.getStatusCode().isError()) {
+                            throw new MarpokatException("find dm answered " + res.getStatusCode() + ": "
+                                    + new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8));
+                        }
+                        return res.bodyTo(Map.class);
+                    });
+            Object id = channel == null ? null : channel.get("id");
+            return id instanceof String channelId && !channelId.isBlank() ? Optional.of(channelId) : Optional.empty();
+        } catch (RestClientException e) {
+            throw new MarpokatException("find dm failed: " + e.getMessage(), e);
+        }
+    }
+
+    /** Makes a channel read-only (frozen = true) or writable again. Both are idempotent. */
+    public void setFrozen(String channelId, boolean frozen) {
+        try {
+            http.method(frozen ? HttpMethod.POST : HttpMethod.DELETE)
+                    .uri("/v1/server/channels/{id}/freeze", channelId)
+                    .header("Authorization", "Bearer " + serverToken())
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw new MarpokatException((frozen ? "freeze " : "unfreeze ") + channelId + " answered "
+                                + res.getStatusCode() + ": " + new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8));
+                    })
+                    .toBodilessEntity();
+        } catch (RestClientException e) {
+            throw new MarpokatException((frozen ? "freeze " : "unfreeze ") + channelId + " failed: " + e.getMessage(), e);
         }
     }
 
