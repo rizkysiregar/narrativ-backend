@@ -35,6 +35,7 @@ class MarpokatClientTest {
     private final AtomicReference<String> authorization = new AtomicReference<>();
     private final AtomicReference<String> body = new AtomicReference<>();
     private volatile int status = 200;
+    private volatile String responseBody = "{\"id\":\"x\"}";
 
     @BeforeEach
     void start() throws IOException {
@@ -45,7 +46,7 @@ class MarpokatClientTest {
             apiKey.set(exchange.getRequestHeaders().getFirst("X-Api-Key"));
             authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
             body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            byte[] out = (status == 200 ? "{\"id\":\"x\"}" : "{\"error\":{\"code\":\"unauthenticated\"}}").getBytes(StandardCharsets.UTF_8);
+            byte[] out = (status == 200 ? responseBody : "{\"error\":{\"code\":\"unauthenticated\"}}").getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(status, out.length);
             exchange.getResponseBody().write(out);
@@ -86,6 +87,37 @@ class MarpokatClientTest {
         assertThat(json.get("name").asText()).isEqualTo("Rizky");
         assertThat(json.get("avatar_url").isNull()).isTrue();
         assertThat(json.get("metadata").get("username").asText()).isEqualTo("rizky");
+    }
+
+    @Test
+    void getOrCreateDirectMessage_PostsBothUsersAndReturnsTheChannelId() throws Exception {
+        responseBody = "{\"id\":\"0193a000-aaaa-7000-8000-000000000009\",\"type\":\"dm\"}";
+
+        String id = client().getOrCreateDirectMessage("user-a", "user-b");
+
+        assertThat(id).isEqualTo("0193a000-aaaa-7000-8000-000000000009");
+        assertThat(method.get()).isEqualTo("POST");
+        assertThat(path.get()).isEqualTo("/v1/server/channels/dm");
+        assertThat(apiKey.get()).isEqualTo("mpk_key");
+        JsonNode json = new ObjectMapper().readTree(body.get());
+        assertThat(json.get("user_a").asText()).isEqualTo("user-a");
+        assertThat(json.get("user_b").asText()).isEqualTo("user-b");
+        assertThat(authorization.get()).startsWith("Bearer ");
+    }
+
+    @Test
+    void getOrCreateDirectMessage_AnswerWithoutId_Throws() {
+        responseBody = "{\"type\":\"dm\"}";
+        assertThatThrownBy(() -> client().getOrCreateDirectMessage("a", "b"))
+                .isInstanceOf(MarpokatClient.MarpokatException.class);
+    }
+
+    @Test
+    void getOrCreateDirectMessage_ErrorStatus_Throws() {
+        status = 404;
+        assertThatThrownBy(() -> client().getOrCreateDirectMessage("a", "b"))
+                .isInstanceOf(MarpokatClient.MarpokatException.class)
+                .hasMessageContaining("404");
     }
 
     @Test

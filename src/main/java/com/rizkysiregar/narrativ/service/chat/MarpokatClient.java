@@ -74,6 +74,33 @@ public class MarpokatClient {
         }
     }
 
+    /**
+     * Gets or creates the direct message of two users (both must exist in Marpokat) and returns the channel id.
+     * Marpokat keeps one DM per pair, whichever order the ids come in.
+     */
+    public String getOrCreateDirectMessage(String userA, String userB) {
+        try {
+            Map<?, ?> channel = http.post()
+                    .uri("/v1/server/channels/dm")
+                    .header("Authorization", "Bearer " + serverToken())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("user_a", userA, "user_b", userB))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw new MarpokatException("create dm answered " + res.getStatusCode()
+                                + ": " + new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8));
+                    })
+                    .body(Map.class);
+            Object id = channel == null ? null : channel.get("id");
+            if (!(id instanceof String channelId) || channelId.isBlank()) {
+                throw new MarpokatException("create dm answered without a channel id");
+            }
+            return channelId;
+        } catch (RestClientException e) {
+            throw new MarpokatException("create dm failed: " + e.getMessage(), e);
+        }
+    }
+
     /** A user token for the apps: sub is the Narrativ user id. */
     public SignedToken userToken(String externalId) {
         Instant now = clock.instant();

@@ -2,6 +2,8 @@ package com.rizkysiregar.narrativ.controller;
 
 import com.rizkysiregar.narrativ.model.UserPrincipal;
 import com.rizkysiregar.narrativ.model.response.ChatTokenResponse;
+import com.rizkysiregar.narrativ.model.response.DirectMessageResponse;
+import com.rizkysiregar.narrativ.service.chat.ChatDirectMessageService;
 import com.rizkysiregar.narrativ.service.chat.ChatTokenService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -9,9 +11,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -20,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChatController {
 
     private final ChatTokenService chatTokenService;
+    private final ChatDirectMessageService chatDirectMessageService;
 
     @Operation(summary = "Token for the chat service (Marpokat)",
             description = "Syncs the user's chat profile and returns a Marpokat user token with the api key and address "
@@ -28,5 +34,17 @@ public class ChatController {
     @PreAuthorize("hasRole('USER')")
     public ChatTokenResponse token(@Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal currentUser) {
         return chatTokenService.issueToken(currentUser.getUserId());
+    }
+
+    @Operation(summary = "Open the direct message with another user",
+            description = "Creates the chat channel of the two users when it does not exist yet and returns its id. "
+                    + "A user on either side of a block does not exist for the other (404 USER_NOT_FOUND). "
+                    + "400 for yourself, 503 CHAT_UNAVAILABLE while chat is off or unreachable")
+    @PostMapping("/dm/{userId}")
+    @PreAuthorize("hasRole('USER')")
+    public DirectMessageResponse openDirectMessage(
+            @PathVariable UUID userId,
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal currentUser) {
+        return chatDirectMessageService.open(currentUser.getUserId(), userId);
     }
 }
