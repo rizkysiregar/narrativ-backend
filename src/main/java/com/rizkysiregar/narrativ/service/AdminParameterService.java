@@ -35,6 +35,7 @@ public class AdminParameterService {
 
     private final ParameterRepository parameterRepository;
     private final AuditLogService auditLogService;
+    private final FeatureFlagService featureFlagService;
 
     @Transactional(readOnly = true)
     public PaginatedResponse<AdminParameterDTO> search(String keyword, Pageable pageable) {
@@ -67,7 +68,7 @@ public class AdminParameterService {
 
         ParameterEntity entity = new ParameterEntity();
         entity.setParamKey(request.paramKey());
-        entity.setParamValue(request.paramValue().trim());
+        entity.setParamValue(FeatureFlagService.normalizeValue(request.paramKey(), request.paramValue().trim()));
         entity.setDescription(request.description().trim());
         ParameterEntity saved;
         try {
@@ -76,6 +77,7 @@ public class AdminParameterService {
             // two creates of the same key at once: the unique constraint is the real guard
             throw new BusinessException(GlobalMessage.PARAMETER_KEY_EXISTS, HttpStatus.CONFLICT);
         }
+        evictFeatureFlagsIfNeeded(saved.getParamKey());
 
         auditLogService.record(AdminAuditAction.PARAMETER_CREATE, AuditTargetType.PARAMETER, saved.getId().toString(),
                 null, AuditLogService.metadata(
@@ -92,7 +94,8 @@ public class AdminParameterService {
 
         List<String> fields = new ArrayList<>();
         Map<String, Object> metadata = AuditLogService.metadata("paramKey", entity.getParamKey());
-        String value = request.paramValue() == null ? null : request.paramValue().trim();
+        String value = request.paramValue() == null ? null
+                : FeatureFlagService.normalizeValue(entity.getParamKey(), request.paramValue().trim());
         String description = request.description() == null ? null : request.description().trim();
         if (value != null && !value.equals(entity.getParamValue())) {
             fields.add("paramValue");
@@ -112,6 +115,7 @@ public class AdminParameterService {
         }
 
         ParameterEntity saved = parameterRepository.save(entity);
+        evictFeatureFlagsIfNeeded(saved.getParamKey());
         metadata.put("fields", fields);
         auditLogService.record(AdminAuditAction.PARAMETER_UPDATE, AuditTargetType.PARAMETER, saved.getId().toString(), null, metadata);
         return AdminParameterDTO.from(saved);
@@ -121,11 +125,19 @@ public class AdminParameterService {
     public Operation delete(Long id) {
         ParameterEntity entity = find(id);
         parameterRepository.delete(entity);
+        evictFeatureFlagsIfNeeded(entity.getParamKey());
 
         auditLogService.record(AdminAuditAction.PARAMETER_DELETE, AuditTargetType.PARAMETER, entity.getId().toString(),
                 null, AuditLogService.metadata(
                         "paramKey", entity.getParamKey(), "paramValue", entity.getParamValue(), "description", entity.getDescription()));
         return Operation.DELETED;
+    }
+
+    // a feature switch is cached for the apps: drop it once this change commits so they see the new value right away
+    private void evictFeatureFlagsIfNeeded(String paramKey) {
+        if (FeatureFlagService.isFeatureFlag(paramKey)) {
+            featureFlagService.evictAfterCommit();
+        }
     }
 
     private ParameterEntity find(Long id) {

@@ -63,6 +63,7 @@ public enum GlobalMessage {
     INVALID_PARAMETER("400", "Invalid value for parameter ''{0}''"),
     EMAIL_NOT_VERIFIED("400", "Your email has not been verified. Please request an OTP code and verify your email first."),
     CHAT_UNAVAILABLE("503", "Chat is not available right now. Please try again in a moment."),
+    CHAT_DISABLED("403", "Chat is turned off for now."),
     ;
 
 
