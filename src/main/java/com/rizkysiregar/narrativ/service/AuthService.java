@@ -23,6 +23,8 @@ import com.rizkysiregar.narrativ.util.EmailMasking;
 import com.rizkysiregar.narrativ.util.EmailNormalizer;
 import com.rizkysiregar.narrativ.util.LikePatterns;
 import com.rizkysiregar.narrativ.util.Operation;
+import com.rizkysiregar.narrativ.util.Paging;
+import com.rizkysiregar.narrativ.util.SearchTerm;
 import com.rizkysiregar.narrativ.util.UsernameGenerator;
 import jakarta.persistence.criteria.Predicate;
 import lombok.extern.slf4j.Slf4j;
@@ -506,6 +508,28 @@ public class AuthService {
 
         return new PaginatedResponse<>(
                 usersContent,
+                users.getNumber(),
+                users.getSize(),
+                users.getTotalElements(),
+                users.getTotalPages(),
+                users.isLast()
+        );
+    }
+
+    /**
+     * Active users whose username or name contains {@code query}, best match first (see
+     * UserRepository#searchActive), without the people on either side of a block. No match is an empty page, not
+     * a 404 like {@link #search}.
+     */
+    public PaginatedResponse<PublicUserDTO> searchUsers(String query, UUID viewerId, int page, int size) {
+        SearchTerm term = SearchTerm.of(query);
+        Pageable pageable = Paging.of(page, size);
+        log.debug("USER.SEARCH.TERM termLength={} page={} size={} viewerId={}", term.value().length(), page, size, viewerId);
+
+        Page<UserEntity> users = userRepository.searchActive(
+                term.value(), term.containsPattern(), term.prefixPattern(), viewerId, pageable);
+        return new PaginatedResponse<>(
+                users.getContent().stream().map(this::toPublicUser).toList(),
                 users.getNumber(),
                 users.getSize(),
                 users.getTotalElements(),

@@ -9,6 +9,7 @@ import com.rizkysiregar.narrativ.messaging.event.VideoThumbnailRequestedEvent;
 import com.rizkysiregar.narrativ.model.enums.MediaType;
 import com.rizkysiregar.narrativ.messaging.publisher.PostEventPublisher;
 import com.rizkysiregar.narrativ.model.dto.ObjectStat;
+import com.rizkysiregar.narrativ.model.dto.PostSearchHit;
 import com.rizkysiregar.narrativ.model.response.CreatePostResponse;
 import com.rizkysiregar.narrativ.model.response.CreatePostUploadUrlResponse;
 import com.rizkysiregar.narrativ.model.response.PostFeedResponse;
@@ -22,6 +23,7 @@ import com.rizkysiregar.narrativ.repository.*;
 import com.rizkysiregar.narrativ.service.impl.PostServiceImpl;
 import com.rizkysiregar.narrativ.service.feed.RankedFeedService;
 import com.rizkysiregar.narrativ.util.FeedCursor;
+import com.rizkysiregar.narrativ.util.HomeCursor;
 import com.rizkysiregar.narrativ.util.RankedCursor;
 import com.rizkysiregar.narrativ.util.Operation;
 import org.junit.jupiter.api.Test;
@@ -156,45 +158,6 @@ public class PostServiceTest {
     }
 
     @Test
-    void testFollowingPosts_EmptyWhenNoFollowedPosts() {
-        UUID viewerId = UUID.randomUUID();
-        PageRequest pageable = PageRequest.of(0, 10);
-        when(postPaginationRepository.findFollowingPosts(pageable, viewerId))
-                .thenReturn(Page.empty(pageable));
-
-        PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 10, viewerId);
-
-        assertTrue(response.getContent().isEmpty());
-        assertEquals(0, response.getTotalElements());
-        verifyNoInteractions(likeRepository, commentRepository, fileStorageService);
-    }
-
-    @Test
-    void testFollowingPosts_UsesViewerLikeStatus() throws Exception {
-        UUID viewerId = UUID.randomUUID();
-        UserEntity author = new UserEntity();
-        author.setUsername("followed");
-        PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(author)
-                .caption("hello").createdAt(LocalDateTime.now()).build();
-        PageRequest pageable = PageRequest.of(0, 10);
-        when(postPaginationRepository.findFollowingPosts(pageable, viewerId))
-                .thenReturn(new PageImpl<>(List.of(post), pageable, 1));
-        when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
-                .thenReturn(List.of(media(post.getId(), 0, "image.jpg", MediaType.IMAGE, null)));
-        when(likeRepository.findLikedPostIds(viewerId, List.of(post.getId())))
-                .thenReturn(List.of(post.getId()));
-        when(fileStorageService.getPresignUrl("image.jpg")).thenReturn("signed-image.jpg");
-
-        PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 10, viewerId);
-
-        assertEquals(1, response.getTotalElements());
-        assertEquals("followed", response.getContent().getFirst().getUsername());
-        assertEquals("signed-image.jpg", response.getContent().getFirst().getMedia().getFirst().url());
-        assertTrue(response.getContent().getFirst().isLiked());
-        verify(postPaginationRepository).findFollowingPosts(pageable, viewerId);
-    }
-
-    @Test
     void feedCarriesTheAuthorsProfilePictureResolvedOncePerAuthor() {
         UUID viewerId = UUID.randomUUID();
         UserEntity author = new UserEntity();
@@ -203,9 +166,8 @@ public class PostServiceTest {
         author.setProfileImage(author.getId() + "/PROFILE_PICTURE/me.jpg");
         PostEntity first = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("a").createdAt(LocalDateTime.now()).build();
         PostEntity second = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("b").createdAt(LocalDateTime.now()).build();
-        PageRequest pageable = PageRequest.of(0, 10);
-        when(postPaginationRepository.findFollowingPosts(pageable, viewerId))
-                .thenReturn(new PageImpl<>(List.of(first, second), pageable, 2));
+        when(postPaginationRepository.findFollowingPostsAfter(eq(viewerId), any(), any(), any()))
+                .thenReturn(List.of(first, second));
         when(profileImageUrlResolver.resolve(author.getProfileImage())).thenReturn("https://signed/me.jpg");
 
         PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 10, viewerId);
@@ -222,11 +184,12 @@ public class PostServiceTest {
         author.setId(UUID.randomUUID());
         PostEntity post = PostEntity.builder().id(UUID.randomUUID()).user(author).caption("a")
                 .createdAt(LocalDateTime.of(2026, 11, 18, 10, 0, 0, 123456000)).build();
-        PageRequest pageable = PageRequest.of(0, 1);
+        // a numbered page after the first: the followed posts only, as before
+        PageRequest pageable = PageRequest.of(1, 1);
         when(postPaginationRepository.findFollowingPosts(pageable, viewerId))
                 .thenReturn(new PageImpl<>(List.of(post), pageable, 5));
 
-        PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 1, viewerId);
+        PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(1, 1, viewerId);
 
         assertEquals(new FeedCursor(post.getCreatedAt(), post.getId()).encode(), response.getNextCursor());
     }
@@ -249,7 +212,8 @@ public class PostServiceTest {
         assertEquals(2, response.getContent().size());
         assertFalse(response.isLast());
         assertEquals(-1, response.getTotalElements());
-        assertEquals(new FeedCursor(p2.getCreatedAt(), p2.getId()).encode(), response.getNextCursor());
+        assertEquals(new HomeCursor(new FeedCursor(p2.getCreatedAt(), p2.getId()), HomeCursor.Suggestions.NOT_STARTED, 2),
+                HomeCursor.decode(response.getNextCursor()));
         verify(postPaginationRepository, never()).findFollowingPosts(any(), any());
     }
 
@@ -343,62 +307,6 @@ public class PostServiceTest {
     }
 
     @Test
-    void home_whenItsPostsRunOutSuggestionsFillThePageAndAreMarked() {
-        UUID viewerId = UUID.randomUUID();
-        PostEntity followed = post(someone(), LocalDateTime.now());
-        PostEntity suggestion = post(someone(), LocalDateTime.now());
-        RankedCursor next = new RankedCursor(UUID.randomUUID(), 9, WINDOW_START);
-        PageRequest pageable = PageRequest.of(0, 10);
-        when(postPaginationRepository.findFollowingPosts(pageable, viewerId))
-                .thenReturn(new PageImpl<>(List.of(followed), pageable, 1));
-        when(rankedFeedService.start(RankedFeedService.Feed.SUGGESTIONS, viewerId, false, 0, 9))
-                .thenReturn(Optional.of(new RankedFeedService.Slice(List.of(suggestion), next, WINDOW_START)));
-
-        PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 10, viewerId);
-
-        assertEquals(2, response.getContent().size());
-        assertFalse(response.getContent().get(0).isSuggested());
-        assertTrue(response.getContent().get(1).isSuggested());
-        assertEquals(1, response.getTotalElements());
-        assertFalse(response.isLast());
-        assertEquals(next.encode(), response.getNextCursor());
-    }
-
-    @Test
-    void home_aFullCursorPageGetsNoSuggestions() {
-        UUID viewerId = UUID.randomUUID();
-        UserEntity author = someone();
-        LocalDateTime now = LocalDateTime.of(2026, 11, 18, 10, 0);
-        FeedCursor after = new FeedCursor(now, UUID.randomUUID());
-        when(postPaginationRepository.findFollowingPostsAfter(viewerId, after.createdAt(), after.id(), PageRequest.of(0, 2)))
-                .thenReturn(List.of(post(author, now.minusMinutes(1)), post(author, now.minusMinutes(2))));
-
-        PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 1, after.encode(), viewerId);
-
-        assertEquals(1, response.getContent().size());
-        assertFalse(response.isLast());
-        verifyNoInteractions(rankedFeedService);
-    }
-
-    @Test
-    void home_theLastCursorPageIsFollowedBySuggestions() {
-        UUID viewerId = UUID.randomUUID();
-        FeedCursor after = new FeedCursor(LocalDateTime.now(), UUID.randomUUID());
-        PostEntity suggestion = post(someone(), LocalDateTime.now());
-        when(postPaginationRepository.findFollowingPostsAfter(viewerId, after.createdAt(), after.id(), PageRequest.of(0, 11)))
-                .thenReturn(List.of());
-        when(rankedFeedService.start(RankedFeedService.Feed.SUGGESTIONS, viewerId, false, 0, 10))
-                .thenReturn(Optional.of(new RankedFeedService.Slice(List.of(suggestion), null, WINDOW_START)));
-
-        PaginatedResponse<PostFeedResponse> response = postService.getFollowingPosts(0, 10, after.encode(), viewerId);
-
-        assertTrue(response.getContent().getFirst().isSuggested());
-        // the suggestions end with their ranking
-        assertTrue(response.isLast());
-        assertNull(response.getNextCursor());
-    }
-
-    @Test
     void home_aNumberedPageAfterTheFirstGetsNoSuggestions() {
         UUID viewerId = UUID.randomUUID();
         PageRequest pageable = PageRequest.of(1, 10);
@@ -408,24 +316,6 @@ public class PostServiceTest {
 
         assertTrue(response.isLast());
         verifyNoInteractions(rankedFeedService);
-    }
-
-    @Test
-    void home_suggestionsGoOnFromTheirRankingAndEndWhenItExpired() {
-        UUID viewerId = UUID.randomUUID();
-        RankedCursor cursor = new RankedCursor(UUID.randomUUID(), 10, WINDOW_START);
-        PostEntity suggestion = post(someone(), LocalDateTime.now());
-        when(rankedFeedService.resume(cursor, viewerId, 10))
-                .thenReturn(Optional.of(new RankedFeedService.Slice(List.of(suggestion), null, WINDOW_START)))
-                .thenReturn(Optional.empty());
-
-        PaginatedResponse<PostFeedResponse> first = postService.getFollowingPosts(0, 10, cursor.encode(), viewerId);
-        PaginatedResponse<PostFeedResponse> expired = postService.getFollowingPosts(0, 10, cursor.encode(), viewerId);
-
-        assertTrue(first.getContent().getFirst().isSuggested());
-        assertTrue(expired.getContent().isEmpty());
-        assertTrue(expired.isLast());
-        verify(postPaginationRepository, never()).findExplorePostsAfter(anyBoolean(), any(), any(), any(), any());
     }
 
     @Test
@@ -1032,8 +922,8 @@ public class PostServiceTest {
         when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
                 .thenReturn(List.of(media(post.getId(), 0, "media.jpg", MediaType.VIDEO, "thumb.jpg")));
         // explore leaves taken down posts out; the home feed lists them
-        when(postPaginationRepository.findFollowingPosts(PageRequest.of(0, 10), viewerId))
-                .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
+        when(postPaginationRepository.findFollowingPostsAfter(eq(viewerId), any(), any(), any()))
+                .thenReturn(List.of(post));
 
         PostFeedResponse item = postService.getFollowingPosts(0, 10, viewerId).getContent().get(0);
 
@@ -1185,5 +1075,290 @@ public class PostServiceTest {
         assertEquals("secret caption", item.getCaption());
         assertEquals("melanggar aturan komunitas", item.getTakedownReason());
         assertEquals("signed-media", item.getMedia().get(0).url());
+    }
+
+    // --- search ---
+
+    private static PostSearchHit hit(PostEntity post) {
+        return new PostSearchHit() {
+            @Override
+            public UUID getId() {
+                return post.getId();
+            }
+
+            @Override
+            public LocalDateTime getCreatedAt() {
+                return post.getCreatedAt();
+            }
+        };
+    }
+
+    @Test
+    void searchPosts_asksForThePrefixOfEveryWordAndKeepsTheOrderOfTheHits() {
+        UUID viewerId = UUID.randomUUID();
+        UserEntity author = someone();
+        PostEntity newer = post(author, LocalDateTime.of(2026, 11, 20, 10, 0));
+        PostEntity older = post(author, LocalDateTime.of(2026, 11, 19, 10, 0));
+        when(postPaginationRepository.searchPosts(eq("kopi:* & susu:*"), eq(viewerId), any(), any(), eq(11)))
+                .thenReturn(List.of(hit(newer), hit(older)));
+        // the visible posts come back in no particular order
+        when(postPaginationRepository.findRankedVisibleByIds(List.of(newer.getId(), older.getId()), viewerId))
+                .thenReturn(List.of(older, newer));
+
+        PaginatedResponse<PostFeedResponse> result = postService.searchPosts(" Kopi #susu ", 10, null, viewerId);
+
+        assertEquals(List.of(newer.getId(), older.getId()), result.getContent().stream().map(PostFeedResponse::getId).toList());
+        assertTrue(result.isLast());
+        assertNull(result.getNextCursor());
+    }
+
+    @Test
+    void searchPosts_aFullPageEndsWithTheCursorOfItsLastHit() {
+        UUID viewerId = UUID.randomUUID();
+        UserEntity author = someone();
+        PostEntity first = post(author, LocalDateTime.of(2026, 11, 20, 10, 0));
+        PostEntity second = post(author, LocalDateTime.of(2026, 11, 19, 10, 0));
+        PostEntity beyond = post(author, LocalDateTime.of(2026, 11, 18, 10, 0));
+        when(postPaginationRepository.searchPosts(anyString(), eq(viewerId), any(), any(), eq(3)))
+                .thenReturn(List.of(hit(first), hit(second), hit(beyond)));
+        // the last hit of the page was deleted in between: it is left out, the cursor still points past it
+        when(postPaginationRepository.findRankedVisibleByIds(List.of(first.getId(), second.getId()), viewerId))
+                .thenReturn(List.of(first));
+
+        PaginatedResponse<PostFeedResponse> result = postService.searchPosts("coffee", 2, null, viewerId);
+
+        assertEquals(List.of(first.getId()), result.getContent().stream().map(PostFeedResponse::getId).toList());
+        assertFalse(result.isLast());
+        assertEquals(new FeedCursor(second.getCreatedAt(), second.getId()).encode(), result.getNextCursor());
+    }
+
+    @Test
+    void searchPosts_goesOnAfterTheCursor() {
+        UUID viewerId = UUID.randomUUID();
+        FeedCursor cursor = new FeedCursor(LocalDateTime.of(2026, 11, 19, 10, 0), UUID.randomUUID());
+        when(postPaginationRepository.searchPosts("coffee:*", viewerId, cursor.createdAt(), cursor.id(), 11))
+                .thenReturn(List.of());
+
+        PaginatedResponse<PostFeedResponse> result = postService.searchPosts("coffee", 10, cursor.encode(), viewerId);
+
+        assertTrue(result.getContent().isEmpty());
+        assertTrue(result.isLast());
+        verify(postPaginationRepository, never()).findRankedVisibleByIds(any(), any());
+    }
+
+    @Test
+    void searchPosts_onlyPunctuationFindsNothingWithoutAQuery() {
+        PaginatedResponse<PostFeedResponse> result = postService.searchPosts("#!?", 10, null, UUID.randomUUID());
+
+        assertTrue(result.getContent().isEmpty());
+        verify(postPaginationRepository, never()).searchPosts(any(), any(), any(), any(), anyInt());
+    }
+
+    @Test
+    void searchPosts_aTermOfOneLetterIsABadRequest() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> postService.searchPosts("k", 10, null, UUID.randomUUID()));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+    }
+
+    @Test
+    void searchPosts_aPageTooLargeIsABadRequest() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> postService.searchPosts("coffee", 51, null, UUID.randomUUID()));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+    }
+
+    // --- home feed: followed posts with suggestions mixed in ---
+
+    private static List<PostEntity> followedPosts(UserEntity author, LocalDateTime newest, int count) {
+        return java.util.stream.IntStream.range(0, count)
+                .mapToObj(i -> post(author, newest.minusMinutes(i))).toList();
+    }
+
+    private static RankedFeedService.Slice suggestionSlice(RankedCursor next, PostEntity... posts) {
+        return new RankedFeedService.Slice(List.of(posts), next, WINDOW_START);
+    }
+
+    @Test
+    void home_theFirstPageIsFollowedPostsOnlyWhileTheirTurnLasts() {
+        UUID viewerId = UUID.randomUUID();
+        List<PostEntity> rows = followedPosts(someone(), LocalDateTime.of(2026, 11, 20, 10, 0), 11);
+        when(postPaginationRepository.findFollowingPostsAfter(eq(viewerId), any(), any(), eq(PageRequest.of(0, 11))))
+                .thenReturn(rows);
+
+        PaginatedResponse<PostFeedResponse> page = postService.getFollowingPosts(0, 10, viewerId);
+
+        assertEquals(10, page.getContent().size());
+        assertTrue(page.getContent().stream().noneMatch(PostFeedResponse::isSuggested));
+        assertEquals(-1, page.getTotalElements());
+        HomeCursor next = HomeCursor.decode(page.getNextCursor());
+        assertEquals(new FeedCursor(rows.get(9).getCreatedAt(), rows.get(9).getId()), next.following());
+        assertEquals(10, next.slot());
+        assertEquals(HomeCursor.Suggestions.NOT_STARTED, next.suggestions());
+        // the suggestions are not ranked before their turn
+        verifyNoInteractions(rankedFeedService);
+    }
+
+    @Test
+    void home_afterTenFollowedPostsComeThreeSuggestionsThenTheFollowedPostsGoOn() {
+        UUID viewerId = UUID.randomUUID();
+        UserEntity author = someone();
+        FeedCursor after = new FeedCursor(LocalDateTime.of(2026, 11, 20, 10, 0), UUID.randomUUID());
+        RankedCursor ranking = new RankedCursor(UUID.randomUUID(), 3, WINDOW_START);
+        PostEntity s1 = post(someone(), LocalDateTime.now());
+        PostEntity s2 = post(someone(), LocalDateTime.now());
+        PostEntity s3 = post(someone(), LocalDateTime.now());
+        when(rankedFeedService.start(RankedFeedService.Feed.SUGGESTIONS, viewerId, false, 0, 3))
+                .thenReturn(Optional.of(suggestionSlice(ranking, s1, s2, s3)));
+        List<PostEntity> rows = followedPosts(author, after.createdAt().minusMinutes(1), 8);
+        when(postPaginationRepository.findFollowingPostsAfter(viewerId, after.createdAt(), after.id(), PageRequest.of(0, 8)))
+                .thenReturn(rows);
+
+        PaginatedResponse<PostFeedResponse> page = postService.getFollowingPosts(0, 10,
+                new HomeCursor(after, HomeCursor.Suggestions.NOT_STARTED, 10).encode(), viewerId);
+
+        List<Boolean> marks = page.getContent().stream().map(PostFeedResponse::isSuggested).toList();
+        assertEquals(List.of(true, true, true, false, false, false, false, false, false, false), marks);
+        HomeCursor next = HomeCursor.decode(page.getNextCursor());
+        assertEquals(7, next.slot());
+        assertEquals(ranking, next.suggestions().ranking());
+        assertEquals(rows.get(6).getId(), next.following().id());
+    }
+
+    @Test
+    void home_aRoundCutByThePageEndGoesOnOnTheNextPage() {
+        UUID viewerId = UUID.randomUUID();
+        FeedCursor after = new FeedCursor(LocalDateTime.of(2026, 11, 20, 10, 0), UUID.randomUUID());
+        RankedCursor ranking = new RankedCursor(UUID.randomUUID(), 4, WINDOW_START);
+        RankedCursor further = new RankedCursor(ranking.snapshotId(), 6, WINDOW_START);
+        when(rankedFeedService.resume(ranking, viewerId, 2))
+                .thenReturn(Optional.of(suggestionSlice(further, post(someone(), LocalDateTime.now()), post(someone(), LocalDateTime.now()))));
+        when(postPaginationRepository.findFollowingPostsAfter(viewerId, after.createdAt(), after.id(), PageRequest.of(0, 3)))
+                .thenReturn(followedPosts(someone(), after.createdAt().minusMinutes(1), 3));
+
+        // one suggestion of the round was on the last page
+        PaginatedResponse<PostFeedResponse> page = postService.getFollowingPosts(0, 4,
+                new HomeCursor(after, HomeCursor.Suggestions.at(ranking), 11).encode(), viewerId);
+
+        assertEquals(List.of(true, true, false, false), page.getContent().stream().map(PostFeedResponse::isSuggested).toList());
+        assertEquals(2, HomeCursor.decode(page.getNextCursor()).slot());
+    }
+
+    @Test
+    void home_whenTheFollowedPostsRunOutSuggestionsFillThePage() {
+        UUID viewerId = UUID.randomUUID();
+        List<PostEntity> rows = followedPosts(someone(), LocalDateTime.of(2026, 11, 20, 10, 0), 2);
+        when(postPaginationRepository.findFollowingPostsAfter(eq(viewerId), any(), any(), eq(PageRequest.of(0, 11))))
+                .thenReturn(rows);
+        RankedCursor ranking = new RankedCursor(UUID.randomUUID(), 8, WINDOW_START);
+        PostEntity[] suggestionsFound = followedPosts(someone(), LocalDateTime.now(), 8).toArray(PostEntity[]::new);
+        when(rankedFeedService.start(RankedFeedService.Feed.SUGGESTIONS, viewerId, false, 0, 8))
+                .thenReturn(Optional.of(suggestionSlice(ranking, suggestionsFound)));
+
+        PaginatedResponse<PostFeedResponse> page = postService.getFollowingPosts(0, 10, viewerId);
+
+        assertEquals(10, page.getContent().size());
+        assertEquals(2, page.getContent().stream().filter(post -> !post.isSuggested()).count());
+        HomeCursor next = HomeCursor.decode(page.getNextCursor());
+        assertNull(next.following());
+        assertEquals(ranking, next.suggestions().ranking());
+        assertFalse(page.isLast());
+    }
+
+    @Test
+    void home_somebodyWhoFollowsNobodyGetsSuggestionsAtOnce() {
+        UUID viewerId = UUID.randomUUID();
+        when(postPaginationRepository.findFollowingPostsAfter(eq(viewerId), any(), any(), any())).thenReturn(List.of());
+        PostEntity suggestion = post(someone(), LocalDateTime.now());
+        when(rankedFeedService.start(RankedFeedService.Feed.SUGGESTIONS, viewerId, false, 0, 10))
+                .thenReturn(Optional.of(suggestionSlice(null, suggestion)));
+
+        PaginatedResponse<PostFeedResponse> page = postService.getFollowingPosts(0, 10, viewerId);
+
+        assertEquals(List.of(suggestion.getId()), page.getContent().stream().map(PostFeedResponse::getId).toList());
+        assertTrue(page.getContent().getFirst().isSuggested());
+        // both sources are used up
+        assertTrue(page.isLast());
+        assertNull(page.getNextCursor());
+    }
+
+    @Test
+    void home_withoutSuggestionsTheFollowedPostsFillEveryPage() {
+        UUID viewerId = UUID.randomUUID();
+        FeedCursor after = new FeedCursor(LocalDateTime.of(2026, 11, 20, 10, 0), UUID.randomUUID());
+        // no Redis: no ranking
+        when(rankedFeedService.start(any(), any(), anyBoolean(), anyInt(), anyInt())).thenReturn(Optional.empty());
+        List<PostEntity> rows = followedPosts(someone(), after.createdAt().minusMinutes(1), 11);
+        when(postPaginationRepository.findFollowingPostsAfter(viewerId, after.createdAt(), after.id(), PageRequest.of(0, 11)))
+                .thenReturn(rows);
+
+        PaginatedResponse<PostFeedResponse> page = postService.getFollowingPosts(0, 10,
+                new HomeCursor(after, HomeCursor.Suggestions.NOT_STARTED, 10).encode(), viewerId);
+
+        assertEquals(10, page.getContent().size());
+        assertTrue(page.getContent().stream().noneMatch(PostFeedResponse::isSuggested));
+        HomeCursor next = HomeCursor.decode(page.getNextCursor());
+        assertTrue(next.suggestions().done());
+        assertFalse(page.isLast());
+    }
+
+    @Test
+    void home_anExpiredRankingEndsTheSuggestionsAndTheFeedIfNothingElseIsLeft() {
+        UUID viewerId = UUID.randomUUID();
+        RankedCursor ranking = new RankedCursor(UUID.randomUUID(), 10, WINDOW_START);
+        when(rankedFeedService.resume(ranking, viewerId, 10)).thenReturn(Optional.empty());
+
+        PaginatedResponse<PostFeedResponse> page = postService.getFollowingPosts(0, 10,
+                new HomeCursor(null, HomeCursor.Suggestions.at(ranking), 0).encode(), viewerId);
+
+        assertTrue(page.getContent().isEmpty());
+        assertTrue(page.isLast());
+    }
+
+    @Test
+    void home_aDateCursorOfTheOldHomeFeedGoesOnInTheFollowedPosts() {
+        UUID viewerId = UUID.randomUUID();
+        FeedCursor old = new FeedCursor(LocalDateTime.of(2026, 11, 20, 10, 0), UUID.randomUUID());
+        when(postPaginationRepository.findFollowingPostsAfter(viewerId, old.createdAt(), old.id(), PageRequest.of(0, 11)))
+                .thenReturn(followedPosts(someone(), old.createdAt().minusMinutes(1), 11));
+
+        PaginatedResponse<PostFeedResponse> page = postService.getFollowingPosts(0, 10, old.encode(), viewerId);
+
+        assertEquals(10, page.getContent().size());
+        verifyNoInteractions(rankedFeedService);
+    }
+
+    @Test
+    void home_aRankedCursorOfTheOldHomeFeedGoesOnInTheSuggestions() {
+        UUID viewerId = UUID.randomUUID();
+        RankedCursor old = new RankedCursor(UUID.randomUUID(), 10, WINDOW_START);
+        PostEntity suggestion = post(someone(), LocalDateTime.now());
+        when(rankedFeedService.resume(old, viewerId, 10)).thenReturn(Optional.of(suggestionSlice(null, suggestion)));
+
+        PaginatedResponse<PostFeedResponse> page = postService.getFollowingPosts(0, 10, old.encode(), viewerId);
+
+        assertTrue(page.getContent().getFirst().isSuggested());
+        assertTrue(page.isLast());
+        verify(postPaginationRepository, never()).findFollowingPostsAfter(any(), any(), any(), any());
+    }
+
+    @Test
+    void home_theFeedCarriesTheViewersLikesAndPresignedMedia() throws Exception {
+        UUID viewerId = UUID.randomUUID();
+        UserEntity author = someone();
+        author.setUsername("followed");
+        PostEntity post = post(author, LocalDateTime.now());
+        when(postPaginationRepository.findFollowingPostsAfter(eq(viewerId), any(), any(), any())).thenReturn(List.of(post));
+        when(rankedFeedService.start(any(), any(), anyBoolean(), anyInt(), anyInt())).thenReturn(Optional.empty());
+        when(postMediaRepository.findByPostIdInOrderByPostIdAscPositionAsc(any()))
+                .thenReturn(List.of(media(post.getId(), 0, "image.jpg", MediaType.IMAGE, null)));
+        when(likeRepository.findLikedPostIds(viewerId, List.of(post.getId()))).thenReturn(List.of(post.getId()));
+        when(fileStorageService.getPresignUrl("image.jpg")).thenReturn("signed-image.jpg");
+
+        PaginatedResponse<PostFeedResponse> page = postService.getFollowingPosts(0, 10, viewerId);
+
+        assertEquals("followed", page.getContent().getFirst().getUsername());
+        assertEquals("signed-image.jpg", page.getContent().getFirst().getMedia().getFirst().url());
+        assertTrue(page.getContent().getFirst().isLiked());
     }
 }

@@ -8,6 +8,7 @@ import com.rizkysiregar.narrativ.messaging.event.PostCreatedEvent;
 import com.rizkysiregar.narrativ.messaging.event.VideoThumbnailRequestedEvent;
 import com.rizkysiregar.narrativ.messaging.publisher.PostEventPublisher;
 import com.rizkysiregar.narrativ.model.dto.PostCountDTO;
+import com.rizkysiregar.narrativ.model.dto.PostSearchHit;
 import com.rizkysiregar.narrativ.model.response.CreatePostResponse;
 import com.rizkysiregar.narrativ.model.response.CreatePostUploadUrlResponse;
 import com.rizkysiregar.narrativ.model.response.PostFeedResponse;
@@ -29,9 +30,11 @@ import com.rizkysiregar.narrativ.service.UploadedObjectStats;
 import com.rizkysiregar.narrativ.util.AfterCommit;
 import com.rizkysiregar.narrativ.service.feed.RankedFeedService;
 import com.rizkysiregar.narrativ.util.FeedCursor;
+import com.rizkysiregar.narrativ.util.HomeCursor;
 import com.rizkysiregar.narrativ.util.RankedCursor;
 import com.rizkysiregar.narrativ.util.Operation;
 import com.rizkysiregar.narrativ.util.Paging;
+import com.rizkysiregar.narrativ.util.SearchTerm;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -47,6 +50,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -140,53 +144,75 @@ public class PostServiceImpl implements PostService {
     }
 
     /**
-     * The home feed: the viewer's own posts and those of the people they follow, by date. Once they run out the
-     * feed goes on with suggestions (ranked posts of people they do not follow, marked {@code suggested}), so a new
-     * user who follows nobody yet does not land on an empty screen. Only page 0 and cursor pages get them: a client paging by
-     * number would otherwise get the same suggestions again on every page after the last.
+     * The home feed: the viewer's own posts and those of the people they follow, by date, with a few suggestions
+     * (ranked posts of people they do not follow, marked {@code suggested}) after every
+     * {@value #HOME_POSTS_PER_ROUND} of them, so the feed keeps showing new people now that there is no explore page.
+     * Once the followed posts run out the suggestions fill the pages, so a new user who follows nobody yet does not
+     * land on an empty screen. The first page (page 0, no cursor) and every cursor page are built this way; a numbered
+     * page after the first is the followed posts only, as before.
      */
     @Override
     public PaginatedResponse<PostFeedResponse> getFollowingPosts(int page, int size, String cursor, UUID viewerId) {
         if (cursor != null) {
             Paging.of(0, size);
-            Optional<RankedCursor> suggestions = RankedCursor.tryDecode(cursor);
-            if (suggestions.isPresent()) {
-                // the suggestions end with their ranking, the home feed has no date order to go on with
-                return rankedFeedService.resume(suggestions.get(), viewerId, size)
-                        .map(slice -> withSuggestions(List.of(), slice, size, viewerId))
-                        .orElseGet(() -> cursorPage(List.of(), Set.of(), size, null, viewerId));
-            }
-            FeedCursor after = FeedCursor.decode(cursor);
-            List<PostEntity> rows = postPaginationRepository.findFollowingPostsAfter(
-                    viewerId, after.createdAt(), after.id(), PageRequest.of(0, size + 1));
-            if (rows.size() > size) {
-                List<PostEntity> posts = rows.subList(0, size);
-                return cursorPage(posts, Set.of(), size, cursorOf(posts.getLast()), viewerId);
-            }
-            return startSuggestions(rows, size, viewerId);
+            return homePage(HomeCursor.decode(cursor), size, viewerId);
         }
-        Page<PostEntity> postPage = postPaginationRepository.findFollowingPosts(Paging.of(page, size), viewerId);
-        if (page > 0 || !postPage.isLast()) {
-            return buildPaginatedResponse(postPage, viewerId);
+        if (page == 0) {
+            Paging.of(0, size);
+            return homePage(HomeCursor.start(), size, viewerId);
         }
-        PaginatedResponse<PostFeedResponse> firstPage = startSuggestions(postPage.getContent(), size, viewerId);
-        return new PaginatedResponse<>(firstPage.getContent(), postPage.getNumber(), postPage.getSize(),
-                postPage.getTotalElements(), postPage.getTotalPages(), firstPage.isLast(), firstPage.getNextCursor());
+        return buildPaginatedResponse(postPaginationRepository.findFollowingPosts(Paging.of(page, size), viewerId), viewerId);
     }
 
-    // the last posts of the home feed, and suggestions in the room left on the page
-    private PaginatedResponse<PostFeedResponse> startSuggestions(List<PostEntity> homePosts, int size, UUID viewerId) {
-        return rankedFeedService.start(RankedFeedService.Feed.SUGGESTIONS, viewerId, false, 0, size - homePosts.size())
-                .map(slice -> withSuggestions(homePosts, slice, size, viewerId))
-                .orElseGet(() -> cursorPage(homePosts, Set.of(), size, null, viewerId));
-    }
+    // a round of the home feed: this many followed posts, then this many suggestions
+    static final int HOME_POSTS_PER_ROUND = 10;
+    static final int SUGGESTIONS_PER_ROUND = 3;
 
-    private PaginatedResponse<PostFeedResponse> withSuggestions(List<PostEntity> homePosts, RankedFeedService.Slice slice,
-                                                                int size, UUID viewerId) {
-        List<PostEntity> posts = new ArrayList<>(homePosts);
-        posts.addAll(slice.posts());
-        Set<UUID> suggested = slice.posts().stream().map(PostEntity::getId).collect(Collectors.toSet());
-        return cursorPage(posts, suggested, size, slice.next() == null ? null : slice.next().encode(), viewerId);
+    /**
+     * One page of the home feed from {@code at}. The slot counts through a round: below
+     * {@link #HOME_POSTS_PER_ROUND} it is the followed posts' turn, after that the suggestions'. A source that ran out
+     * leaves the whole page to the other one. The suggestions are only ranked when their first turn comes.
+     */
+    private PaginatedResponse<PostFeedResponse> homePage(HomeCursor at, int size, UUID viewerId) {
+        List<PostEntity> posts = new ArrayList<>(size);
+        Set<UUID> suggested = new HashSet<>();
+        FeedCursor following = at.following();
+        HomeCursor.Suggestions suggestions = at.suggestions();
+        int slot = at.slot();
+        int roundLength = HOME_POSTS_PER_ROUND + SUGGESTIONS_PER_ROUND;
+
+        while (posts.size() < size && (following != null || !suggestions.done())) {
+            int room = size - posts.size();
+            if (following == null || (slot >= HOME_POSTS_PER_ROUND && !suggestions.done())) {
+                int want = following == null ? room : Math.min(room, roundLength - slot);
+                Optional<RankedFeedService.Slice> slice = suggestions.ranking() == null
+                        ? rankedFeedService.start(RankedFeedService.Feed.SUGGESTIONS, viewerId, false, 0, want)
+                        : rankedFeedService.resume(suggestions.ranking(), viewerId, want);
+                // no Redis, or the ranking expired: the feed goes on without suggestions
+                List<PostEntity> found = slice.map(RankedFeedService.Slice::posts).orElse(List.of());
+                posts.addAll(found);
+                found.forEach(post -> suggested.add(post.getId()));
+                suggestions = HomeCursor.Suggestions.at(slice.map(RankedFeedService.Slice::next).orElse(null));
+                slot = suggestions.done() || slot + found.size() >= roundLength ? 0 : slot + found.size();
+            } else {
+                if (slot >= HOME_POSTS_PER_ROUND) {
+                    // the suggestions ran out within their turn
+                    slot = 0;
+                }
+                int want = suggestions.done() ? room : Math.min(room, HOME_POSTS_PER_ROUND - slot);
+                // one row more than wanted tells whether more followed posts follow
+                List<PostEntity> rows = postPaginationRepository.findFollowingPostsAfter(
+                        viewerId, following.createdAt(), following.id(), PageRequest.of(0, want + 1));
+                boolean more = rows.size() > want;
+                List<PostEntity> found = more ? rows.subList(0, want) : rows;
+                posts.addAll(found);
+                following = more ? new FeedCursor(found.getLast().getCreatedAt(), found.getLast().getId()) : null;
+                slot += found.size();
+            }
+        }
+        boolean hasMore = following != null || !suggestions.done();
+        String next = hasMore ? new HomeCursor(following, suggestions, slot).encode() : null;
+        return cursorPage(posts, suggested, size, next, viewerId);
     }
 
     @Override
@@ -226,6 +252,39 @@ public class PostServiceImpl implements PostService {
     }
 
     // a page without totals (-1): it is the last one when no cursor follows
+    @Override
+    public PaginatedResponse<PostFeedResponse> searchPosts(String query, int size, String cursor, UUID viewerId) {
+        SearchTerm term = SearchTerm.of(query);
+        Paging.of(0, size);
+        FeedCursor after = cursor == null
+                ? new FeedCursor(LocalDateTime.now().plusDays(1), new UUID(-1L, -1L))
+                : FeedCursor.decode(cursor);
+        // the length, not the words: what people search for is theirs
+        log.debug("POST.SEARCH termLength={} size={} cursor={} viewerId={}", term.value().length(), size, cursor != null, viewerId);
+
+        String tsQuery = term.prefixTsQuery();
+        if (tsQuery.isEmpty()) {
+            // only punctuation: no word a caption could hold
+            return cursorPage(List.of(), Set.of(), size, null, viewerId);
+        }
+        // one row more than the page tells whether another page follows
+        List<PostSearchHit> hits = postPaginationRepository.searchPosts(tsQuery, viewerId, after.createdAt(), after.id(), size + 1);
+        boolean hasMore = hits.size() > size;
+        List<PostSearchHit> page = hasMore ? hits.subList(0, size) : hits;
+        if (page.isEmpty()) {
+            return cursorPage(List.of(), Set.of(), size, null, viewerId);
+        }
+        // loaded with their authors in one go; a post deleted or hidden since the search is left out
+        Map<UUID, PostEntity> byId = postPaginationRepository
+                .findRankedVisibleByIds(page.stream().map(PostSearchHit::getId).toList(), viewerId).stream()
+                .collect(Collectors.toMap(PostEntity::getId, Function.identity()));
+        List<PostEntity> posts = page.stream().map(hit -> byId.get(hit.getId())).filter(Objects::nonNull).toList();
+        // the cursor is the last hit, found or not, so the next page never repeats this one
+        PostSearchHit last = page.getLast();
+        String next = hasMore ? new FeedCursor(last.getCreatedAt(), last.getId()).encode() : null;
+        return cursorPage(posts, Set.of(), size, next, viewerId);
+    }
+
     private PaginatedResponse<PostFeedResponse> cursorPage(List<PostEntity> posts, Set<UUID> suggestedIds, int size,
                                                            String nextCursor, UUID viewerId) {
         List<PostFeedResponse> content = toFeedResponses(posts, viewerId);

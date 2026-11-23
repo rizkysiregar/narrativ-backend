@@ -26,7 +26,7 @@ public class FeedPostController {
         this.postService = postService;
     }
 
-    @Operation(summary = "Home feed: your own posts and those of the people you follow, newest first; when they run out, suggestions from explore follow (suggested=true). Pass the nextCursor of a page as cursor to get the next one (page is then ignored and the totals are -1); page keeps working, but only page 0 gets suggestions.")
+    @Operation(summary = "Home feed: your own posts and those of the people you follow, newest first, with 3 suggestions (ranked posts of people you do not follow, suggested=true) after every 10 of them; when they run out, suggestions fill the pages. Page 0 and every cursor page are built this way and have no totals (-1): pass the nextCursor of a page as cursor to get the next one (page is then ignored). A numbered page after the first holds the followed posts only.")
     @GetMapping
     public PaginatedResponse<PostFeedResponse> getHomePosts(
             @RequestParam(defaultValue = "0") int page,
@@ -47,6 +47,18 @@ public class FeedPostController {
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         return postService.getExplorePosts(page, size, cursor, userPrincipal.getUserId(), mediaOnly);
+    }
+
+    @Operation(summary = "Search posts by the words of their caption",
+            description = "q is 2 to 50 characters (400 otherwise). Every word of q must be in the caption, each also as the start of a longer word (\"kopi sus\" finds \"kopi susu\"); a hashtag counts as a word (#coffee is found by coffee). Newest first, same visibility as explore (no deleted or taken down posts, no blocked people). Page through with nextCursor; totals are -1.")
+    @GetMapping("/search")
+    public PaginatedResponse<PostFeedResponse> searchFeedPosts(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String cursor,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return postService.searchPosts(q, size, cursor, userPrincipal.getUserId());
     }
 
     @Operation(summary = "Get one post by id, e.g. to open it from a push notification. 404 when it is deleted, its author is gone or banned, or either side blocked the other. A taken down post is returned without caption and media, except to its author.")
