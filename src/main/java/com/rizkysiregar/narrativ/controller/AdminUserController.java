@@ -2,6 +2,7 @@ package com.rizkysiregar.narrativ.controller;
 
 import com.rizkysiregar.narrativ.model.UserPrincipal;
 import com.rizkysiregar.narrativ.model.dto.AdminUserDetailDTO;
+import com.rizkysiregar.narrativ.model.request.AdminCreateUserRequest;
 import com.rizkysiregar.narrativ.model.request.AdminUpdateUserRequest;
 import com.rizkysiregar.narrativ.model.request.AdminUserSearchRequest;
 import com.rizkysiregar.narrativ.model.request.BanUserRequest;
@@ -32,7 +33,8 @@ public class AdminUserController {
     private final UserManagementService userManagementService;
 
     @Operation(summary = "Admin search/list users",
-            description = "status: ACTIVE, BANNED or DELETED (deleted by the user). createdFrom/createdTo are inclusive dates (yyyy-MM-dd) in Asia/Jakarta time.")
+            description = "status: ACTIVE, BANNED or DELETED (deleted by the user). createdFrom/createdTo are inclusive dates (yyyy-MM-dd) in Asia/Jakarta time. "
+                    + "seeded: true for the accounts an admin created, false for the ones people signed up for")
     @GetMapping
     public PaginatedResponse<AdminUserDetailDTO> searchUsers(
             @RequestParam(required = false) String username,
@@ -41,13 +43,23 @@ public class AdminUserController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdTo,
+            @RequestParam(required = false) Boolean seeded,
             @Parameter(hidden = true)
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         return userManagementService.searchUsersForAdmin(
-                new AdminUserSearchRequest(username, email, role, status, createdFrom, createdTo),
+                new AdminUserSearchRequest(username, email, role, status, createdFrom, createdTo, seeded),
                 pageable
         );
+    }
+
+    @Operation(summary = "Admin create a user account",
+            description = "For filling the app with first content: a USER account with the sign-up rules but no email OTP, "
+                    + "flagged seeded=true and audited (USER_CREATE). It signs in with the given username and password. "
+                    + "400 USERNAME_ALREADY_TAKEN / EMAIL_ALREADY_TAKEN")
+    @PostMapping
+    public AdminUserDetailDTO createUser(@Valid @RequestBody AdminCreateUserRequest request) {
+        return userManagementService.createUserForAdmin(request);
     }
 
     @Operation(summary = "Admin get user detail by userId, including post/comment/follow counts")

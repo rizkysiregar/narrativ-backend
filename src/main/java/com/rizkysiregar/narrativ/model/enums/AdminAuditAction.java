@@ -2,6 +2,7 @@ package com.rizkysiregar.narrativ.model.enums;
 
 public enum AdminAuditAction {
     ADMIN_REGISTER,
+    USER_CREATE,
     USER_UPDATE,
     USER_BAN,
     USER_UNBAN,

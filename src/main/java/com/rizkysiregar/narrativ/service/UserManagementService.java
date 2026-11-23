@@ -11,6 +11,7 @@ import com.rizkysiregar.narrativ.model.enums.ReportAction;
 import com.rizkysiregar.narrativ.model.enums.ReportTargetType;
 import com.rizkysiregar.narrativ.model.enums.Role;
 import com.rizkysiregar.narrativ.model.enums.UserStatus;
+import com.rizkysiregar.narrativ.model.request.AdminCreateUserRequest;
 import com.rizkysiregar.narrativ.model.request.AdminUpdateUserRequest;
 import com.rizkysiregar.narrativ.model.request.AdminUserSearchRequest;
 import com.rizkysiregar.narrativ.model.request.BanUserRequest;
@@ -205,6 +206,9 @@ public class UserManagementService {
             if (createdBefore != null) {
                 predicates.add(cb.lessThan(root.get("createdAt"), createdBefore));
             }
+            if (request.seeded() != null) {
+                predicates.add(cb.equal(root.get("seeded"), request.seeded()));
+            }
 
             return cb.and(predicates.toArray(new Predicate[0]));
         }, pageable);
@@ -221,6 +225,13 @@ public class UserManagementService {
                 users.getTotalPages(),
                 users.isLast()
         );
+    }
+
+    /** Creates a seeded user account (no OTP) and returns it as the admin detail, with zero counts. */
+    @Transactional
+    public AdminUserDetailDTO createUserForAdmin(AdminCreateUserRequest request) {
+        UserEntity user = authService.createSeededUser(request);
+        return toAdminDetail(AdminUserDetailDTO.from(user, new AdminUserDetailDTO.Stats(0, 0, 0, 0)), user);
     }
 
     @Transactional(readOnly = true)

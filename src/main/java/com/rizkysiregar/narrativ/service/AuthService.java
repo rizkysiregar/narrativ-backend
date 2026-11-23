@@ -106,15 +106,7 @@ public class AuthService {
     @Transactional
     public Operation register(RegisterUserRequest registerUserRequest, Boolean isAdmin) {
         String email = EmailNormalizer.normalize(registerUserRequest.getEmail());
-
-        // case-insensitive: "Alice" next to "alice" would be an impersonation waiting to happen
-        if (userRepository.findByUsername(registerUserRequest.getUsername()).isPresent()) {
-            throw new BusinessException(GlobalMessage.USERNAME_ALREADY_TAKEN, HttpStatus.BAD_REQUEST);
-        }
-
-        if (userRepository.findByEmail(email).isPresent()) {
-            throw new BusinessException(GlobalMessage.EMAIL_ALREADY_TAKEN, HttpStatus.BAD_REQUEST);
-        }
+        assertAvailable(registerUserRequest.getUsername(), email);
 
         // admins are created by an admin, only self-registration has to prove the mailbox
         if (!isAdmin && registrationOtpService.isVerificationRequired()) {
@@ -128,13 +120,8 @@ public class AuthService {
             role = Role.ADMIN;
         }
 
-        UserEntity entity = new UserEntity();
-        entity.setUsername(registerUserRequest.getUsername());
-        entity.setPassword(encoder.encode(registerUserRequest.getPassword()));
-        entity.setEmail(email);
-        entity.setFirstName(registerUserRequest.getFirstName());
-        entity.setLastName(registerUserRequest.getLastName());
-        entity.setRole(role);
+        UserEntity entity = newAccount(registerUserRequest.getUsername(), registerUserRequest.getPassword(), email,
+                registerUserRequest.getFirstName(), registerUserRequest.getLastName(), role);
 
         UserEntity saved = userRepository.save(entity);
 
@@ -144,6 +131,48 @@ public class AuthService {
                     AuditLogService.metadata("username", entity.getUsername()));
         }
         return Operation.CREATED;
+    }
+
+    /**
+     * A user account an admin creates from App management, to fill the app with first content: the same rules as a
+     * sign-up but no OTP (the admin is signed in), flagged as seeded and audited. It signs in like any other account.
+     */
+    @Transactional
+    public UserEntity createSeededUser(AdminCreateUserRequest request) {
+        String email = EmailNormalizer.normalize(request.email());
+        assertAvailable(request.username(), email);
+
+        UserEntity entity = newAccount(request.username(), request.password(), email,
+                request.firstName().trim(), request.lastName().trim(), Role.USER);
+        entity.setSeeded(true);
+        UserEntity saved = userRepository.save(entity);
+
+        auditLogService.record(AdminAuditAction.USER_CREATE, AuditTargetType.USER, saved.getId().toString(), null,
+                AuditLogService.metadata("username", saved.getUsername(), "seeded", true));
+        log.info("ADMIN.USER.CREATED userId={} username={}", saved.getId(), saved.getUsername());
+        return saved;
+    }
+
+    private void assertAvailable(String username, String normalizedEmail) {
+        // case-insensitive: "Alice" next to "alice" would be an impersonation waiting to happen
+        if (userRepository.findByUsername(username).isPresent()) {
+            throw new BusinessException(GlobalMessage.USERNAME_ALREADY_TAKEN, HttpStatus.BAD_REQUEST);
+        }
+        if (userRepository.findByEmail(normalizedEmail).isPresent()) {
+            throw new BusinessException(GlobalMessage.EMAIL_ALREADY_TAKEN, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private UserEntity newAccount(String username, String rawPassword, String normalizedEmail,
+                                  String firstName, String lastName, Role role) {
+        UserEntity entity = new UserEntity();
+        entity.setUsername(username);
+        entity.setPassword(encoder.encode(rawPassword));
+        entity.setEmail(normalizedEmail);
+        entity.setFirstName(firstName);
+        entity.setLastName(lastName);
+        entity.setRole(role);
+        return entity;
     }
 
     public LoginResponse login(UserLoginRequest userLoginRequest) {

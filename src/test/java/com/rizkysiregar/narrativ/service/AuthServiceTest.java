@@ -927,4 +927,61 @@ public class AuthServiceTest {
         verify(userRepository, never()).save(any());
         verifyNoInteractions(jwtService);
     }
+
+    // ---- accounts an admin creates (POST /admin/users)
+
+    private static com.rizkysiregar.narrativ.model.request.AdminCreateUserRequest createRequest() {
+        return new com.rizkysiregar.narrativ.model.request.AdminCreateUserRequest(
+                "sari", "password123", " Sari@Mail.com ", " Sari ", "Wulandari ");
+    }
+
+    @Test
+    void createSeededUser_SavesASeededUserWithoutOtpAndAudits() {
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> {
+            UserEntity saved = invocation.getArgument(0);
+            saved.setId(java.util.UUID.fromString("0193a000-0000-7000-8000-0000000000aa"));
+            return saved;
+        });
+
+        UserEntity saved = authService.createSeededUser(createRequest());
+
+        assertTrue(saved.isSeeded());
+        assertEquals(com.rizkysiregar.narrativ.model.enums.Role.USER, saved.getRole());
+        assertEquals("sari", saved.getUsername());
+        assertEquals("sari@mail.com", saved.getEmail());
+        assertEquals("Sari", saved.getFirstName());
+        assertEquals("Wulandari", saved.getLastName());
+        // stored hashed, and the admin's password signs in
+        assertNotEquals("password123", saved.getPassword());
+        assertTrue(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().matches("password123", saved.getPassword()));
+        verifyNoInteractions(registrationOtpService);
+        verify(auditLogService).record(eq(com.rizkysiregar.narrativ.model.enums.AdminAuditAction.USER_CREATE),
+                eq(com.rizkysiregar.narrativ.model.enums.AuditTargetType.USER),
+                eq("0193a000-0000-7000-8000-0000000000aa"), isNull(), any());
+    }
+
+    @Test
+    void createSeededUser_TakenUsernameOrEmail_CreatesNothing() {
+        when(userRepository.findByUsername("sari")).thenReturn(Optional.of(new UserEntity()));
+        BusinessException taken = assertThrows(BusinessException.class, () -> authService.createSeededUser(createRequest()));
+        assertEquals(GlobalMessage.USERNAME_ALREADY_TAKEN.name(), taken.getErrorCode());
+
+        when(userRepository.findByUsername("sari")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("sari@mail.com")).thenReturn(Optional.of(new UserEntity()));
+        BusinessException emailTaken = assertThrows(BusinessException.class, () -> authService.createSeededUser(createRequest()));
+        assertEquals(GlobalMessage.EMAIL_ALREADY_TAKEN.name(), emailTaken.getErrorCode());
+
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void testRegister_SelfSignUpIsNeverSeeded() {
+        ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
+        when(userRepository.save(captor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        authService.register(registerRequest("token-1"), false);
+
+        assertFalse(captor.getValue().isSeeded());
+    }
 }
