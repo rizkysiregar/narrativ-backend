@@ -26,7 +26,7 @@ public class FeedPostController {
         this.postService = postService;
     }
 
-    @Operation(summary = "Home feed: your own posts and those of the people you follow, newest first; when they run out, suggestions from explore follow (suggested=true). Pass the nextCursor of a page as cursor to get the next one (page is then ignored and the totals are -1); page keeps working, but only page 0 gets suggestions.")
+    @Operation(summary = "Home feed: your own posts and those of the people you follow, newest first, with 3 suggestions (ranked posts of people you do not follow, suggested=true) after every 10 of them; when they run out, suggestions fill the pages. Page 0 and every cursor page are built this way and have no totals (-1): pass the nextCursor of a page as cursor to get the next one (page is then ignored). A numbered page after the first holds the followed posts only.")
     @GetMapping
     public PaginatedResponse<PostFeedResponse> getHomePosts(
             @RequestParam(defaultValue = "0") int page,
