@@ -21,6 +21,7 @@ public record AdminUserDetailDTO(
         Instant bannedAt,
         String bannedBy,
         String banReason,
+        boolean seeded,
         Stats stats
 ) {
     /** Raw row counts for the admin detail view; null in list and update responses. */
@@ -28,7 +29,7 @@ public record AdminUserDetailDTO(
 
     public AdminUserDetailDTO withProfileImageUrl(String url) {
         return new AdminUserDetailDTO(id, username, email, firstName, lastName, fullName, phoneNumber, url, role,
-                deleted, status, bannedAt, bannedBy, banReason, stats);
+                deleted, status, bannedAt, bannedBy, banReason, seeded, stats);
     }
 
     public static AdminUserDetailDTO from(UserEntity userEntity) {
@@ -51,6 +52,7 @@ public record AdminUserDetailDTO(
                 userEntity.getBannedAt(),
                 userEntity.getBannedBy() == null ? null : userEntity.getBannedBy().toString(),
                 userEntity.getBanReason(),
+                userEntity.isSeeded(),
                 stats
         );
     }

@@ -80,4 +80,8 @@ public class UserEntity {
     @Column(name = "ban_reason", length = 500)
     private String banReason;
 
+    // created by an admin (POST /admin/users) to fill the app with first content, not signed up by a person
+    @Column(nullable = false)
+    private boolean seeded;
+
 }

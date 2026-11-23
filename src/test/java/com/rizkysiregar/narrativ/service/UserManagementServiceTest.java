@@ -330,4 +330,22 @@ class UserManagementServiceTest {
 
         verifyNoInteractions(userRepository);
     }
+
+    // --------------------------------------------------------------- create
+
+    @Test
+    void createUserForAdmin_returnsTheSeededUserWithZeroCounts() {
+        UUID id = UUID.randomUUID();
+        UserEntity created = user(id, Role.USER);
+        created.setSeeded(true);
+        var request = new com.rizkysiregar.narrativ.model.request.AdminCreateUserRequest(
+                "sari", "password123", "sari@mail.com", "Sari", "Wulandari");
+        when(authService.createSeededUser(request)).thenReturn(created);
+
+        AdminUserDetailDTO result = userManagementService.createUserForAdmin(request);
+
+        assertEquals(id.toString(), result.id());
+        org.junit.jupiter.api.Assertions.assertTrue(result.seeded());
+        assertEquals(new AdminUserDetailDTO.Stats(0, 0, 0, 0), result.stats());
+    }
 }
