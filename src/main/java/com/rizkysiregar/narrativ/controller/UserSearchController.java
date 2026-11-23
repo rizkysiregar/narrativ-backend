@@ -36,6 +36,18 @@ public class UserSearchController {
         );
     }
 
+    @Operation(summary = "Search people by a part of their username or name",
+            description = "q is 2 to 50 characters (400 otherwise), case-insensitive. Best match first: the exact username, then usernames and names starting with q, then the rest. Deleted and banned users and either side of a block never show up. No match is an empty page (200), unlike GET /users which answers 404.")
+    @GetMapping("search")
+    public PaginatedResponse<PublicUserDTO> searchPeople(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        return authService.searchUsers(q, currentUser.getUserId(), page, size);
+    }
+
     @Operation(summary = "Get active user details by username",
             description = "Case-insensitive. 404 when the user is deleted or banned, or either side blocked the other, like GET /users/{userId}. Profile links of the web client carry the username.")
     @GetMapping("by-username/{username}")

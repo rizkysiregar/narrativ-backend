@@ -984,4 +984,42 @@ public class AuthServiceTest {
 
         assertFalse(captor.getValue().isSeeded());
     }
+
+    @Test
+    void searchUsers_passesTheTermAndItsPatternsAndAnswersAPage() {
+        UUID viewerId = UUID.randomUUID();
+        UserEntity user = new UserEntity();
+        user.setId(UUID.randomUUID());
+        user.setUsername("rizkysiregar");
+        user.setFirstName("Rizky");
+        user.setLastName("Siregar");
+        when(userRepository.searchActive("rizky_s", "%rizky!_s%", "rizky!_s%", viewerId, PageRequest.of(1, 5)))
+                .thenReturn(new PageImpl<>(java.util.List.of(user), PageRequest.of(1, 5), 6));
+
+        PaginatedResponse<PublicUserDTO> result = authService.searchUsers(" Rizky_S ", viewerId, 1, 5);
+
+        assertEquals("rizkysiregar", result.getContent().get(0).username());
+        assertEquals(6, result.getTotalElements());
+        assertEquals(1, result.getPageNumber());
+    }
+
+    @Test
+    void searchUsers_noMatchIsAnEmptyPageNotA404() {
+        UUID viewerId = UUID.randomUUID();
+        when(userRepository.searchActive(eq("nobody"), anyString(), anyString(), eq(viewerId), any()))
+                .thenReturn(Page.empty(PageRequest.of(0, 20)));
+
+        PaginatedResponse<PublicUserDTO> result = authService.searchUsers("nobody", viewerId, 0, 20);
+
+        assertTrue(result.getContent().isEmpty());
+        assertTrue(result.isLast());
+    }
+
+    @Test
+    void searchUsers_aTermOfOneLetterIsABadRequest() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> authService.searchUsers("r", UUID.randomUUID(), 0, 20));
+        assertEquals(org.springframework.http.HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        verify(userRepository, never()).searchActive(any(), any(), any(), any(), any());
+    }
 }

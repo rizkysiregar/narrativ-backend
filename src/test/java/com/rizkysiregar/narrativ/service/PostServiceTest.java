@@ -9,6 +9,7 @@ import com.rizkysiregar.narrativ.messaging.event.VideoThumbnailRequestedEvent;
 import com.rizkysiregar.narrativ.model.enums.MediaType;
 import com.rizkysiregar.narrativ.messaging.publisher.PostEventPublisher;
 import com.rizkysiregar.narrativ.model.dto.ObjectStat;
+import com.rizkysiregar.narrativ.model.dto.PostSearchHit;
 import com.rizkysiregar.narrativ.model.response.CreatePostResponse;
 import com.rizkysiregar.narrativ.model.response.CreatePostUploadUrlResponse;
 import com.rizkysiregar.narrativ.model.response.PostFeedResponse;
@@ -1185,5 +1186,96 @@ public class PostServiceTest {
         assertEquals("secret caption", item.getCaption());
         assertEquals("melanggar aturan komunitas", item.getTakedownReason());
         assertEquals("signed-media", item.getMedia().get(0).url());
+    }
+
+    // --- search ---
+
+    private static PostSearchHit hit(PostEntity post) {
+        return new PostSearchHit() {
+            @Override
+            public UUID getId() {
+                return post.getId();
+            }
+
+            @Override
+            public LocalDateTime getCreatedAt() {
+                return post.getCreatedAt();
+            }
+        };
+    }
+
+    @Test
+    void searchPosts_asksForThePrefixOfEveryWordAndKeepsTheOrderOfTheHits() {
+        UUID viewerId = UUID.randomUUID();
+        UserEntity author = someone();
+        PostEntity newer = post(author, LocalDateTime.of(2026, 11, 20, 10, 0));
+        PostEntity older = post(author, LocalDateTime.of(2026, 11, 19, 10, 0));
+        when(postPaginationRepository.searchPosts(eq("kopi:* & susu:*"), eq(viewerId), any(), any(), eq(11)))
+                .thenReturn(List.of(hit(newer), hit(older)));
+        // the visible posts come back in no particular order
+        when(postPaginationRepository.findRankedVisibleByIds(List.of(newer.getId(), older.getId()), viewerId))
+                .thenReturn(List.of(older, newer));
+
+        PaginatedResponse<PostFeedResponse> result = postService.searchPosts(" Kopi #susu ", 10, null, viewerId);
+
+        assertEquals(List.of(newer.getId(), older.getId()), result.getContent().stream().map(PostFeedResponse::getId).toList());
+        assertTrue(result.isLast());
+        assertNull(result.getNextCursor());
+    }
+
+    @Test
+    void searchPosts_aFullPageEndsWithTheCursorOfItsLastHit() {
+        UUID viewerId = UUID.randomUUID();
+        UserEntity author = someone();
+        PostEntity first = post(author, LocalDateTime.of(2026, 11, 20, 10, 0));
+        PostEntity second = post(author, LocalDateTime.of(2026, 11, 19, 10, 0));
+        PostEntity beyond = post(author, LocalDateTime.of(2026, 11, 18, 10, 0));
+        when(postPaginationRepository.searchPosts(anyString(), eq(viewerId), any(), any(), eq(3)))
+                .thenReturn(List.of(hit(first), hit(second), hit(beyond)));
+        // the last hit of the page was deleted in between: it is left out, the cursor still points past it
+        when(postPaginationRepository.findRankedVisibleByIds(List.of(first.getId(), second.getId()), viewerId))
+                .thenReturn(List.of(first));
+
+        PaginatedResponse<PostFeedResponse> result = postService.searchPosts("coffee", 2, null, viewerId);
+
+        assertEquals(List.of(first.getId()), result.getContent().stream().map(PostFeedResponse::getId).toList());
+        assertFalse(result.isLast());
+        assertEquals(new FeedCursor(second.getCreatedAt(), second.getId()).encode(), result.getNextCursor());
+    }
+
+    @Test
+    void searchPosts_goesOnAfterTheCursor() {
+        UUID viewerId = UUID.randomUUID();
+        FeedCursor cursor = new FeedCursor(LocalDateTime.of(2026, 11, 19, 10, 0), UUID.randomUUID());
+        when(postPaginationRepository.searchPosts("coffee:*", viewerId, cursor.createdAt(), cursor.id(), 11))
+                .thenReturn(List.of());
+
+        PaginatedResponse<PostFeedResponse> result = postService.searchPosts("coffee", 10, cursor.encode(), viewerId);
+
+        assertTrue(result.getContent().isEmpty());
+        assertTrue(result.isLast());
+        verify(postPaginationRepository, never()).findRankedVisibleByIds(any(), any());
+    }
+
+    @Test
+    void searchPosts_onlyPunctuationFindsNothingWithoutAQuery() {
+        PaginatedResponse<PostFeedResponse> result = postService.searchPosts("#!?", 10, null, UUID.randomUUID());
+
+        assertTrue(result.getContent().isEmpty());
+        verify(postPaginationRepository, never()).searchPosts(any(), any(), any(), any(), anyInt());
+    }
+
+    @Test
+    void searchPosts_aTermOfOneLetterIsABadRequest() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> postService.searchPosts("k", 10, null, UUID.randomUUID()));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+    }
+
+    @Test
+    void searchPosts_aPageTooLargeIsABadRequest() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> postService.searchPosts("coffee", 51, null, UUID.randomUUID()));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
     }
 }

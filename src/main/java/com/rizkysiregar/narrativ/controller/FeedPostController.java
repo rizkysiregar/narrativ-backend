@@ -49,6 +49,18 @@ public class FeedPostController {
         return postService.getExplorePosts(page, size, cursor, userPrincipal.getUserId(), mediaOnly);
     }
 
+    @Operation(summary = "Search posts by the words of their caption",
+            description = "q is 2 to 50 characters (400 otherwise). Every word of q must be in the caption, each also as the start of a longer word (\"kopi sus\" finds \"kopi susu\"); a hashtag counts as a word (#coffee is found by coffee). Newest first, same visibility as explore (no deleted or taken down posts, no blocked people). Page through with nextCursor; totals are -1.")
+    @GetMapping("/search")
+    public PaginatedResponse<PostFeedResponse> searchPosts(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String cursor,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return postService.searchPosts(q, size, cursor, userPrincipal.getUserId());
+    }
+
     @Operation(summary = "Get one post by id, e.g. to open it from a push notification. 404 when it is deleted, its author is gone or banned, or either side blocked the other. A taken down post is returned without caption and media, except to its author.")
     @GetMapping("/{postId}")
     public PostFeedResponse getPost(

@@ -8,6 +8,7 @@ import com.rizkysiregar.narrativ.messaging.event.PostCreatedEvent;
 import com.rizkysiregar.narrativ.messaging.event.VideoThumbnailRequestedEvent;
 import com.rizkysiregar.narrativ.messaging.publisher.PostEventPublisher;
 import com.rizkysiregar.narrativ.model.dto.PostCountDTO;
+import com.rizkysiregar.narrativ.model.dto.PostSearchHit;
 import com.rizkysiregar.narrativ.model.response.CreatePostResponse;
 import com.rizkysiregar.narrativ.model.response.CreatePostUploadUrlResponse;
 import com.rizkysiregar.narrativ.model.response.PostFeedResponse;
@@ -32,6 +33,7 @@ import com.rizkysiregar.narrativ.util.FeedCursor;
 import com.rizkysiregar.narrativ.util.RankedCursor;
 import com.rizkysiregar.narrativ.util.Operation;
 import com.rizkysiregar.narrativ.util.Paging;
+import com.rizkysiregar.narrativ.util.SearchTerm;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -47,6 +49,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -226,6 +229,39 @@ public class PostServiceImpl implements PostService {
     }
 
     // a page without totals (-1): it is the last one when no cursor follows
+    @Override
+    public PaginatedResponse<PostFeedResponse> searchPosts(String query, int size, String cursor, UUID viewerId) {
+        SearchTerm term = SearchTerm.of(query);
+        Paging.of(0, size);
+        FeedCursor after = cursor == null
+                ? new FeedCursor(LocalDateTime.now().plusDays(1), new UUID(-1L, -1L))
+                : FeedCursor.decode(cursor);
+        // the length, not the words: what people search for is theirs
+        log.debug("POST.SEARCH termLength={} size={} cursor={} viewerId={}", term.value().length(), size, cursor != null, viewerId);
+
+        String tsQuery = term.prefixTsQuery();
+        if (tsQuery.isEmpty()) {
+            // only punctuation: no word a caption could hold
+            return cursorPage(List.of(), Set.of(), size, null, viewerId);
+        }
+        // one row more than the page tells whether another page follows
+        List<PostSearchHit> hits = postPaginationRepository.searchPosts(tsQuery, viewerId, after.createdAt(), after.id(), size + 1);
+        boolean hasMore = hits.size() > size;
+        List<PostSearchHit> page = hasMore ? hits.subList(0, size) : hits;
+        if (page.isEmpty()) {
+            return cursorPage(List.of(), Set.of(), size, null, viewerId);
+        }
+        // loaded with their authors in one go; a post deleted or hidden since the search is left out
+        Map<UUID, PostEntity> byId = postPaginationRepository
+                .findRankedVisibleByIds(page.stream().map(PostSearchHit::getId).toList(), viewerId).stream()
+                .collect(Collectors.toMap(PostEntity::getId, Function.identity()));
+        List<PostEntity> posts = page.stream().map(hit -> byId.get(hit.getId())).filter(Objects::nonNull).toList();
+        // the cursor is the last hit, found or not, so the next page never repeats this one
+        PostSearchHit last = page.getLast();
+        String next = hasMore ? new FeedCursor(last.getCreatedAt(), last.getId()).encode() : null;
+        return cursorPage(posts, Set.of(), size, next, viewerId);
+    }
+
     private PaginatedResponse<PostFeedResponse> cursorPage(List<PostEntity> posts, Set<UUID> suggestedIds, int size,
                                                            String nextCursor, UUID viewerId) {
         List<PostFeedResponse> content = toFeedResponses(posts, viewerId);

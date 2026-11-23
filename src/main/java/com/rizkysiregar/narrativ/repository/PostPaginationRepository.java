@@ -1,5 +1,6 @@
 package com.rizkysiregar.narrativ.repository;
 
+import com.rizkysiregar.narrativ.model.dto.PostSearchHit;
 import com.rizkysiregar.narrativ.model.dto.RankingCandidate;
 import com.rizkysiregar.narrativ.model.entity.PostEntity;
 import org.springframework.data.domain.Page;
@@ -150,4 +151,29 @@ public interface PostPaginationRepository extends PagingAndSortingRepository<Pos
               AND NOT EXISTS (SELECT b.id FROM UserBlockEntity b WHERE (b.blockerId = :viewerId AND b.blockedId = author.id) OR (b.blockerId = author.id AND b.blockedId = :viewerId))
             """)
     List<PostEntity> findRankedVisibleByIds(@Param("postIds") List<UUID> postIds, @Param("viewerId") UUID viewerId);
+
+    // --- search ---
+
+    /**
+     * The posts whose caption holds every word of {@code tsQuery} (see SearchTerm#prefixTsQuery), newest first,
+     * strictly after the cursor, with the visibility of explore: not deleted or taken down, author active, no block
+     * either way. The full-text expression is the one idx_posts_caption_fts (V21) is built on; change both or none.
+     * Native because JPQL knows no full-text search.
+     */
+    @Query(nativeQuery = true, value = """
+            SELECT p.id AS "id", p.created_at AS "createdAt"
+            FROM posts p JOIN users author ON author.id = p.user_id
+            WHERE to_tsvector('simple', coalesce(p.caption, '')) @@ to_tsquery('simple', :tsQuery)
+              AND p.is_deleted = false AND p.moderation_status <> 'TAKEN_DOWN'
+              AND author.is_deleted = false AND author.status = 'ACTIVE'
+              AND NOT EXISTS (SELECT 1 FROM user_blocks b
+                              WHERE (b.blocker_id = :viewerId AND b.blocked_id = author.id)
+                                 OR (b.blocker_id = author.id AND b.blocked_id = :viewerId))
+              AND (p.created_at < :cursorAt OR (p.created_at = :cursorAt AND p.id < :cursorId))
+            ORDER BY p.created_at DESC, p.id DESC
+            LIMIT :limit
+            """)
+    List<PostSearchHit> searchPosts(@Param("tsQuery") String tsQuery, @Param("viewerId") UUID viewerId,
+                                    @Param("cursorAt") LocalDateTime cursorAt, @Param("cursorId") UUID cursorId,
+                                    @Param("limit") int limit);
 }

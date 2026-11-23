@@ -22,6 +22,12 @@ public interface PostService {
     PostFeedResponse getPostById(UUID postId, UUID viewerId);
     PaginatedResponse<PostFeedResponse> getAllPostByUserId(int page, int size, String cursor, String username, UUID viewerId, boolean mediaOnly);
 
+    /**
+     * The posts whose caption holds every word of {@code query} (each also as the start of a longer word), newest
+     * first, with the visibility of explore. Pages by cursor only; the totals are -1.
+     */
+    PaginatedResponse<PostFeedResponse> searchPosts(String query, int size, String cursor, UUID viewerId);
+
     default PaginatedResponse<PostFeedResponse> getExplorePosts(int page, int size, UUID userId, boolean mediaOnly) {
         return getExplorePosts(page, size, null, userId, mediaOnly);
     }
