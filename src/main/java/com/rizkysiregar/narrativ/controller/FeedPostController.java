@@ -52,7 +52,7 @@ public class FeedPostController {
     @Operation(summary = "Search posts by the words of their caption",
             description = "q is 2 to 50 characters (400 otherwise). Every word of q must be in the caption, each also as the start of a longer word (\"kopi sus\" finds \"kopi susu\"); a hashtag counts as a word (#coffee is found by coffee). Newest first, same visibility as explore (no deleted or taken down posts, no blocked people). Page through with nextCursor; totals are -1.")
     @GetMapping("/search")
-    public PaginatedResponse<PostFeedResponse> searchPosts(
+    public PaginatedResponse<PostFeedResponse> searchFeedPosts(
             @RequestParam String q,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String cursor,
