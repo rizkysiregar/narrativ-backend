@@ -40,6 +40,8 @@ class AdminParameterServiceTest {
     private ParameterRepository parameterRepository;
     @Mock
     private AuditLogService auditLogService;
+    @Mock
+    private FeatureFlagService featureFlagService;
 
     @InjectMocks
     private AdminParameterService service;
@@ -156,5 +158,72 @@ class AdminParameterServiceTest {
 
         verify(parameterRepository, never()).delete(any(ParameterEntity.class));
         verifyNoInteractions(auditLogService);
+    }
+
+    private void assertInvalidFlag(Runnable action) {
+        BusinessException exception = assertThrows(BusinessException.class, action::run);
+        assertEquals(GlobalMessage.INVALID_PARAMETER.name(), exception.getErrorCode());
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getHttpStatus());
+    }
+
+    @Test
+    void create_featureFlag_normalizesTheValueAndDropsTheCache() {
+        when(parameterRepository.saveAndFlush(any(ParameterEntity.class))).thenAnswer(invocation -> {
+            ParameterEntity saved = invocation.getArgument(0);
+            saved.setId(9L);
+            return saved;
+        });
+
+        AdminParameterDTO result = service.create(new CreateParameterRequest("feature.chat.enabled", " TRUE ", "Chat"));
+
+        assertEquals("true", result.paramValue());
+        verify(featureFlagService).evictAfterCommit();
+    }
+
+    @Test
+    void create_featureFlagWithAnotherValue_isRejected() {
+        assertInvalidFlag(() -> service.create(new CreateParameterRequest("feature.chat.enabled", "yes", "Chat")));
+
+        verify(parameterRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(featureFlagService);
+    }
+
+    @Test
+    void update_featureFlag_dropsTheCache() {
+        when(parameterRepository.findById(3L)).thenReturn(Optional.of(parameter(3L, "feature.chat.enabled", "true", "Chat")));
+        when(parameterRepository.save(any(ParameterEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminParameterDTO result = service.update(3L, new UpdateParameterRequest("False", null));
+
+        assertEquals("false", result.paramValue());
+        verify(featureFlagService).evictAfterCommit();
+    }
+
+    @Test
+    void update_featureFlagWithAnotherValue_isRejected() {
+        when(parameterRepository.findById(3L)).thenReturn(Optional.of(parameter(3L, "feature.chat.enabled", "true", "Chat")));
+
+        assertInvalidFlag(() -> service.update(3L, new UpdateParameterRequest("1", null)));
+
+        verify(parameterRepository, never()).save(any());
+    }
+
+    @Test
+    void update_otherParameter_leavesTheFeatureCacheAlone() {
+        when(parameterRepository.findById(4L)).thenReturn(Optional.of(parameter(4L, "feed.ranking.gravity", "1.5", "Gravity")));
+        when(parameterRepository.save(any(ParameterEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.update(4L, new UpdateParameterRequest("2", null));
+
+        verifyNoInteractions(featureFlagService);
+    }
+
+    @Test
+    void delete_featureFlag_dropsTheCache() {
+        when(parameterRepository.findById(5L)).thenReturn(Optional.of(parameter(5L, "feature.chat.enabled", "true", "Chat")));
+
+        service.delete(5L);
+
+        verify(featureFlagService).evictAfterCommit();
     }
 }
