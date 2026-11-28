@@ -21,7 +21,8 @@ spring:
     # an unsupported language gets the English default, not the server's own language
     fallback-to-system-locale: false
   config:
-    import: optional:file:./.env[.properties]
+    # .env.local (docker-compose.yml setup, see .env.local.example) is read last, so it wins over .env
+    import: optional:file:./.env[.properties],optional:file:./.env.local[.properties]
   servlet:
     multipart:
       max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE}

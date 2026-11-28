@@ -1,0 +1,92 @@
+# Local development infrastructure: everything the app needs, on your own machine, apart from the shared dev
+# environment. Credentials below are for local use only; every port is bound to 127.0.0.1.
+#
+#   docker compose up -d          start
+#   docker compose down           stop, keep data
+#   docker compose down -v        stop and wipe all data (fresh database, empty queues, empty bucket)
+#
+# The app side: cp .env.local.example .env.local, then ./mvnw spring-boot:run (profile "local").
+
+name: narrativ-local
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: narrativ_local
+      POSTGRES_USER: narrativ
+      POSTGRES_PASSWORD: narrativ
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U narrativ -d narrativ_local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: narrativ
+      RABBITMQ_DEFAULT_PASS: narrativ
+      RABBITMQ_DEFAULT_VHOST: /narrativ-local
+    ports:
+      - "127.0.0.1:5672:5672"
+      # management UI: http://localhost:15672 (narrativ / narrativ)
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # S3-compatible storage for post media and avatars. The official minio/minio image is no longer published on
+  # Docker Hub, hence the Chainguard build of the same MinIO. A directory in the data path is a bucket, so the
+  # bucket exists before the server starts.
+  minio:
+    image: chainguard/minio:latest
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c", "mkdir -p /data/narrativ-local && exec minio server /data --console-address :9001"]
+    environment:
+      MINIO_ROOT_USER: narrativ
+      MINIO_ROOT_PASSWORD: narrativ-secret
+    ports:
+      - "127.0.0.1:9000:9000"
+      # console: http://localhost:9001 (narrativ / narrativ-secret)
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio-data:/data
+
+  # catches every email the app sends (OTP, password reset): nothing leaves your machine.
+  # inbox: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
+volumes:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:
+  minio-data:

@@ -36,3 +36,4 @@ logs/
 .env
 deploy/*.secrets.env
 .DS_Store
+.env.local
