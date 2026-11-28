@@ -249,6 +249,21 @@ git clone https://github.com/rizkysiregar/narrativ-backend.git
 cd narrativ-backend
 ```
 
+### 1b. Run fully local (recommended for day-to-day work)
+
+`docker-compose.yml` runs PostgreSQL, Redis, RabbitMQ, MinIO and Mailpit on your machine, apart from the shared dev
+environment (own database, vhost and bucket; emails land in Mailpit instead of real mailboxes).
+
+```shell
+docker compose up -d
+cp .env.local.example .env.local     # set FIREBASE_CREDENTIALS_FILE and SECRET_KEY (openssl rand -base64 64)
+./mvnw spring-boot:run               # profile "local"
+```
+
+`.env.local` is read after `.env` and wins over it; remove it to run against the dev infrastructure again (step 2).
+`docker compose down -v` wipes all local data. UIs: RabbitMQ http://localhost:15672, MinIO http://localhost:9001,
+Mailpit http://localhost:8025 (credentials in `docker-compose.yml`).
+
 ### 2. Configure the environment
 
 ```shell
